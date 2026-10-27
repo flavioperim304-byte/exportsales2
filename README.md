@@ -27,7 +27,7 @@ npm run lint
 
 A live qualification needs an Exa key. Firecrawl and Parallel are optional: a missing key skips that stage and the score says the evidence was not collected.
 
-Set them in `.env.local`:
+Set them in `api-keys.env` at the project root (next to `API-KEYS.txt` and `package.json`):
 
 ```bash
 EXA_API_KEY=

@@ -1,0 +1,13 @@
+You are already in the project folder. There is no extra folder named workspace.
+
+Paste your keys into the file named api-keys.env in this same folder.
+It sits next to this note and next to package.json.
+
+EXA_API_KEY is the one a live search needs.
+FIRECRAWL_API_KEY and PARALLEL_API_KEY can stay empty.
+
+The file .env is hidden, which is why it does not appear in the file list.
+Use api-keys.env instead.
+
+You can also open the desk and go to Sources:
+http://127.0.0.1:4317/sources
