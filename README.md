@@ -35,7 +35,7 @@ FIRECRAWL_API_KEY=
 PARALLEL_API_KEY=
 ```
 
-Or paste them in **Sources** on the desk. Those values are written to `data/secrets.json` (mode 0600, gitignored) and are sent only to the three APIs. An environment variable wins over a saved key.
+Or open [Sources](http://127.0.0.1:4317/sources) from the top bar (**Sources 0/3** means nothing is connected yet). Those values are written to `data/secrets.json` (mode 0600, gitignored) and are sent only to the three APIs. An environment variable wins over a saved key.
 
 Live runs are stored in `data/runs.json`. Parallel deep research can take several minutes. Leave the run open; if it is still going after eight minutes, Meridian scores the evidence it already has and attaches the report when you reopen the run.
 

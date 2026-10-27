@@ -32,9 +32,24 @@ const STEPS = [
   },
 ]
 
-export function DeskHome({ runs }: { runs: RunSummary[] }) {
+export function DeskHome({
+  runs,
+  sourcesReady,
+}: {
+  runs: RunSummary[]
+  sourcesReady: number
+}) {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-8 sm:py-12">
+      {sourcesReady === 0 ? (
+        <p className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm leading-relaxed">
+          Sources are not connected. Exa, Firecrawl, and Parallel have no keys yet, so a live search cannot start.{" "}
+          <Link href="/sources" className="font-medium text-foreground underline-offset-2 hover:underline">
+            Open Sources
+          </Link>{" "}
+          and save the keys there. The worked example below does not need them.
+        </p>
+      ) : null}
       <section className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr] lg:items-end">
         <div className="max-w-2xl">
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">

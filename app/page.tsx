@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { connection } from "next/server"
 import { DeskHome } from "@/components/desk-home"
+import { keyFlags } from "@/lib/keys"
 import { summarize } from "@/lib/summary"
 import { listRuns } from "@/lib/store"
 
@@ -21,5 +22,7 @@ export default function Page() {
 async function Home() {
   await connection()
   const runs = listRuns().map(summarize)
-  return <DeskHome runs={runs} />
+  const flags = keyFlags()
+  const sourcesReady = [flags.exa, flags.firecrawl, flags.parallel].filter(Boolean).length
+  return <DeskHome runs={runs} sourcesReady={sourcesReady} />
 }
