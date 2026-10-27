@@ -1,7 +1,8 @@
 You are already in the project folder. There is no extra folder named workspace.
 
-Paste your keys into the file named api-keys.env in this same folder.
-It sits next to this note and next to package.json.
+Paste your keys into api-keys.env in this same folder.
+It is a normal project file next to this note and package.json.
+A previous paste did not arrive because the file was hidden. Paste again and save.
 
 EXA_API_KEY is the one a live search needs.
 FIRECRAWL_API_KEY and PARALLEL_API_KEY can stay empty.
