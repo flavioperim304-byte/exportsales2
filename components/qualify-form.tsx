@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { PromptPreview } from "@/components/prompt-preview"
-import { EXAMPLE_BRIEF, HAIR_MARKETS, KANECHOM_BRIEF, LQ_BRIEF, emptyBrief } from "@/lib/example"
+import { EXAMPLE_BRIEF, KANECHOM_BRIEF, LQ_BRIEF, emptyBrief } from "@/lib/example"
 import { LEADS_PER_COUNTRY, targetCountries } from "@/lib/prompts"
 import type { Brief, KeyFlags } from "@/lib/types"
 
@@ -39,7 +39,7 @@ export function QualifyForm({
     setBrief((current) => ({ ...current, [key]: value }))
   }
 
-  async function launch(payload: Brief | (Brief & { also: Brief })) {
+  async function launch(payload: Brief) {
     setPending(true)
     setError("")
     try {
@@ -69,18 +69,6 @@ export function QualifyForm({
   function submit(event: React.FormEvent) {
     event.preventDefault()
     void launch(brief)
-  }
-
-  function submitBoth() {
-    const markets = brief.markets.trim() || HAIR_MARKETS
-    const onLq = brief.supplierName === LQ_BRIEF.supplierName
-    const primary = onLq ? { ...LQ_BRIEF, ...brief, markets } : { ...KANECHOM_BRIEF, ...brief, markets }
-    const secondary = onLq ? { ...KANECHOM_BRIEF, markets } : { ...LQ_BRIEF, markets }
-    if (brief.supplierName !== KANECHOM_BRIEF.supplierName && !onLq) {
-      void launch({ ...KANECHOM_BRIEF, markets, also: { ...LQ_BRIEF, markets } })
-      return
-    }
-    void launch({ ...primary, also: secondary })
   }
 
   const exaReady = flags?.exa ?? false
@@ -244,15 +232,6 @@ export function QualifyForm({
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" className="h-10 px-4" disabled={pending || flags === null || !exaReady}>
           {pending ? "Starting the pipeline…" : "Run the pipeline"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-10 px-4"
-          disabled={pending || flags === null || !exaReady}
-          onClick={submitBoth}
-        >
-          Qualify Kanechom and LQ together
         </Button>
         <p className="text-xs text-muted-foreground">
           Parallel pro-fast is the slow step. You can leave the run open while it researches.

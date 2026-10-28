@@ -64,7 +64,7 @@ export function RunDesk({ initial }: { initial: Run }) {
       const response = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(run.also ? { ...run.brief, also: run.also } : run.brief),
+        body: JSON.stringify(run.brief),
       })
       const data = (await response.json()) as { id?: string; error?: string }
       if (!response.ok || !data.id) {

@@ -10,14 +10,6 @@ export async function POST(request: Request) {
   if (!parsed.brief) {
     return Response.json({ error: parsed.error ?? "Invalid brief." }, { status: 400 })
   }
-  const alsoBody =
-    body && typeof body === "object" && "also" in body
-      ? (body as { also?: unknown }).also
-      : undefined
-  const alsoParsed = alsoBody ? validateBrief(alsoBody) : undefined
-  if (alsoParsed && !alsoParsed.brief) {
-    return Response.json({ error: alsoParsed.error ?? "The second supplier brief is invalid." }, { status: 400 })
-  }
   if (!getKeys().exa) {
     return Response.json(
       {
@@ -27,6 +19,6 @@ export async function POST(request: Request) {
       { status: 400 }
     )
   }
-  const run = await startRun(parsed.brief, alsoParsed?.brief)
+  const run = await startRun(parsed.brief)
   return Response.json({ id: run.id })
 }
