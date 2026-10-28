@@ -49,8 +49,7 @@ Each live run spends one Exa Agent search per country (a second search only if t
 This is a Next.js 16 app. Netlify runs it with its OpenNext adapter. `netlify.toml` sets the build to `npm run build` and the publish directory to `.next`. Leave `@netlify/plugin-nextjs` unpinned so Netlify updates the adapter on each build.
 
 1. Create a Git repository for this project and push `main`.
-2. In Netlify, add a site from that repository. Node 22 is set in `netlify.toml`.
-3. Under Site configuration → Environment variables, add `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `OPENAI_API_KEY`, and `PARALLEL_API_KEY`. Give each one the Builds and Functions scopes. Names are listed in `.env.example`.
-4. Deploy. The desk is the whole app: `/` is the dashboard, `/qualify` starts a search, `/sources` is where keys can also be saved.
+2. In Netlify, add a site from that repository. The build command is `npm run build` and the publish directory is `.next`. Node 22 is set in `netlify.toml`.
+3. Deploy. The API keys already live in the Netlify site environment. The desk is `/`. `/qualify` starts a search. `/sources` shows whether those keys are connected.
 
 A live qualification writes `data/runs.json` on the server and keeps working after the HTTP response returns. On Netlify those files do not survive the next function call, and the pipeline stops when that call ends. The worked example still opens. For searches that run for several minutes, keep the desk on a long-lived Node process (`npm run start`) and put the four keys in the environment.
