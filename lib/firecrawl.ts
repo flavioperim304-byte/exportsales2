@@ -1,5 +1,6 @@
 import type { Brief, Extraction } from "./types"
 import { requestJson } from "./http"
+import { firecrawlPrompt } from "./prompts"
 import { asString, asStringArray, clip } from "./text"
 
 const SCHEMA = {
@@ -47,20 +48,14 @@ function empty(error: string): Extraction {
 export async function extractPage(
   url: string,
   brief: Brief,
-  key: string
+  key: string,
+  country = ""
 ): Promise<Extraction> {
   if (!/^https?:\/\//i.test(url)) {
     return empty("The lead has no http(s) page to read.")
   }
 
-  const prompt = [
-    "Extract a buyer profile for an export salesperson.",
-    `Supplier origin: ${brief.originCountry}.`,
-    `Products: ${brief.products}.`,
-    `Target markets: ${brief.markets}.`,
-    "Use only facts stated on the page. Unknown fields stay empty.",
-    "buyerSignals must be short phrases that appear on the page.",
-  ].join(" ")
+  const prompt = firecrawlPrompt(brief, country)
 
   const data = await requestJson("https://api.firecrawl.dev/v2/scrape", {
     method: "POST",

@@ -1,3 +1,4 @@
+import { LEADS_PER_COUNTRY } from "./prompts"
 import type { Brief } from "./types"
 
 export const EXAMPLE_BRIEF: Brief = {
@@ -13,7 +14,39 @@ export const EXAMPLE_BRIEF: Brief = {
   buyerTypes: "specialty importers, green coffee distributors, roasters that import",
   mustHaves: "imports or distributes green coffee",
   exclusions: "instant coffee, equipment manufacturers, cafes with no wholesale",
-  leadCount: 5,
+  leadCount: LEADS_PER_COUNTRY,
+}
+
+const HAIR_PRODUCTS = "hair care products: shampoo, conditioner, treatments, and styling"
+
+export const KANECHOM_BRIEF: Brief = {
+  supplierName: "Kanechom",
+  originCountry: "Brazil",
+  website: "https://kanechom.com",
+  products: HAIR_PRODUCTS,
+  differentiators:
+    "Brazilian hair care aimed at low-end retail. The buyer needs coverage in that channel.",
+  certifications: "GMP, ANVISA",
+  markets: "",
+  buyerTypes: "distributor, wholesaler, or importer of hair care products",
+  mustHaves: "experience importing an international brand, coverage in low-end retail",
+  exclusions: "salons with no wholesale, equipment-only suppliers",
+  leadCount: LEADS_PER_COUNTRY,
+}
+
+export const LQ_BRIEF: Brief = {
+  supplierName: "LQ Professional",
+  originCountry: "Brazil",
+  website: "https://lqprofessional.com.br",
+  products: HAIR_PRODUCTS,
+  differentiators:
+    "Brazilian professional hair care for salons. The buyer needs the capacity to train hairdressers.",
+  certifications: "GMP, ANVISA",
+  markets: "",
+  buyerTypes: "distributor, wholesaler, or importer of hair care products",
+  mustHaves: "experience importing an international brand, capacity to train hairdressers",
+  exclusions: "salons with no wholesale, equipment-only suppliers",
+  leadCount: LEADS_PER_COUNTRY,
 }
 
 export function emptyBrief(): Brief {
@@ -28,7 +61,8 @@ export function emptyBrief(): Brief {
     buyerTypes: "",
     mustHaves: "",
     exclusions: "",
-    leadCount: 6,
+    instructions: "",
+    leadCount: LEADS_PER_COUNTRY,
   }
 }
 
@@ -49,15 +83,14 @@ export function validateBrief(input: unknown): { brief?: Brief; error?: string }
     buyerTypes: text(raw.buyerTypes),
     mustHaves: text(raw.mustHaves),
     exclusions: text(raw.exclusions),
-    leadCount: Number(raw.leadCount),
+    instructions: text(raw.instructions).slice(0, 800),
+    leadCount: LEADS_PER_COUNTRY,
   }
   if (!brief.supplierName) return { error: "Name the supplier you are representing." }
   if (!brief.originCountry) return { error: "Add the supplier’s origin country." }
   if (!brief.products) return { error: "Describe the products this supplier exports." }
   if (!brief.markets) return { error: "Add at least one target market." }
   if (!brief.buyerTypes) return { error: "Describe the buyer types you want." }
-  if (!Number.isFinite(brief.leadCount)) brief.leadCount = 6
-  brief.leadCount = Math.min(8, Math.max(4, Math.round(brief.leadCount)))
   if (brief.website && !/^https?:\/\//i.test(brief.website)) {
     brief.website = `https://${brief.website}`
   }

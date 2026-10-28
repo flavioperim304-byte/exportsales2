@@ -10,13 +10,13 @@ const STEPS = [
     n: "01",
     source: "Exa",
     title: "Search and enrichment",
-    copy: "Finds companies that buy or distribute what the supplier exports, and keeps the page summary plus the passages that mention products, origins, and markets.",
+    copy: "Builds a fresh search prompt for each target country and asks for 10 companies there, keeping the page summary and the passages that mention products, origins, and markets.",
   },
   {
     n: "02",
     source: "Firecrawl",
     title: "Data extraction",
-    copy: "Reads each company site and pulls a buyer profile: role, what they buy, where they sell, certifications, and short quotes from the page.",
+    copy: "Reads each company site with a prompt built from that country’s brief, and pulls a buyer profile: role, what they buy, where they sell, certifications, and short quotes from the page.",
   },
   {
     n: "03",

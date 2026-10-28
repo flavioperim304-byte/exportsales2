@@ -1,5 +1,6 @@
 import type { Brief, Lead } from "./types"
 import { ApiError, requestJson } from "./http"
+import { exaBackupQuery, exaQuery, LEADS_PER_COUNTRY, targetCountries } from "./prompts"
 import { clip, domainOf, sameSite } from "./text"
 
 type ExaResult = {
@@ -94,53 +95,81 @@ function contents(brief: Brief) {
   }
 }
 
-export async function searchLeads(brief: Brief, key: string): Promise<Lead[]> {
-  const wanted = brief.leadCount
-  const baseQuery = `Companies that import, distribute, or buy ${brief.products} from ${brief.originCountry}. They operate in ${brief.markets}. Buyer types: ${brief.buyerTypes}. ${brief.mustHaves}`
+function acceptResults(
+  results: ExaResult[],
+  brief: Brief,
+  country: string,
+  seen: Set<string>
+): Lead[] {
+  const local = new Set(seen)
+  const leads: Lead[] = []
+  for (const result of results) {
+    const lead = toLead(result)
+    if (!lead) continue
+    if (brief.website && sameSite(brief.website, lead.url)) continue
+    if (local.has(lead.domain)) continue
+    local.add(lead.domain)
+    lead.market = country
+    leads.push(lead)
+  }
+  const ownSites = leads.filter((lead) => !SOCIAL.test(lead.domain))
+  const social = leads.filter((lead) => SOCIAL.test(lead.domain))
+  return [...ownSites, ...social]
+}
+
+async function searchCountry(
+  brief: Brief,
+  key: string,
+  country: string,
+  seen: Set<string>
+): Promise<Lead[]> {
+  const query = exaQuery(brief, country)
   const body = {
-    query: baseQuery,
+    query,
     type: "auto",
     category: "company",
-    numResults: Math.min(12, wanted + 4),
+    numResults: LEADS_PER_COUNTRY + 8,
     contents: contents(brief),
   }
-
   let results: ExaResult[]
   try {
     results = await searchOnce(key, body)
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 400) throw error
     results = await searchOnce(key, {
-      query: baseQuery,
+      query,
       type: "auto",
       category: "company",
-      numResults: Math.min(12, wanted + 4),
+      numResults: LEADS_PER_COUNTRY + 8,
       contents: { text: { maxCharacters: 2200 }, highlights: true },
     })
   }
 
-  if (results.length < wanted) {
+  let leads = acceptResults(results, brief, country, seen)
+  if (leads.length < LEADS_PER_COUNTRY) {
     const extra = await searchOnce(key, {
-      query: `Importers and distributors of ${brief.products} in ${brief.markets}`,
+      query: exaBackupQuery(brief, country),
       type: "auto",
-      numResults: wanted,
+      numResults: LEADS_PER_COUNTRY,
       contents: { text: { maxCharacters: 1800 }, highlights: true },
     }).catch(() => [] as ExaResult[])
-    results = [...results, ...extra]
+    const more = acceptResults(extra, brief, country, new Set([...seen, ...leads.map((lead) => lead.domain)]))
+    leads = [...leads, ...more]
   }
+  return leads.slice(0, LEADS_PER_COUNTRY)
+}
 
+export async function searchLeads(brief: Brief, key: string): Promise<Lead[]> {
+  const countries = targetCountries(brief)
+  const targets = countries.length ? countries : [brief.markets.trim() || "the target market"]
   const seen = new Set<string>()
   const leads: Lead[] = []
-  for (const result of results) {
-    const lead = toLead(result)
-    if (!lead) continue
-    if (brief.website && sameSite(brief.website, lead.url)) continue
-    if (seen.has(lead.domain)) continue
-    seen.add(lead.domain)
-    leads.push(lead)
+  for (const country of targets) {
+    const found = await searchCountry(brief, key, country, seen)
+    for (const lead of found) {
+      seen.add(lead.domain)
+      leads.push(lead)
+    }
   }
-
-  const ownSites = leads.filter((lead) => !SOCIAL.test(lead.domain))
-  const social = leads.filter((lead) => SOCIAL.test(lead.domain))
-  return [...ownSites, ...social].slice(0, wanted)
+  return leads
 }

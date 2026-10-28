@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { EXAMPLE_BRIEF, emptyBrief } from "@/lib/example"
+import { PromptPreview } from "@/components/prompt-preview"
+import { EXAMPLE_BRIEF, KANECHOM_BRIEF, LQ_BRIEF, emptyBrief } from "@/lib/example"
+import { LEADS_PER_COUNTRY, targetCountries } from "@/lib/prompts"
 import type { Brief, KeyFlags } from "@/lib/types"
 
 export function QualifyForm() {
@@ -60,17 +62,22 @@ export function QualifyForm() {
         <div>
           <h1 className="font-serif text-4xl">New qualification</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            The supplier is the company you are selling. The ICP is who should buy. A live run
-            calls Exa, then Firecrawl once per lead, then one Parallel deep-research task.
+            The supplier is the company you are selling. The ICP is who should buy. Prompts are
+            rebuilt from this form, with a separate search for {LEADS_PER_COUNTRY} leads in each
+            country.
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setBrief({ ...EXAMPLE_BRIEF })}
-        >
-          Load the coffee example
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setBrief({ ...KANECHOM_BRIEF })}>
+            Load Kanechom
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setBrief({ ...LQ_BRIEF })}>
+            Load LQ Professional
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setBrief({ ...EXAMPLE_BRIEF })}>
+            Load the coffee example
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -132,7 +139,11 @@ export function QualifyForm() {
 
         <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
           <h2 className="font-serif text-2xl">Ideal buyer</h2>
-          <Field label="Target markets" htmlFor="markets" hint="Comma separated countries.">
+          <Field
+            label="Target markets"
+            htmlFor="markets"
+            hint={`Comma separated countries. ${LEADS_PER_COUNTRY} leads in each.`}
+          >
             <Input
               id="markets"
               value={brief.markets}
@@ -163,19 +174,27 @@ export function QualifyForm() {
               onChange={(event) => set("exclusions", event.target.value)}
             />
           </Field>
-          <Field label="How many leads" htmlFor="leadCount" hint="4 to 8. Each one is a Firecrawl read.">
-            <Input
-              id="leadCount"
-              type="number"
-              min={4}
-              max={8}
-              value={brief.leadCount}
-              onChange={(event) => set("leadCount", Number(event.target.value))}
-              className="h-10"
+          <Field
+            label="Prompt instructions"
+            htmlFor="instructions"
+            hint="Added to every prompt. The text below changes as you type."
+          >
+            <Textarea
+              id="instructions"
+              value={brief.instructions ?? ""}
+              onChange={(event) => set("instructions", event.target.value)}
+              placeholder="Example: prefer buyers that already stock Brazilian brands."
             />
           </Field>
+          <p className="text-sm text-muted-foreground">
+            {targetCountries(brief).length === 0
+              ? `Add countries to size the run. Each one asks Exa for ${LEADS_PER_COUNTRY} companies.`
+              : `${targetCountries(brief).length} ${targetCountries(brief).length === 1 ? "country" : "countries"} × ${LEADS_PER_COUNTRY} leads = ${targetCountries(brief).length * LEADS_PER_COUNTRY} company reads.`}
+          </p>
         </section>
       </div>
+
+      <PromptPreview brief={brief} />
 
       {flags && !exaReady ? (
         <p className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm">

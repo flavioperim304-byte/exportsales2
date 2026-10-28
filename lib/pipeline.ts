@@ -43,7 +43,7 @@ export function blankStages(): StageState[] {
     {
       id: "search",
       status: "running",
-      detail: "Asking Exa for companies that buy or distribute this supplier’s products.",
+      detail: "Asking Exa for 10 companies in each target country.",
       startedAt: now(),
     },
     {
@@ -202,7 +202,13 @@ async function doSearch(id: string) {
       const search = stage(current, "search")
       search.status = "done"
       search.finishedAt = now()
-      search.detail = `Exa returned ${leads.length} companies with page text and highlights.`
+      const byCountry = new Map<string, number>()
+      for (const lead of leads) {
+        const country = lead.market || "Unassigned"
+        byCountry.set(country, (byCountry.get(country) ?? 0) + 1)
+      }
+      const counts = [...byCountry.entries()].map(([country, count]) => `${country}: ${count}`)
+      search.detail = `Exa returned ${leads.length} companies. ${counts.join(" · ")}.`
       log(current, "search", search.detail)
       const extract = stage(current, "extract")
       extract.status = "running"
@@ -256,13 +262,18 @@ async function doExtract(id: string): Promise<"wait" | "next"> {
     extract.startedAt = extract.startedAt ?? now()
     const index = run.leads.indexOf(pending) + 1
     extract.detail = `Reading ${pending.name} (${index} of ${run.leads.length}).`
-    return { action: "read" as const, leadId: pending.id, url: pending.url }
+    return {
+      action: "read" as const,
+      leadId: pending.id,
+      url: pending.url,
+      country: pending.market ?? "",
+    }
   })
   if (!plan || plan.action !== "read") return "next"
   try {
     const run = getRun(id)
     if (!run || !keys.firecrawl) return "next"
-    const extraction = await extractPage(plan.url, run.brief, keys.firecrawl)
+    const extraction = await extractPage(plan.url, run.brief, keys.firecrawl, plan.country)
     await updateRun(id, (current) => {
       const lead = current.leads.find((item) => item.id === plan.leadId)
       if (!lead) return

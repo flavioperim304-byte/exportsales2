@@ -1,6 +1,9 @@
 import type { Brief, Competitor, Lead, MarketContext } from "./types"
 import { ApiError, requestJson } from "./http"
-import { asString, asStringArray, clip } from "./text"
+import { researchPrompt } from "./prompts"
+import { asString, asStringArray } from "./text"
+
+export { researchPrompt }
 
 export type ParsedResearch = {
   market: MarketContext
@@ -69,38 +72,6 @@ const OUTPUT_SCHEMA = {
       "leads",
     ],
   },
-}
-
-function leadCard(lead: Lead): string {
-  const extraction = lead.extraction
-  return [
-    lead.name,
-    lead.url,
-    extraction?.country || lead.country,
-    extraction?.role,
-    extraction?.buys?.slice(0, 4).join("; "),
-    clip(extraction?.summary || lead.exa.summary || lead.exa.text, 280),
-  ]
-    .filter(Boolean)
-    .join(" — ")
-}
-
-export function researchPrompt(brief: Brief, leads: Lead[]): string {
-  const cards = leads.map((lead, index) => `${index + 1}. ${leadCard(lead)}`).join("\n")
-  return [
-    "You are supporting an export salesperson. Research the market and the named buyer candidates with current web sources. Cite URLs. Do not invent companies or figures.",
-    `Supplier: ${brief.supplierName} (${brief.originCountry}). Website: ${brief.website || "unpublished"}.`,
-    `Products: ${brief.products}.`,
-    `Differentiators: ${brief.differentiators || "unpublished"}.`,
-    `Certifications: ${brief.certifications || "unpublished"}.`,
-    `Ideal buyer: ${brief.buyerTypes} in ${brief.markets}.`,
-    `Must-haves: ${brief.mustHaves || "none stated"}. Exclusions: ${brief.exclusions || "none stated"}.`,
-    "Candidates:",
-    cards,
-    "Return the category outlook in the target markets, how buyers purchase, import signals, up to five competitor suppliers (not the candidates), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
-  ]
-    .join("\n")
-    .slice(0, 14000)
 }
 
 export async function createResearch(

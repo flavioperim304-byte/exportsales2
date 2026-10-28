@@ -32,6 +32,9 @@ export type Brief = {
   buyerTypes: string
   mustHaves: string
   exclusions: string
+  /** Extra sentences inserted into the Exa, Firecrawl, and Parallel prompts. */
+  instructions?: string
+  /** Leads requested in each target country. Live runs use 10. */
   leadCount: number
 }
 
@@ -100,6 +103,8 @@ export type Lead = {
   domain: string
   url: string
   country: string
+  /** Country this lead was searched for. Not treated as evidence of where the company is based. */
+  market?: string
   exa: ExaHit
   extraction?: Extraction
   context?: LeadContext

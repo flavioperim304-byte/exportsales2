@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { PromptPreview } from "@/components/prompt-preview"
 import { BAND_LABEL, STATUS_LABEL, formatWhen, isHttpUrl, leadPlace } from "@/lib/format"
 import type { Band, Evidence, Lead, Run, StageState } from "@/lib/types"
 
@@ -140,7 +141,17 @@ export function RunDesk({ initial }: { initial: Run }) {
             {run.brief.differentiators}
           </p>
         ) : null}
+        {run.brief.instructions ? (
+          <p className="mt-3 text-sm text-muted-foreground">Prompt note: {run.brief.instructions}</p>
+        ) : null}
       </section>
+
+      <details className="rounded-xl border border-border bg-card p-4">
+        <summary className="cursor-pointer text-sm font-medium">Prompts built from this brief</summary>
+        <div className="mt-4">
+          <PromptPreview brief={run.brief} bare />
+        </div>
+      </details>
 
       <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {run.stages.map((item) => (
@@ -220,6 +231,7 @@ export function RunDesk({ initial }: { initial: Run }) {
                     <div>
                       <p className="text-xs text-muted-foreground">
                         {String(index + 1).padStart(2, "0")} · {leadPlace(item)}
+                        {item.market ? ` · for ${item.market}` : ""}
                       </p>
                       <p className="font-medium">{item.name}</p>
                       <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
