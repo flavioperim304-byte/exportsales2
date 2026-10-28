@@ -326,7 +326,7 @@ export function QualifyForm({
         <p className="text-xs text-muted-foreground">
           {brief.searchKind === "competitors" && brief.exaEffort !== "deep"
             ? "Exa Ultra can take about 15 minutes. Parallel then checks the distributors. You can leave the run open."
-            : "Parallel pro-fast is the slow step. You can leave the run open while it researches."}
+            : "Parallel uses the Task API on core, about $0.03 a run. You can leave the run open while it researches."}
         </p>
       </div>
     </form>
