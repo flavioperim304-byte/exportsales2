@@ -26,6 +26,7 @@ export function exaQuery(brief: Brief, country: string, buyerType?: string): str
     brief.exclusions ? `Do not return: ${brief.exclusions}.` : "",
     brief.certifications ? `Relevant certifications: ${brief.certifications}.` : "",
     brief.differentiators ? `What the supplier offers: ${brief.differentiators}.` : "",
+    `Return ${type} even when the additional instructions mention a narrower buyer type.`,
     extra(brief),
   ]
     .filter(Boolean)

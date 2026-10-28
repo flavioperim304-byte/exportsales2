@@ -55,6 +55,7 @@ test("each listed buyer type is searched on its own", () => {
   assert.deepEqual(buyerTypes(LQ_BRIEF), ["distributor", "wholesaler", "trading company"])
   const wholesale = exaQuery(LQ_BRIEF, "Dominican Republic", "wholesaler")
   assert.match(wholesale, /only for this buyer type: wholesaler/)
+  assert.match(wholesale, /Return wholesaler even when the additional instructions/)
   assert.doesNotMatch(wholesale, /buyer type: distributor,/)
 })
 
