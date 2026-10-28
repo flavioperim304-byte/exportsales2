@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { KANECHOM_BRIEF, LQ_BRIEF } from "../lib/example"
 import { icpLevel, qualificationRows } from "../lib/qualify"
-import { fitsRequestedMarket } from "../lib/score"
+import { countryIsExcluded, fitsRequestedMarket } from "../lib/score"
 import { parallelInstructions } from "../lib/prompts"
 import type { Lead, LeadScore } from "../lib/types"
 
@@ -117,6 +117,15 @@ test("OpenAI's preliminary score is used until Parallel replaces it", () => {
   const [refined] = qualificationRows([item], KANECHOM_BRIEF, LQ_BRIEF)
   assert.equal(refined.source, "parallel")
   assert.equal(refined.level, "medium")
+})
+
+test("Ecuador, Colombia, and India stay out of a competitor map", () => {
+  const skip = "Ecuador, Colombia, India"
+  assert.equal(countryIsExcluded("Ecuador", "distribuidor.com", skip), true)
+  assert.equal(countryIsExcluded("Colombia", "marca.com", skip), true)
+  assert.equal(countryIsExcluded("", "marca.co", skip), true)
+  assert.equal(countryIsExcluded("Peru", "distribuidor.pe", skip), false)
+  assert.equal(countryIsExcluded("Chile", "marca.cl", skip), false)
 })
 
 test("a company from another country is not a Dominican Republic lead", () => {

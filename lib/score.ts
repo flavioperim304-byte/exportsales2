@@ -168,6 +168,7 @@ const COUNTRY_TLD: Record<string, string> = {
   de: "germany",
   do: "dominican republic",
   ec: "ecuador",
+  in: "india",
   fr: "france",
   gb: "united kingdom",
   jp: "japan",
@@ -191,6 +192,18 @@ function sharesMarket(left: string, right: string): boolean {
     if (leftHit && rightHit) return true
   }
   return false
+}
+
+/** True when the company is in one of the countries the brief told us to skip. */
+export function countryIsExcluded(country: string, domain: string, excluded: string): boolean {
+  return splitList(excluded).some((item) => {
+    const target = item.trim()
+    if (!target) return false
+    if (country.trim() && sharesMarket(target, country)) return true
+    const tld = domain.split(".").pop()?.toLowerCase() ?? ""
+    const fromDomain = tld.length === 2 ? COUNTRY_TLD[tld] : ""
+    return Boolean(fromDomain && sharesMarket(target, fromDomain))
+  })
 }
 
 /** True when a search hit belongs to the country that was requested. */

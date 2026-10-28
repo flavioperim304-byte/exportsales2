@@ -141,10 +141,15 @@ export function Dashboard({
             <div>
               <h2 className="font-serif text-2xl">Output</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {run.also
-                  ? `${run.brief.supplierName} and ${run.also.supplierName}`
-                  : run.brief.supplierName}{" "}
-                · {run.brief.markets}
+                {run.brief.searchKind === "competitors"
+                  ? `${run.brief.supplierName} distributors`
+                  : run.also
+                    ? `${run.brief.supplierName} and ${run.also.supplierName}`
+                    : run.brief.supplierName}{" "}
+                ·{" "}
+                {run.brief.searchKind === "competitors"
+                  ? `${run.brief.countryCount ?? 5} countries${run.brief.excludedMarkets ? `, excluding ${run.brief.excludedMarkets}` : ""}`
+                  : run.brief.markets}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">

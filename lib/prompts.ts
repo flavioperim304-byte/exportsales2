@@ -34,6 +34,32 @@ function promptSearch(brief: Brief, country: string): string {
   ].join("\n\n")
 }
 
+export function competitorQuery(brief: Brief): string {
+  const count = brief.countryCount && brief.countryCount > 0 ? brief.countryCount : 5
+  const named = brief.markets.trim()
+  const skip = brief.excludedMarkets?.trim()
+  return [
+    brief.instructions?.trim() || `Find distributors of ${brief.supplierName}.`,
+    named ? `Only these countries: ${named}.` : `Cover ${count} countries.`,
+    skip ? `Do not include these countries: ${skip}.` : "",
+    `In each country return the company that distributes ${brief.supplierName} and the direct competitor distributors in that same country.`,
+    `The brand is from ${brief.originCountry}. A direct competitor distributor imports a rival brand there. Do not return retailers or the brand’s own headquarters.`,
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+}
+
+export function competitorSystemPrompt(): string {
+  return [
+    "You are in search mode.",
+    "Return real distributor companies and their official websites.",
+    "For every country, include the distributor of the named brand and the direct competitor distributors in that country.",
+    "A direct competitor imports a rival brand in the same country. Skip retailers, salons, and the brand itself.",
+    "Do not return a company in an excluded country.",
+    "Do not score the companies and do not invent email addresses or phone numbers.",
+  ].join(" ")
+}
+
 export function buyerTypes(brief: Brief): string[] {
   return splitList(brief.buyerTypes)
 }
@@ -74,6 +100,22 @@ export function exaBackupQuery(brief: Brief, country: string, buyerType?: string
 }
 
 export function firecrawlPrompt(brief: Brief, country: string, buyerType?: string): string {
+  if (brief.searchKind === "competitors") {
+    return [
+      "Extract a buyer profile for an export salesperson.",
+      `Brand: ${brief.supplierName} (${brief.originCountry}).`,
+      country
+        ? `This company was retrieved in ${country}.`
+        : "The country is whatever the page states.",
+      buyerType ? `The search labeled this company as: ${buyerType}.` : "",
+      "Confirm whether the page shows this company distributing the brand, or distributing a rival brand in the same country.",
+      brief.instructions?.trim() ?? "",
+      "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
+      "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }
   if (isPromptOnly(brief)) {
     return [
       "Extract a buyer profile for an export salesperson.",
@@ -139,6 +181,19 @@ export function exaSystemPrompt(): string {
 }
 
 export function openaiInstructions(brief: Brief, also?: Brief): string {
+  if (brief.searchKind === "competitors" && !also) {
+    return [
+      "You classify distributor leads. Use only the evidence in the candidate cards. Do not browse and do not invent brands or countries.",
+      `Brand: ${brief.supplierName}, from ${brief.originCountry}.`,
+      brief.excludedMarkets ? `Excluded countries: ${brief.excludedMarkets}.` : "",
+      "A high score means the company distributes this brand, or it is a direct competitor distributor of a rival brand in the same country. Low means a retailer, a salon, or an unrelated company.",
+      "Set best_fit to the brand name when they distribute it, direct competitor when they import a rival, or neither.",
+      brief.instructions?.trim() ?? "",
+      "qualification_needed is what a salesperson still has to confirm. This is not a purchase score.",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }
   if (isPromptOnly(brief) && !also) {
     return [
       "You score export leads. Use only the evidence in the candidate cards. Do not browse and do not invent contacts, volumes, or brands.",
@@ -173,6 +228,23 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
 
 export function parallelInstructions(brief: Brief, also?: Brief): string {
   const countries = targetCountries(brief)
+  if (brief.searchKind === "competitors" && !also) {
+    const count = brief.countryCount && brief.countryCount > 0 ? brief.countryCount : 5
+    return [
+      "You are mapping local distributors of one brand and their direct competitors. Cite URLs. Do not invent companies, countries, or brands.",
+      `Brand: ${brief.supplierName}, from ${brief.originCountry}.`,
+      countries.length
+        ? `Look only in: ${countries.join(", ")}.`
+        : `Cover ${count} countries.`,
+      brief.excludedMarkets ? `Do not include: ${brief.excludedMarkets}.` : "",
+      "For each country, confirm who distributes the brand and name the direct competitor distributors who import rival brands there. A retailer or a salon is not a direct competitor distributor.",
+      brief.instructions?.trim() ?? "",
+      "Set icp high when the company is the brand’s distributor or a direct competitor distributor, medium when the role is likely but not proven, and low when it is unrelated. Set best_fit to the brand name, direct competitor, or neither.",
+      "qualification_needed is what still has to be confirmed. Put rival brand names in known suppliers when a source names them. In competitors, list direct competitor distributors that are not already in the candidate list.",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }
   if (isPromptOnly(brief) && !also) {
     return [
       "You are supporting an export salesperson. OpenAI already assigned a preliminary high, medium, or low and a best fit. Those levels are not confirmed purchasing intent. Refine them with current web sources. Cite URLs. Do not invent companies, contacts, or figures. You may change icp, each supplier fit, and best_fit when the sources disagree with the preliminary score, and say what changed.",

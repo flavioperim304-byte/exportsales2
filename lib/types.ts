@@ -36,6 +36,14 @@ export type Brief = {
   instructions?: string
   /** Leads requested in each target country. Live runs use 10. */
   leadCount: number
+  /** buyers finds customers for the supplier. competitors maps who already distributes a brand. */
+  searchKind?: "buyers" | "competitors"
+  /** Exa Deep is the faster search. Exa Ultra is the long list-building agent. */
+  exaEffort?: "deep" | "ultra"
+  /** How many countries a competitor search should cover. */
+  countryCount?: number
+  /** Countries a competitor search must leave out. */
+  excludedMarkets?: string
 }
 
 export type Evidence = {

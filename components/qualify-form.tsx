@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { PromptPreview } from "@/components/prompt-preview"
-import { EXAMPLE_BRIEF, KANECHOM_BRIEF, LQ_BRIEF, emptyBrief, presentBrief } from "@/lib/example"
+import { CADIVEU_COMPETITOR_BRIEF, EXAMPLE_BRIEF, KANECHOM_BRIEF, LQ_BRIEF, emptyBrief, presentBrief } from "@/lib/example"
 import { formatWhen } from "@/lib/format"
 import { LEADS_PER_COUNTRY, targetCountries } from "@/lib/prompts"
 import type { SavedPrompt } from "@/lib/prompt-library"
@@ -109,9 +109,9 @@ export function QualifyForm({
         <div>
           {compact ? null : <h1 className="font-serif text-4xl">New qualification</h1>}
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Exa Agent searches, Firecrawl Agent collects ICP fields and contacts, OpenAI scores
-            best fit, and Parallel deep research refines it. Prompts rebuild as you type, with{" "}
-            {LEADS_PER_COUNTRY} leads in each country.
+            Find buyers for your brand, or map who already distributes a Brazilian brand and the
+            direct competitors in each country. Exa Deep is the faster pass. Exa Ultra builds the
+            longer list, and Parallel checks it.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -124,13 +124,32 @@ export function QualifyForm({
           <Button type="button" variant="outline" onClick={() => setBrief(presentBrief(EXAMPLE_BRIEF))}>
             Load the coffee example
           </Button>
+          <Button type="button" variant="outline" onClick={() => setBrief(presentBrief(CADIVEU_COMPETITOR_BRIEF))}>
+            Load Cadiveu competitors
+          </Button>
         </div>
       </div>
 
       <div className={compact ? "grid gap-6" : "grid gap-6 lg:grid-cols-2"}>
         <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
-          <h2 className="font-serif text-2xl">Supplier</h2>
-          <Field label="Trade name" htmlFor="supplierName">
+          <h2 className="font-serif text-2xl">{brief.searchKind === "competitors" ? "Brand" : "Supplier"}</h2>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={brief.searchKind === "competitors" ? "outline" : "default"}
+              onClick={() => set("searchKind", "buyers")}
+            >
+              Find buyers
+            </Button>
+            <Button
+              type="button"
+              variant={brief.searchKind === "competitors" ? "default" : "outline"}
+              onClick={() => set("searchKind", "competitors")}
+            >
+              Competitor distributors
+            </Button>
+          </div>
+          <Field label={brief.searchKind === "competitors" ? "Brand" : "Trade name"} htmlFor="supplierName">
             <Input
               id="supplierName"
               value={brief.supplierName}
@@ -149,7 +168,15 @@ export function QualifyForm({
                 required
               />
             </Field>
-            <Field label="Website" htmlFor="website" hint="Used to drop the supplier from the buyer list.">
+            <Field
+              label="Website"
+              htmlFor="website"
+              hint={
+                brief.searchKind === "competitors"
+                  ? "Used to drop the brand’s own site."
+                  : "Used to drop the supplier from the buyer list."
+              }
+            >
               <Input
                 id="website"
                 value={brief.website}
@@ -159,19 +186,64 @@ export function QualifyForm({
               />
             </Field>
           </div>
-          <Field
-            label="Target markets"
-            htmlFor="markets"
-            hint={`Comma separated countries. ${LEADS_PER_COUNTRY} leads in each.`}
-          >
-            <Input
-              id="markets"
-              value={brief.markets}
-              onChange={(event) => set("markets", event.target.value)}
-              className="h-10"
-              required
-            />
-          </Field>
+          {brief.searchKind === "competitors" ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Countries to cover" htmlFor="countryCount" hint="Exa picks this many, unless you name them.">
+                  <Input
+                    id="countryCount"
+                    type="number"
+                    min={1}
+                    max={8}
+                    value={brief.countryCount ?? 5}
+                    onChange={(event) => set("countryCount", Number(event.target.value))}
+                    className="h-10"
+                  />
+                </Field>
+                <Field label="Exa" htmlFor="exaEffort" hint="Ultra is the thorough list. Deep is faster.">
+                  <select
+                    id="exaEffort"
+                    value={brief.exaEffort ?? "ultra"}
+                    onChange={(event) => set("exaEffort", event.target.value === "deep" ? "deep" : "ultra")}
+                    className="h-10 rounded-lg border border-input bg-transparent px-3 text-sm"
+                  >
+                    <option value="ultra">Ultra</option>
+                    <option value="deep">Deep</option>
+                  </select>
+                </Field>
+              </div>
+              <Field label="Countries to leave out" htmlFor="excludedMarkets" hint="Comma separated. Example: Ecuador, Colombia, India.">
+                <Input
+                  id="excludedMarkets"
+                  value={brief.excludedMarkets ?? ""}
+                  onChange={(event) => set("excludedMarkets", event.target.value)}
+                  className="h-10"
+                />
+              </Field>
+              <Field label="Only these countries" htmlFor="markets" hint="Leave blank to let Exa choose the countries.">
+                <Input
+                  id="markets"
+                  value={brief.markets}
+                  onChange={(event) => set("markets", event.target.value)}
+                  className="h-10"
+                />
+              </Field>
+            </>
+          ) : (
+            <Field
+              label="Target markets"
+              htmlFor="markets"
+              hint={`Comma separated countries. ${LEADS_PER_COUNTRY} leads in each.`}
+            >
+              <Input
+                id="markets"
+                value={brief.markets}
+                onChange={(event) => set("markets", event.target.value)}
+                className="h-10"
+                required
+              />
+            </Field>
+          )}
         </section>
 
         <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
@@ -252,7 +324,9 @@ export function QualifyForm({
           {pending ? "Starting the pipeline…" : "Run the pipeline"}
         </Button>
         <p className="text-xs text-muted-foreground">
-          Parallel pro-fast is the slow step. You can leave the run open while it researches.
+          {brief.searchKind === "competitors" && brief.exaEffort !== "deep"
+            ? "Exa Ultra can take about 15 minutes. Parallel then checks the distributors. You can leave the run open."
+            : "Parallel pro-fast is the slow step. You can leave the run open while it researches."}
         </p>
       </div>
     </form>

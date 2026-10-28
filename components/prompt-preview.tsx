@@ -1,5 +1,7 @@
 import {
   buyerTypes,
+  competitorQuery,
+  competitorSystemPrompt,
   exaQuery,
   exaSystemPrompt,
   firecrawlPrompt,
@@ -11,6 +13,31 @@ import {
 import type { Brief } from "@/lib/types"
 
 export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: boolean }) {
+  if (brief.searchKind === "competitors") {
+    const effort = brief.exaEffort === "deep" ? "Exa Deep" : "Exa Ultra"
+    return (
+      <section className={bare ? "flex flex-col gap-4" : "flex flex-col gap-4 rounded-xl border border-border bg-card p-4"}>
+        <div>
+          <h2 className="font-serif text-2xl">Prompts</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+            {effort} looks for the brand’s distributor and the direct competitors in each country.
+            Parallel then checks that map. Exa Ultra can take about 15 minutes.
+          </p>
+        </div>
+        <PromptBlock
+          label={effort}
+          text={
+            brief.exaEffort === "deep"
+              ? competitorQuery(brief)
+              : `${competitorSystemPrompt()}\n\n${competitorQuery(brief)}`
+          }
+        />
+        <PromptBlock label="Firecrawl Agent" text={firecrawlPrompt(brief, "")} />
+        <PromptBlock label="OpenAI" text={openaiInstructions(brief)} />
+        <PromptBlock label="Parallel · deep research" text={parallelInstructions(brief)} />
+      </section>
+    )
+  }
   const countries = targetCountries(brief)
   const reads = countries.length * LEADS_PER_COUNTRY
   return (

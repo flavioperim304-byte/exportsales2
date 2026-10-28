@@ -23,7 +23,7 @@ export function resultsCsv(run: Pick<Run, "leads" | "brief" | "also">): string {
   const header = [
     "Company",
     "Country",
-    "Buyer type",
+    "Role",
     "ICP",
     "Best fit",
     "Email",

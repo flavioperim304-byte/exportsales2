@@ -69,12 +69,56 @@ export function emptyBrief(): Brief {
     exclusions: "",
     instructions: "",
     leadCount: LEADS_PER_COUNTRY,
+    searchKind: "buyers",
+    exaEffort: "ultra",
+    countryCount: 5,
+    excludedMarkets: "",
+  }
+}
+
+export const CADIVEU_COMPETITOR_BRIEF: Brief = {
+  supplierName: "Cadiveu",
+  originCountry: "Brazil",
+  website: "https://cadiveu.com.br",
+  products: "",
+  differentiators: "",
+  certifications: "",
+  markets: "",
+  buyerTypes: "",
+  mustHaves: "",
+  exclusions: "",
+  instructions:
+    "Find distributors that import the Brazilian brand Cadiveu. Cover 5 countries. Do not include Ecuador, Colombia, or India. In each country, name the Cadiveu distributor and the direct competitor distributors who import rival professional hair brands.",
+  leadCount: LEADS_PER_COUNTRY,
+  searchKind: "competitors",
+  exaEffort: "ultra",
+  countryCount: 5,
+  excludedMarkets: "Ecuador, Colombia, India",
+}
+
+function countryCountOf(value: unknown): number {
+  const count = typeof value === "number" ? value : Number(value)
+  if (!Number.isFinite(count) || count < 1) return 5
+  return Math.min(8, Math.round(count))
+}
+
+function searchFields(brief: Brief): Pick<Brief, "searchKind" | "exaEffort" | "countryCount" | "excludedMarkets"> {
+  return {
+    searchKind: brief.searchKind === "competitors" ? "competitors" : "buyers",
+    exaEffort: brief.exaEffort === "deep" ? "deep" : "ultra",
+    countryCount: countryCountOf(brief.countryCount),
+    excludedMarkets: brief.excludedMarkets?.trim() ?? "",
   }
 }
 
 export function presentBrief(brief: Brief): Brief {
   if (isPromptOnly(brief)) {
-    return { ...brief, instructions: brief.instructions?.trim() ?? "", leadCount: LEADS_PER_COUNTRY }
+    return {
+      ...brief,
+      ...searchFields(brief),
+      instructions: brief.instructions?.trim() ?? "",
+      leadCount: LEADS_PER_COUNTRY,
+    }
   }
   const prompt = [
     brief.instructions?.trim(),
@@ -97,6 +141,7 @@ export function presentBrief(brief: Brief): Brief {
     exclusions: "",
     instructions: prompt,
     leadCount: LEADS_PER_COUNTRY,
+    ...searchFields(brief),
   }
 }
 
@@ -119,10 +164,16 @@ export function validateBrief(input: unknown): { brief?: Brief; error?: string }
     exclusions: text(raw.exclusions),
     instructions: text(raw.instructions).slice(0, 8000),
     leadCount: LEADS_PER_COUNTRY,
+    searchKind: raw.searchKind === "competitors" ? "competitors" : "buyers",
+    exaEffort: raw.exaEffort === "deep" ? "deep" : "ultra",
+    countryCount: countryCountOf(raw.countryCount),
+    excludedMarkets: text(raw.excludedMarkets),
   }
   if (!brief.supplierName) return { error: "Name the supplier you are representing." }
   if (!brief.originCountry) return { error: "Add the supplier’s origin country." }
-  if (!brief.markets) return { error: "Add at least one target market." }
+  if (brief.searchKind !== "competitors" && !brief.markets) {
+    return { error: "Add at least one target market." }
+  }
   if (!brief.products && !brief.instructions) {
     return { error: "Write the prompt for this search." }
   }

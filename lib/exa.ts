@@ -2,6 +2,8 @@ import type { Brief, Lead } from "./types"
 import { ApiError, requestJson } from "./http"
 import {
   buyerTypes,
+  competitorQuery,
+  competitorSystemPrompt,
   exaBackupQuery,
   exaQuery,
   exaSystemPrompt,
@@ -9,7 +11,7 @@ import {
   searchBrief,
   targetCountries,
 } from "./prompts"
-import { fitsRequestedMarket } from "./score"
+import { countryIsExcluded, fitsRequestedMarket } from "./score"
 import { asString, domainOf, sameSite } from "./text"
 
 const SOCIAL = /linkedin\.com|facebook\.com|instagram\.com|wikipedia\.org|youtube\.com/i
@@ -28,6 +30,7 @@ const COMPANY_SCHEMA = {
           name: { type: "string" },
           website: { type: "string" },
           country: { type: "string" },
+          role: { type: "string" },
           why: { type: "string" },
         },
         required: ["name", "website", "country", "why"],
@@ -41,7 +44,7 @@ function exaHeaders(key: string): HeadersInit {
   return { Authorization: `Bearer ${key}`, "x-api-key": key }
 }
 
-export type AgentCompany = { name: string; website: string; country: string; why: string }
+export type AgentCompany = { name: string; website: string; country: string; why: string; role: string }
 
 export function companiesFromAgent(data: unknown): AgentCompany[] {
   if (!data || typeof data !== "object") return []
@@ -64,21 +67,34 @@ export function companiesFromAgent(data: unknown): AgentCompany[] {
         website: asString(row.website || row.url),
         country: asString(row.country),
         why: asString(row.why),
+        role: asString(row.role),
       }
     })
     .filter((item) => item.name && item.website)
 }
 
-async function runAgentSearch(key: string, query: string, websites: string[]): Promise<AgentCompany[]> {
+async function runAgentSearch(
+  key: string,
+  query: string,
+  websites: string[],
+  options?: {
+    effort?: string
+    systemPrompt?: string
+    schema?: unknown
+    budget?: { maxCostDollars: number; maxDurationSeconds: number }
+    waitMs?: number
+  }
+): Promise<AgentCompany[]> {
   const created = await requestJson("https://api.exa.ai/agent/runs", {
     method: "POST",
     timeoutMs: 40000,
     headers: exaHeaders(key),
     body: JSON.stringify({
       query,
-      systemPrompt: exaSystemPrompt(),
-      effort: "medium",
-      outputSchema: COMPANY_SCHEMA,
+      systemPrompt: options?.systemPrompt ?? exaSystemPrompt(),
+      effort: options?.effort ?? "medium",
+      outputSchema: options?.schema ?? COMPANY_SCHEMA,
+      budget: options?.budget,
       input: websites.length
         ? { exclusion: websites.map((website) => ({ website })) }
         : undefined,
@@ -86,7 +102,7 @@ async function runAgentSearch(key: string, query: string, websites: string[]): P
   })
   const id = asString((created as { id?: unknown } | null)?.id)
   if (!id) throw new ApiError("Exa Agent did not return a run id.", 502)
-  const deadline = Date.now() + 4 * 60 * 1000
+  const deadline = Date.now() + (options?.waitMs ?? 4 * 60 * 1000)
   let latest: unknown = created
   while (Date.now() < deadline) {
     const status = asString((latest as { status?: unknown } | null)?.status).toLowerCase()
@@ -101,7 +117,8 @@ async function runAgentSearch(key: string, query: string, websites: string[]): P
       headers: exaHeaders(key),
     })
   }
-  throw new ApiError("Exa Agent is still searching after 4 minutes.", 408)
+  const minutes = Math.round((options?.waitMs ?? 4 * 60 * 1000) / 60000)
+  throw new ApiError(`Exa Agent is still searching after ${minutes} minutes.`, 408)
 }
 
 function websiteUrl(value: string): string {
@@ -236,6 +253,88 @@ async function searchCountry(
   return { leads: leads.slice(0, LEADS_PER_COUNTRY), outside }
 }
 
+const COMPETITOR_SCHEMA = {
+  ...COMPANY_SCHEMA,
+  properties: {
+    companies: {
+      ...COMPANY_SCHEMA.properties.companies,
+      maxItems: 24,
+      items: {
+        ...COMPANY_SCHEMA.properties.companies.items,
+        required: ["name", "website", "country", "role", "why"],
+      },
+    },
+  },
+}
+
+async function runDeepSearch(key: string, query: string): Promise<AgentCompany[]> {
+  const data = await requestJson("https://api.exa.ai/search", {
+    method: "POST",
+    timeoutMs: 90000,
+    headers: exaHeaders(key),
+    body: JSON.stringify({
+      query,
+      type: "deep",
+      numResults: 12,
+      contents: { highlights: { maxCharacters: 1500 } },
+    }),
+  })
+  const results = Array.isArray((data as { results?: unknown } | null)?.results)
+    ? (data as { results: unknown[] }).results
+    : []
+  return results
+    .map((item) => {
+      const row = (item ?? {}) as Record<string, unknown>
+      const highlights = Array.isArray(row.highlights)
+        ? row.highlights.filter((part): part is string => typeof part === "string")
+        : []
+      return {
+        name: asString(row.title),
+        website: asString(row.url),
+        country: "",
+        why: highlights[0] || asString(row.text),
+        role: "",
+      }
+    })
+    .filter((item) => item.name && item.website)
+}
+
+async function searchCompetitors(
+  brief: Brief,
+  key: string,
+  websites: string[]
+): Promise<{ leads: Lead[]; outside: number }> {
+  const query = competitorQuery(brief)
+  const companies =
+    brief.exaEffort === "deep"
+      ? await runDeepSearch(key, query)
+      : await runAgentSearch(key, query, websites, {
+          effort: "ultra",
+          systemPrompt: competitorSystemPrompt(),
+          schema: COMPETITOR_SCHEMA,
+          budget: { maxCostDollars: 8, maxDurationSeconds: 900 },
+          waitMs: 16 * 60 * 1000,
+        })
+  const seen = new Set<string>()
+  const leads: Lead[] = []
+  let outside = 0
+  for (const company of companies) {
+    const lead = companyToLead({ ...company, role: company.role })
+    if (!lead) continue
+    if (websites.some((site) => sameSite(site, lead.url))) continue
+    if (countryIsExcluded(company.country, lead.domain, brief.excludedMarkets ?? "")) {
+      outside += 1
+      continue
+    }
+    if (seen.has(lead.domain)) continue
+    seen.add(lead.domain)
+    lead.market = company.country || "Unassigned"
+    lead.buyerType = company.role
+    leads.push(lead)
+  }
+  return { leads: leads.slice(0, 24), outside }
+}
+
 export async function searchLeads(
   brief: Brief,
   key: string,
@@ -243,6 +342,9 @@ export async function searchLeads(
 ): Promise<{ leads: Lead[]; outside: number }> {
   const queryBrief = searchBrief(brief, also)
   const websites = [brief.website, also?.website].filter((site): site is string => Boolean(site))
+  if (queryBrief.searchKind === "competitors") {
+    return searchCompetitors(queryBrief, key, websites)
+  }
   const suppliers = [brief.supplierName, also?.supplierName].filter((name): name is string =>
     Boolean(name)
   )

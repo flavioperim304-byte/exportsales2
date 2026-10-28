@@ -1,9 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { KANECHOM_BRIEF, LQ_BRIEF, presentBrief, validateBrief } from "../lib/example"
+import { CADIVEU_COMPETITOR_BRIEF, KANECHOM_BRIEF, LQ_BRIEF, presentBrief, validateBrief } from "../lib/example"
 import {
   LEADS_PER_COUNTRY,
   buyerTypes,
+  competitorQuery,
   exaQuery,
   isPromptOnly,
   exaSystemPrompt,
@@ -54,6 +55,20 @@ test("Kanechom and LQ Professional prompts follow different must-haves", () => {
   assert.match(lq, /train hairdressers/)
   assert.doesNotMatch(kanechom, /train hairdressers/)
   assert.match(firecrawlPrompt(LQ_BRIEF, "Mexico"), /GMP, ANVISA/)
+})
+
+test("a competitor search covers several countries and leaves the named ones out", () => {
+  const brief = presentBrief(CADIVEU_COMPETITOR_BRIEF)
+  assert.equal(brief.searchKind, "competitors")
+  assert.equal(brief.exaEffort, "ultra")
+  assert.equal(brief.countryCount, 5)
+  const query = competitorQuery(brief)
+  assert.match(query, /5 countries/)
+  assert.match(query, /Ecuador, Colombia, India/)
+  assert.match(query, /direct competitor distributors/)
+  assert.match(query, /Cadiveu/)
+  assert.match(parallelInstructions(brief), /direct competitor/)
+  assert.equal(validateBrief({ ...brief, markets: "" }).error, undefined)
 })
 
 test("a single prompt replaces buyer type, must-have, and exclusion fields", () => {
