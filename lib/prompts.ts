@@ -33,25 +33,29 @@ export function exaQuery(brief: Brief, country: string, buyerType?: string): str
     .join(" ")
 }
 
-export function exaBackupQuery(brief: Brief, country: string): string {
+export function exaBackupQuery(brief: Brief, country: string, buyerType?: string): string {
+  const type = buyerType?.trim() || brief.buyerTypes.trim() || "importer, distributor, or wholesaler"
   return [
-    `Importers, distributors, and wholesalers of ${brief.products} based in ${country}.`,
-    brief.buyerTypes,
+    `More ${type} in ${country} that buy or import ${brief.products}.`,
+    `This search is only for this buyer type: ${type}. Do not fill the list with a different type.`,
     brief.mustHaves ? `Must show: ${brief.mustHaves}.` : "",
+    brief.exclusions ? `Do not return: ${brief.exclusions}.` : "",
     extra(brief),
   ]
     .filter(Boolean)
     .join(" ")
 }
 
-export function firecrawlPrompt(brief: Brief, country: string): string {
+export function firecrawlPrompt(brief: Brief, country: string, buyerType?: string): string {
+  const type = buyerType?.trim()
   return [
     "Extract a buyer profile for an export salesperson.",
     `Supplier: ${brief.supplierName} (${brief.originCountry}). Products: ${brief.products}.`,
     country
       ? `This company was retrieved as a candidate for ${country}.`
       : `Target markets: ${brief.markets}.`,
-    `Ideal buyer: ${brief.buyerTypes}.`,
+    type ? `This company was searched as this buyer type: ${type}. Record whether the page shows that type.` : "",
+    brief.buyerTypes ? `Buyer types in this brief: ${brief.buyerTypes}.` : "",
     brief.mustHaves ? `Look for evidence of these must-haves: ${brief.mustHaves}.` : "",
     brief.exclusions ? `Note if the page matches an exclusion: ${brief.exclusions}.` : "",
     brief.certifications
@@ -59,7 +63,7 @@ export function firecrawlPrompt(brief: Brief, country: string): string {
       : "",
     "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
     "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
-    "buyerSignals must be short phrases about importing, distributing, retail coverage, or training.",
+    "buyerSignals must be short phrases about the buyer type named above, including importing, wholesale coverage, or trading.",
     extra(brief),
   ]
     .filter(Boolean)
@@ -98,10 +102,11 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
   return [
     "You score export leads. Use only the evidence in the candidate cards. Do not browse and do not invent contacts, volumes, or brands.",
     `Suppliers: ${suppliers}, from ${brief.originCountry}.`,
-    `${brief.supplierName}: ${brief.products}. Buyer: ${brief.buyerTypes}. Must-haves: ${brief.mustHaves || "none"}.`,
+    `${brief.supplierName}: ${brief.products}. Buyer types: ${brief.buyerTypes || "unpublished"}. A company fits the channel when it matches any one of these types. Must-haves: ${brief.mustHaves || "none"}.`,
     also
-      ? `${also.supplierName}: ${also.products}. Buyer: ${also.buyerTypes}. Must-haves: ${also.mustHaves || "none"}.`
+      ? `${also.supplierName}: ${also.products}. Buyer types: ${also.buyerTypes || "unpublished"}. A company fits the channel when it matches any one of these types. Must-haves: ${also.mustHaves || "none"}.`
       : "",
+    "Score the company against the buyer type it was searched as, and against the other types in the brief. Do not lower the score only because it is a wholesaler or a trading company rather than a distributor.",
     "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
     "qualification_needed is what a salesperson still has to confirm. High means product and channel fit. It is not confirmed purchasing intent.",
     extra(brief),
@@ -118,10 +123,11 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
   return [
     "You are supporting an export salesperson. OpenAI already assigned a preliminary high, medium, or low and a best fit. Those levels are not confirmed purchasing intent. Refine them with current web sources. Cite URLs. Do not invent companies, contacts, or figures. You may change icp, each supplier fit, and best_fit when the sources disagree with the preliminary score, and say what changed.",
     `Suppliers to place: ${suppliers}, from ${brief.originCountry}.`,
-    `${brief.supplierName}: ${brief.products}. Buyer: ${brief.buyerTypes}. Must-haves: ${brief.mustHaves || "none"}. ${brief.differentiators || ""}`,
+    `${brief.supplierName}: ${brief.products}. Buyer types: ${brief.buyerTypes || "unpublished"}. A company fits the channel when it matches any one of these types. Must-haves: ${brief.mustHaves || "none"}. ${brief.differentiators || ""}`,
     also
-      ? `${also.supplierName}: ${also.products}. Buyer: ${also.buyerTypes}. Must-haves: ${also.mustHaves || "none"}. ${also.differentiators || ""}`
+      ? `${also.supplierName}: ${also.products}. Buyer types: ${also.buyerTypes || "unpublished"}. A company fits the channel when it matches any one of these types. Must-haves: ${also.mustHaves || "none"}. ${also.differentiators || ""}`
       : "",
+    "Each candidate names the buyer type it was searched as. Judge that type. Do not lower the score only because the company is a wholesaler or a trading company rather than a distributor.",
     `Websites to exclude as buyers: ${[brief.website, also?.website].filter(Boolean).join(", ") || "unpublished"}.`,
     `Certifications: ${brief.certifications || "unpublished"}.`,
     countries.length
@@ -144,6 +150,7 @@ export function researchPrompt(brief: Brief, leads: Lead[], also?: Brief): strin
       const extraction = lead.extraction
       const card = [
         lead.market ? `searched for ${lead.market}` : "",
+        lead.buyerType ? `searched as ${lead.buyerType}` : "",
         lead.name,
         lead.url,
         extraction?.country || lead.country,

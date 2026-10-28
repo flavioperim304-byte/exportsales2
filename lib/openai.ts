@@ -111,6 +111,7 @@ function cards(leads: Lead[]): string {
       return [
         `${index + 1}. ${lead.name}`,
         lead.market ? `searched for ${lead.market}` : "",
+        lead.buyerType ? `searched as ${lead.buyerType}` : "",
         lead.url,
         extraction?.role,
         extraction?.country || lead.country,

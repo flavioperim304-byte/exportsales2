@@ -115,13 +115,14 @@ export async function extractPage(
   url: string,
   brief: Brief,
   key: string,
-  country = ""
+  country = "",
+  buyerType = ""
 ): Promise<Extraction> {
   if (!/^https?:\/\//i.test(url)) {
     return empty("The lead has no http(s) page to read.")
   }
 
-  const prompt = firecrawlPrompt(brief, country)
+  const prompt = firecrawlPrompt(brief, country, buyerType)
 
   const started = await requestJson("https://api.firecrawl.dev/v2/agent", {
     method: "POST",

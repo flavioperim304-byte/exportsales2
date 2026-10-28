@@ -199,16 +199,18 @@ async function searchCountry(
   }
   let leads = mixTypes(groups)
   if (leads.length < LEADS_PER_COUNTRY) {
-    const extra = await runAgentSearch(key, exaBackupQuery(brief, country), websites).catch(
-      () => [] as AgentCompany[]
-    )
-    const more = acceptCompanies(
-      extra,
-      country,
-      new Set([...seen, ...leads.map((lead) => lead.domain)]),
-      websites
-    )
-    leads = [...leads, ...more]
+    const taken = new Set([...seen, ...leads.map((lead) => lead.domain)])
+    for (const type of wanted) {
+      if (leads.length >= LEADS_PER_COUNTRY) break
+      const extra = await runAgentSearch(
+        key,
+        exaBackupQuery(brief, country, type || undefined),
+        websites
+      ).catch(() => [] as AgentCompany[])
+      const more = acceptCompanies(extra, country, taken, websites, type)
+      for (const lead of more) taken.add(lead.domain)
+      leads = [...leads, ...more]
+    }
   }
   return leads.slice(0, LEADS_PER_COUNTRY)
 }

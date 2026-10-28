@@ -292,13 +292,20 @@ async function doExtract(id: string): Promise<"wait" | "next"> {
       leadId: pending.id,
       url: pending.url,
       country: pending.market ?? "",
+      buyerType: pending.buyerType ?? "",
     }
   })
   if (!plan || plan.action !== "read") return "next"
   try {
     const run = getRun(id)
     if (!run || !keys.firecrawl) return "next"
-    const extraction = await extractPage(plan.url, run.brief, keys.firecrawl, plan.country)
+    const extraction = await extractPage(
+      plan.url,
+      run.brief,
+      keys.firecrawl,
+      plan.country,
+      plan.buyerType
+    )
     await updateRun(id, (current) => {
       const lead = current.leads.find((item) => item.id === plan.leadId)
       if (!lead) return

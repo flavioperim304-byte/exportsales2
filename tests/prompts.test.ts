@@ -7,6 +7,7 @@ import {
   exaQuery,
   exaSystemPrompt,
   firecrawlPrompt,
+  openaiInstructions,
   parallelInstructions,
   researchPrompt,
   targetCountries,
@@ -57,6 +58,11 @@ test("each listed buyer type is searched on its own", () => {
   assert.match(wholesale, /only for this buyer type: wholesaler/)
   assert.match(wholesale, /Return wholesaler even when the additional instructions/)
   assert.doesNotMatch(wholesale, /buyer type: distributor,/)
+  const page = firecrawlPrompt(LQ_BRIEF, "Dominican Republic", "wholesaler")
+  assert.match(page, /searched as this buyer type: wholesaler/)
+  assert.match(page, /Buyer types in this brief: distributor, wholesaler, trading company/)
+  assert.match(openaiInstructions(LQ_BRIEF), /matches any one of these types/)
+  assert.match(parallelInstructions(LQ_BRIEF), /matches any one of these types/)
 })
 
 test("both hair briefs search the three markets from the form", () => {
@@ -91,6 +97,7 @@ test("parallel prompt names the country each candidate was searched for", () => 
     url: "https://andes.example",
     country: "",
     market: "Chile",
+    buyerType: "wholesaler",
     exa: {
       title: "Andes Beauty",
       url: "https://andes.example",
@@ -102,6 +109,7 @@ test("parallel prompt names the country each candidate was searched for", () => 
   } satisfies Lead
   const prompt = researchPrompt({ ...LQ_BRIEF, markets: "Chile" }, [lead])
   assert.match(prompt, /searched for Chile/)
+  assert.match(prompt, /searched as wholesaler/)
   assert.match(prompt, /Andes Beauty/)
   assert.match(prompt, /train hairdressers/)
 })

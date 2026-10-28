@@ -1,4 +1,5 @@
 import {
+  buyerTypes,
   exaQuery,
   exaSystemPrompt,
   firecrawlPrompt,
@@ -17,8 +18,8 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
       <div>
         <h2 className="font-serif text-2xl">Prompts</h2>
         <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          These are rebuilt from the brief as you type. Exa Agent stays in search mode,{" "}
-          {LEADS_PER_COUNTRY} companies per country. Firecrawl Agent then collects ICP fields and contacts.
+          These are rebuilt from the brief as you type. Exa Agent stays in search mode and runs one search per buyer type,{" "}
+          {LEADS_PER_COUNTRY} companies per country. Firecrawl, OpenAI, and Parallel receive that same type.
           {countries.length > 0
             ? ` This run would read ${reads} ${reads === 1 ? "page" : "pages"}.`
             : ""}
@@ -32,8 +33,20 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
         countries.map((country) => (
           <article key={country} className="flex flex-col gap-3 border-t border-border pt-4">
             <h3 className="font-serif text-xl">{country}</h3>
-            <PromptBlock label="Exa Agent · search" text={`${exaSystemPrompt()}\n\n${exaQuery(brief, country)}`} />
-            <PromptBlock label="Firecrawl Agent" text={firecrawlPrompt(brief, country)} />
+            {typesFor(brief).map((type) => (
+              <PromptBlock
+                key={`${country}:${type || "buyer"}`}
+                label={type ? `Exa Agent · ${type}` : "Exa Agent · search"}
+                text={`${exaSystemPrompt()}\n\n${exaQuery(brief, country, type || undefined)}`}
+              />
+            ))}
+            {typesFor(brief).map((type) => (
+              <PromptBlock
+                key={`${country}:firecrawl:${type || "buyer"}`}
+                label={type ? `Firecrawl Agent · ${type}` : "Firecrawl Agent"}
+                text={firecrawlPrompt(brief, country, type)}
+              />
+            ))}
           </article>
         ))
       )}
@@ -44,6 +57,11 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
       </article>
     </section>
   )
+}
+
+function typesFor(brief: Brief): string[] {
+  const types = buyerTypes(brief)
+  return types.length ? types : [""]
 }
 
 function PromptBlock({ label, text }: { label: string; text: string }) {
