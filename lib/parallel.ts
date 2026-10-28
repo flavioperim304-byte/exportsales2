@@ -77,9 +77,10 @@ const OUTPUT_SCHEMA = {
 export async function createResearch(
   brief: Brief,
   leads: Lead[],
-  key: string
+  key: string,
+  also?: Brief
 ): Promise<{ runId: string; interactionId?: string; processor: string }> {
-  const input = researchPrompt(brief, leads)
+  const input = researchPrompt(brief, leads, also)
   const processors = ["pro-fast", "pro"]
   let lastError: unknown
   for (const processor of processors) {

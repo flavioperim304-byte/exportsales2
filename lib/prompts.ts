@@ -59,27 +59,49 @@ export function firecrawlPrompt(brief: Brief, country: string): string {
     .join(" ")
 }
 
-export function parallelInstructions(brief: Brief): string {
+export function searchBrief(brief: Brief, also?: Brief): Brief {
+  if (!also) return brief
+  return {
+    ...brief,
+    supplierName: `${brief.supplierName} and ${also.supplierName}`,
+    products: `${brief.products}. Also ${also.products}`,
+    buyerTypes: `${brief.buyerTypes}. Also ${also.buyerTypes}`,
+    mustHaves: [brief.mustHaves, also.mustHaves].filter(Boolean).join(". "),
+    differentiators: [brief.differentiators, also.differentiators].filter(Boolean).join(" "),
+    exclusions: [brief.exclusions, also.exclusions].filter(Boolean).join(", "),
+    instructions: [brief.instructions, also.instructions].filter(Boolean).join(" "),
+  }
+}
+
+export function parallelInstructions(brief: Brief, also?: Brief): string {
   const countries = targetCountries(brief)
+  const suppliers = also
+    ? `${brief.supplierName} and ${also.supplierName}`
+    : brief.supplierName
   return [
-    "You are supporting an export salesperson. Research the market and the named buyer candidates with current web sources. Cite URLs. Do not invent companies or figures.",
-    `Supplier: ${brief.supplierName} (${brief.originCountry}). Website: ${brief.website || "unpublished"}.`,
-    `Products: ${brief.products}.`,
-    `Differentiators: ${brief.differentiators || "unpublished"}.`,
+    "You are supporting an export salesperson. A first pass already judged product and channel fit. It is not confirmed purchasing intent. Refine the named candidates with current web sources. Cite URLs. Do not invent companies, contacts, or figures.",
+    `Suppliers to place: ${suppliers}, from ${brief.originCountry}.`,
+    `${brief.supplierName}: ${brief.products}. Buyer: ${brief.buyerTypes}. Must-haves: ${brief.mustHaves || "none"}. ${brief.differentiators || ""}`,
+    also
+      ? `${also.supplierName}: ${also.products}. Buyer: ${also.buyerTypes}. Must-haves: ${also.mustHaves || "none"}. ${also.differentiators || ""}`
+      : "",
+    `Websites to exclude as buyers: ${[brief.website, also?.website].filter(Boolean).join(", ") || "unpublished"}.`,
     `Certifications: ${brief.certifications || "unpublished"}.`,
-    `Ideal buyer: ${brief.buyerTypes}.`,
     countries.length
       ? `Write the outlook separately for each target country: ${countries.join(", ")}. The shortlist has up to ${LEADS_PER_COUNTRY} candidates per country.`
       : `Target markets: ${brief.markets || "unpublished"}.`,
-    `Must-haves: ${brief.mustHaves || "none stated"}. Exclusions: ${brief.exclusions || "none stated"}.`,
+    `Exclusions: ${brief.exclusions || "none stated"}.`,
     extra(brief),
+    also?.instructions ? `Additional instructions: ${also.instructions.trim()}` : "",
+    "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
+    "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. Rank only within this list. Ranks are not a probability of buying.",
     "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers (not the candidates), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
   ]
     .filter(Boolean)
     .join("\n")
 }
 
-export function researchPrompt(brief: Brief, leads: Lead[]): string {
+export function researchPrompt(brief: Brief, leads: Lead[], also?: Brief): string {
   const cards = leads
     .map((lead, index) => {
       const extraction = lead.extraction
@@ -97,5 +119,5 @@ export function researchPrompt(brief: Brief, leads: Lead[]): string {
       return `${index + 1}. ${card}`
     })
     .join("\n")
-  return [parallelInstructions(brief), "Candidates:", cards].join("\n").slice(0, 14000)
+  return [parallelInstructions(brief, also), "Candidates:", cards].join("\n").slice(0, 14000)
 }

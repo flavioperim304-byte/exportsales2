@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { PromptPreview } from "@/components/prompt-preview"
-import { EXAMPLE_BRIEF, KANECHOM_BRIEF, LQ_BRIEF, emptyBrief } from "@/lib/example"
+import { EXAMPLE_BRIEF, HAIR_MARKETS, KANECHOM_BRIEF, LQ_BRIEF, emptyBrief } from "@/lib/example"
 import { LEADS_PER_COUNTRY, targetCountries } from "@/lib/prompts"
 import type { Brief, KeyFlags } from "@/lib/types"
 
@@ -31,15 +31,14 @@ export function QualifyForm() {
     setBrief((current) => ({ ...current, [key]: value }))
   }
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault()
+  async function launch(payload: Brief | (Brief & { also: Brief })) {
     setPending(true)
     setError("")
     try {
       const response = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(brief),
+        body: JSON.stringify(payload),
       })
       const data = (await response.json()) as { id?: string; error?: string }
       if (!response.ok || !data.id) {
@@ -54,6 +53,23 @@ export function QualifyForm() {
     }
   }
 
+  function submit(event: React.FormEvent) {
+    event.preventDefault()
+    void launch(brief)
+  }
+
+  function submitBoth() {
+    const markets = brief.markets.trim() || HAIR_MARKETS
+    const onLq = brief.supplierName === LQ_BRIEF.supplierName
+    const primary = onLq ? { ...LQ_BRIEF, ...brief, markets } : { ...KANECHOM_BRIEF, ...brief, markets }
+    const secondary = onLq ? { ...KANECHOM_BRIEF, markets } : { ...LQ_BRIEF, markets }
+    if (brief.supplierName !== KANECHOM_BRIEF.supplierName && !onLq) {
+      void launch({ ...KANECHOM_BRIEF, markets, also: { ...LQ_BRIEF, markets } })
+      return
+    }
+    void launch({ ...primary, also: secondary })
+  }
+
   const exaReady = flags?.exa ?? false
 
   return (
@@ -62,8 +78,9 @@ export function QualifyForm() {
         <div>
           <h1 className="font-serif text-4xl">New qualification</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            The supplier is the company you are selling. The ICP is who should buy. Prompts are
-            rebuilt from this form, with a separate search for {LEADS_PER_COUNTRY} leads in each
+            Exa finds the companies. Meridian scores product and channel fit for each supplier.
+            Parallel then checks who can actually buy: competitor overlap, outreach, and what is
+            still unconfirmed. Prompts rebuild as you type, with {LEADS_PER_COUNTRY} leads in each
             country.
           </p>
         </div>
@@ -206,6 +223,15 @@ export function QualifyForm() {
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" className="h-10 px-4" disabled={pending || flags === null || !exaReady}>
           {pending ? "Starting the pipeline…" : "Run the pipeline"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-10 px-4"
+          disabled={pending || flags === null || !exaReady}
+          onClick={submitBoth}
+        >
+          Qualify Kanechom and LQ together
         </Button>
         <p className="text-xs text-muted-foreground">
           Parallel pro-fast is the slow step. You can leave the run open while it researches.

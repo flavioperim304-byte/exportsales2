@@ -1,6 +1,6 @@
 import type { Brief, Lead } from "./types"
 import { ApiError, requestJson } from "./http"
-import { exaBackupQuery, exaQuery, LEADS_PER_COUNTRY, targetCountries } from "./prompts"
+import { exaBackupQuery, exaQuery, LEADS_PER_COUNTRY, searchBrief, targetCountries } from "./prompts"
 import { clip, domainOf, sameSite } from "./text"
 
 type ExaResult = {
@@ -99,14 +99,15 @@ function acceptResults(
   results: ExaResult[],
   brief: Brief,
   country: string,
-  seen: Set<string>
+  seen: Set<string>,
+  websites: string[]
 ): Lead[] {
   const local = new Set(seen)
   const leads: Lead[] = []
   for (const result of results) {
     const lead = toLead(result)
     if (!lead) continue
-    if (brief.website && sameSite(brief.website, lead.url)) continue
+    if (websites.some((site) => sameSite(site, lead.url))) continue
     if (local.has(lead.domain)) continue
     local.add(lead.domain)
     lead.market = country
@@ -121,7 +122,8 @@ async function searchCountry(
   brief: Brief,
   key: string,
   country: string,
-  seen: Set<string>
+  seen: Set<string>,
+  websites: string[]
 ): Promise<Lead[]> {
   const query = exaQuery(brief, country)
   const body = {
@@ -145,7 +147,7 @@ async function searchCountry(
     })
   }
 
-  let leads = acceptResults(results, brief, country, seen)
+  let leads = acceptResults(results, brief, country, seen, websites)
   if (leads.length < LEADS_PER_COUNTRY) {
     const extra = await searchOnce(key, {
       query: exaBackupQuery(brief, country),
@@ -153,19 +155,27 @@ async function searchCountry(
       numResults: LEADS_PER_COUNTRY,
       contents: { text: { maxCharacters: 1800 }, highlights: true },
     }).catch(() => [] as ExaResult[])
-    const more = acceptResults(extra, brief, country, new Set([...seen, ...leads.map((lead) => lead.domain)]))
+    const more = acceptResults(
+      extra,
+      brief,
+      country,
+      new Set([...seen, ...leads.map((lead) => lead.domain)]),
+      websites
+    )
     leads = [...leads, ...more]
   }
   return leads.slice(0, LEADS_PER_COUNTRY)
 }
 
-export async function searchLeads(brief: Brief, key: string): Promise<Lead[]> {
-  const countries = targetCountries(brief)
-  const targets = countries.length ? countries : [brief.markets.trim() || "the target market"]
+export async function searchLeads(brief: Brief, key: string, also?: Brief): Promise<Lead[]> {
+  const queryBrief = searchBrief(brief, also)
+  const websites = [brief.website, also?.website].filter((site): site is string => Boolean(site))
+  const countries = targetCountries(queryBrief)
+  const targets = countries.length ? countries : [queryBrief.markets.trim() || "the target market"]
   const seen = new Set<string>()
   const leads: Lead[] = []
   for (const country of targets) {
-    const found = await searchCountry(brief, key, country, seen)
+    const found = await searchCountry(queryBrief, key, country, seen, websites)
     for (const lead of found) {
       seen.add(lead.domain)
       leads.push(lead)

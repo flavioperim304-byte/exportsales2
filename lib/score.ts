@@ -669,11 +669,24 @@ export function scoreLead(brief: Brief, lead: Lead): LeadScore {
   }
 }
 
+function bestTotal(lead: Lead): number {
+  const scores = [lead.score, lead.alsoScore].filter(
+    (score): score is NonNullable<Lead["score"]> => Boolean(score) && !score?.disqualified
+  )
+  if (scores.length === 0) return lead.score?.disqualified ? -1 : (lead.score?.total ?? 0)
+  return Math.max(...scores.map((score) => score.total))
+}
+
+function fullyOut(lead: Lead): boolean {
+  const scores = [lead.score, lead.alsoScore].filter(Boolean)
+  return scores.length > 0 && scores.every((score) => score?.disqualified)
+}
+
 export function compareLeads(a: Lead, b: Lead): number {
-  const aOut = a.score?.disqualified ? 1 : 0
-  const bOut = b.score?.disqualified ? 1 : 0
+  const aOut = fullyOut(a) ? 1 : 0
+  const bOut = fullyOut(b) ? 1 : 0
   if (aOut !== bOut) return aOut - bOut
-  const byScore = (b.score?.total ?? 0) - (a.score?.total ?? 0)
+  const byScore = bestTotal(b) - bestTotal(a)
   if (byScore !== 0) return byScore
   return a.name.localeCompare(b.name)
 }

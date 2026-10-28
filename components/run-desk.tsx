@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { PromptPreview } from "@/components/prompt-preview"
+import { qualificationRows } from "@/lib/qualify"
 import { BAND_LABEL, STATUS_LABEL, formatWhen, isHttpUrl, leadPlace } from "@/lib/format"
 import type { Band, Evidence, Lead, Run, StageState } from "@/lib/types"
+import type { IcpLevel } from "@/lib/qualify"
 
 const STAGE_META = {
   search: { n: "01", source: "Exa", title: "Search and enrichment" },
@@ -62,7 +64,7 @@ export function RunDesk({ initial }: { initial: Run }) {
       const response = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(run.brief),
+        body: JSON.stringify(run.also ? { ...run.brief, also: run.also } : run.brief),
       })
       const data = (await response.json()) as { id?: string; error?: string }
       if (!response.ok || !data.id) {
@@ -84,7 +86,9 @@ export function RunDesk({ initial }: { initial: Run }) {
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             {run.mode === "sample" ? "Sample dossier" : "Live qualification"} · {STATUS_LABEL[run.status]}
           </p>
-          <h1 className="mt-1 font-serif text-3xl sm:text-4xl">{run.brief.supplierName}</h1>
+          <h1 className="mt-1 font-serif text-3xl sm:text-4xl">
+            {run.also ? `${run.brief.supplierName} and ${run.also.supplierName}` : run.brief.supplierName}
+          </h1>
         </div>
         {run.mode === "sample" ? (
           <Button variant="outline" render={<Link href="/qualify" />}>
@@ -152,6 +156,8 @@ export function RunDesk({ initial }: { initial: Run }) {
           <PromptPreview brief={run.brief} bare />
         </div>
       </details>
+
+      {run.leads.some((lead) => lead.score) ? <QualificationTable run={run} /> : null}
 
       <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {run.stages.map((item) => (
@@ -422,6 +428,62 @@ function Dossier({ lead }: { lead: Lead }) {
       ) : null}
     </article>
   )
+}
+
+function QualificationTable({ run }: { run: Run }) {
+  const rows = qualificationRows(run.leads, run.brief, run.also)
+  return (
+    <section className="rounded-xl border border-border bg-card p-4">
+      <h2 className="font-serif text-2xl">Qualification</h2>
+      <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+        Product and channel fit only. A high score is not a confirmed order. Parallel, when it
+        finishes, checks competitor overlap and whether the company can actually buy.
+      </p>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-border text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+              <th className="py-2 pr-3 font-medium">Company</th>
+              <th className="py-2 pr-3 font-medium">Country</th>
+              <th className="py-2 pr-3 font-medium">ICP</th>
+              {rows[0]?.fits.map((fit) => (
+                <th key={fit.supplier} className="py-2 pr-3 font-medium">
+                  {fit.supplier}
+                </th>
+              ))}
+              <th className="py-2 pr-3 font-medium">Best fit</th>
+              <th className="py-2 font-medium">Still to confirm</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.company} className="border-b border-border/70 align-top">
+                <td className="py-3 pr-3 font-medium">{row.company}</td>
+                <td className="py-3 pr-3 text-muted-foreground">{row.country}</td>
+                <td className="py-3 pr-3">
+                  <Level level={row.level} />
+                </td>
+                {row.fits.map((fit) => (
+                  <td key={fit.supplier} className="py-3 pr-3">
+                    <Level level={fit.level} />
+                  </td>
+                ))}
+                <td className="py-3 pr-3">{row.bestFit}</td>
+                <td className="py-3 text-muted-foreground">
+                  <p>{row.rationale}</p>
+                  <p className="mt-1">{row.qualificationNeeded}</p>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function Level({ level }: { level: IcpLevel }) {
+  return <span className="uppercase tracking-wide">{level}</span>
 }
 
 function Fact({ term, value }: { term: string; value: string }) {

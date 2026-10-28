@@ -109,6 +109,8 @@ export type Lead = {
   extraction?: Extraction
   context?: LeadContext
   score?: LeadScore
+  /** Score against the second supplier, when one run qualifies two brands. */
+  alsoScore?: LeadScore
 }
 
 export type MarketContext = {
@@ -146,6 +148,8 @@ export type Run = {
   mode: "live" | "sample"
   status: RunStatus
   brief: Brief
+  /** Second supplier scored on the same companies. */
+  also?: Brief
   stages: StageState[]
   logs: LogLine[]
   leads: Lead[]

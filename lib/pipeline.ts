@@ -64,8 +64,9 @@ export function blankStages(): StageState[] {
   ]
 }
 
-export function createRun(brief: Brief): Run {
+export function createRun(brief: Brief, also?: Brief): Run {
   const timestamp = now()
+  const names = also ? `${brief.supplierName} and ${also.supplierName}` : brief.supplierName
   return {
     id: crypto.randomUUID(),
     createdAt: timestamp,
@@ -73,12 +74,13 @@ export function createRun(brief: Brief): Run {
     mode: "live",
     status: "searching",
     brief,
+    also,
     stages: blankStages(),
     logs: [
       {
         at: timestamp,
         stage: "search",
-        message: `Qualification started for ${brief.supplierName}.`,
+        message: `Qualification started for ${names}. Exa finds the companies. Fit is scored before Parallel checks who can actually buy.`,
       },
     ],
     leads: [],
@@ -125,7 +127,10 @@ function applyResearch(
 }
 
 function rescore(run: Run) {
-  for (const lead of run.leads) lead.score = scoreLead(run.brief, lead)
+  for (const lead of run.leads) {
+    lead.score = scoreLead(run.brief, lead)
+    lead.alsoScore = run.also ? scoreLead(run.also, lead) : undefined
+  }
   run.leads.sort(compareLeads)
   const classify = stage(run, "classify")
   classify.status = "done"
@@ -184,7 +189,7 @@ async function doSearch(id: string) {
   try {
     const run = getRun(id)
     if (!run) return
-    const leads = await searchLeads(run.brief, keys.exa)
+    const leads = await searchLeads(run.brief, keys.exa, run.also)
     await updateRun(id, (current) => {
       if (leads.length === 0) {
         current.status = "failed"
@@ -338,7 +343,12 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
   }
   if (!snapshot.parallelRunId) {
     try {
-      const created = await createResearch(snapshot.brief, snapshot.leads, keys.parallel)
+      const created = await createResearch(
+        snapshot.brief,
+        snapshot.leads,
+        keys.parallel,
+        snapshot.also
+      )
       await updateRun(id, (run) => {
         run.parallelRunId = created.runId
         run.parallelInteractionId = created.interactionId
@@ -539,8 +549,8 @@ export function ensurePump(id: string) {
   void pump(id).finally(() => running.delete(id))
 }
 
-export async function startRun(brief: Brief): Promise<Run> {
-  const run = createRun(brief)
+export async function startRun(brief: Brief, also?: Brief): Promise<Run> {
+  const run = createRun(brief, also)
   await insertRun(run)
   ensurePump(run.id)
   return run
