@@ -62,12 +62,36 @@ test("a dual qualification names the stronger supplier and keeps low fits out", 
   assert.match(rows[0].qualificationNeeded, /commercial readiness/i)
 })
 
+test("Parallel's levels replace the local checklist once they are attached", () => {
+  const item = lead("Dissol", score(82, "best_fit"), score(40, "weak"))
+  item.context = {
+    fitNarrative: "Mass retail importer.",
+    knownSuppliers: ["Skala"],
+    risks: [],
+    citations: [],
+    icp: "medium",
+    supplierFits: [
+      { supplier: "Kanechom", level: "medium" },
+      { supplier: "LQ Professional", level: "low" },
+    ],
+    bestFit: "Kanechom",
+    qualificationNeeded: "Confirm an open slot next to Skala.",
+  }
+  const [row] = qualificationRows([item], KANECHOM_BRIEF, LQ_BRIEF)
+  assert.equal(row.fromParallel, true)
+  assert.equal(row.level, "medium")
+  assert.equal(row.bestFit, "Kanechom")
+  assert.equal(row.fits[1].level, "low")
+  assert.match(row.qualificationNeeded, /Skala/)
+})
+
 test("Parallel is asked to separate fit from the ability to buy", () => {
   const prompt = parallelInstructions(KANECHOM_BRIEF, LQ_BRIEF)
   assert.match(prompt, /not confirmed purchasing intent/)
   assert.match(prompt, /Kanechom and LQ Professional/)
   assert.match(prompt, /Skala/)
   assert.match(prompt, /straightening/)
+  assert.match(prompt, /best_fit/)
   assert.match(prompt, /employee count/)
   assert.equal(icpLevel(score(70, "strong")), "high")
   assert.equal(icpLevel(score(50, "possible")), "medium")

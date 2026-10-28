@@ -22,13 +22,13 @@ const STEPS = [
     n: "03",
     source: "Parallel",
     title: "Market context",
-    copy: "One deep-research pass on the shortlist: category outlook in the target markets, competitor suppliers, and a fit note for each lead with citations.",
+    copy: "Assigns high, medium, or low fit for each supplier, names the best fit, and writes the market note with citations. That judgment is not a confirmed order.",
   },
   {
     n: "04",
-    source: "Meridian",
-    title: "ICP classification",
-    copy: "Scores every lead against this supplier. Points move only when evidence supports them. Exclusions and peer exporters are disqualified even when the wording overlaps.",
+    source: "Checklist",
+    title: "Evidence check",
+    copy: "Files the page evidence next to Parallel’s score. It does not choose the best fit. Exclusions and peer exporters are still marked from the brief.",
   },
 ]
 
@@ -59,17 +59,18 @@ export function DeskHome({
             Qualify buyers against the supplier you represent.
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
-            Describe a supplier and the buyer you want. Meridian searches for companies, reads
-            their sites, researches the market and the competitors around them, then scores each
-            lead on the evidence.
+            This desk is Meridian. Exa finds the companies, Firecrawl reads their pages, and
+            Parallel assigns high, medium, or low and the best-fit supplier. The local checklist
+            files page evidence and does not make that call.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
-            <Button className="h-10 px-4" render={<Link href="/qualify" />}>
+            <Button className="h-10 px-4" nativeButton={false} render={<Link href="/qualify" />}>
               New qualification
             </Button>
             <Button
               variant="outline"
               className="h-10 px-4"
+              nativeButton={false}
               render={<Link href={`/runs/${SAMPLE_RUN_ID}`} />}
             >
               Open the worked example

@@ -10,6 +10,7 @@ export type QualificationRow = {
   fits: { supplier: string; level: IcpLevel }[]
   bestFit: string
   qualificationNeeded: string
+  fromParallel: boolean
 }
 
 export function icpLevel(score: LeadScore | undefined): IcpLevel {
@@ -39,6 +40,22 @@ function fitTotal(score: LeadScore | undefined): number {
 
 export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): QualificationRow[] {
   return leads.map((lead) => {
+    const country = lead.market || lead.extraction?.country || lead.country || ""
+    const parallelFits = lead.context?.supplierFits ?? []
+    if (lead.context?.icp && parallelFits.length > 0) {
+      return {
+        company: lead.name,
+        country,
+        level: lead.context.icp,
+        rationale: lead.context.fitNarrative || "Parallel did not write a rationale.",
+        fits: parallelFits,
+        bestFit: lead.context.bestFit || "neither",
+        qualificationNeeded:
+          lead.context.qualificationNeeded ||
+          "Parallel did not say what still needs confirmation.",
+        fromParallel: true,
+      }
+    }
     const fits = [
       { supplier: brief.supplierName, level: icpLevel(lead.score), total: fitTotal(lead.score) },
     ]
@@ -77,6 +94,7 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
       fits: fits.map(({ supplier, level: fitLevel }) => ({ supplier, level: fitLevel })),
       bestFit,
       qualificationNeeded: needed(open[0] ? (open[0].supplier === brief.supplierName ? lead.score : lead.alsoScore) : lead.score),
+      fromParallel: false,
     }
   })
 }

@@ -78,10 +78,9 @@ export function QualifyForm() {
         <div>
           <h1 className="font-serif text-4xl">New qualification</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Exa finds the companies. Meridian scores product and channel fit for each supplier.
-            Parallel then checks who can actually buy: competitor overlap, outreach, and what is
-            still unconfirmed. Prompts rebuild as you type, with {LEADS_PER_COUNTRY} leads in each
-            country.
+            Exa finds the companies and Firecrawl reads their pages. Parallel scores best fit
+            for each supplier and writes the market note. Prompts rebuild as you type, with{" "}
+            {LEADS_PER_COUNTRY} leads in each country.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

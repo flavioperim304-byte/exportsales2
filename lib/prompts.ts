@@ -79,7 +79,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
     ? `${brief.supplierName} and ${also.supplierName}`
     : brief.supplierName
   return [
-    "You are supporting an export salesperson. A first pass already judged product and channel fit. It is not confirmed purchasing intent. Refine the named candidates with current web sources. Cite URLs. Do not invent companies, contacts, or figures.",
+    "You are supporting an export salesperson. Score product and channel fit yourself from current web sources. High, medium, and low are not confirmed purchasing intent. Cite URLs. Do not invent companies, contacts, or figures.",
     `Suppliers to place: ${suppliers}, from ${brief.originCountry}.`,
     `${brief.supplierName}: ${brief.products}. Buyer: ${brief.buyerTypes}. Must-haves: ${brief.mustHaves || "none"}. ${brief.differentiators || ""}`,
     also
@@ -94,7 +94,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
     extra(brief),
     also?.instructions ? `Additional instructions: ${also.instructions.trim()}` : "",
     "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
-    "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. Rank only within this list. Ranks are not a probability of buying.",
+    "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. These levels are not a probability of buying.",
     "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers (not the candidates), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
   ]
     .filter(Boolean)

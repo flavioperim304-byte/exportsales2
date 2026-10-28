@@ -95,6 +95,10 @@ export type LeadContext = {
   knownSuppliers: string[]
   risks: string[]
   citations: string[]
+  icp?: "high" | "medium" | "low"
+  supplierFits?: { supplier: string; level: "high" | "medium" | "low" }[]
+  bestFit?: string
+  qualificationNeeded?: string
 }
 
 export type Lead = {

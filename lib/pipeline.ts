@@ -54,12 +54,12 @@ export function blankStages(): StageState[] {
     {
       id: "context",
       status: "pending",
-      detail: "Waiting for Parallel deep research on the shortlist, competitors, and market.",
+      detail: "Waiting for Parallel to assign best fit and research the market.",
     },
     {
       id: "classify",
       status: "pending",
-      detail: "Waiting to score each lead against the supplier.",
+      detail: "Waiting to file an evidence checklist. Best fit comes from Parallel.",
     },
   ]
 }
@@ -80,7 +80,7 @@ export function createRun(brief: Brief, also?: Brief): Run {
       {
         at: timestamp,
         stage: "search",
-        message: `Qualification started for ${names}. Exa finds the companies. Fit is scored before Parallel checks who can actually buy.`,
+        message: `Qualification started for ${names}. Exa finds the companies. Parallel assigns best fit after the pages are read.`,
       },
     ],
     leads: [],
@@ -109,6 +109,10 @@ function applyResearch(
       knownSuppliers: note.knownSuppliers,
       risks: note.risks,
       citations: note.citations,
+      icp: note.icp,
+      supplierFits: note.supplierFits,
+      bestFit: note.bestFit,
+      qualificationNeeded: note.qualificationNeeded,
     }
   }
   if (unmatched.length) {
@@ -121,7 +125,7 @@ function applyResearch(
   const context = stage(run, "context")
   context.status = "done"
   context.finishedAt = now()
-  context.detail = `Market note attached. ${parsed.competitors.length} competitor suppliers. Fit notes on ${parsed.leads.length} names.`
+  context.detail = `Best fit attached for ${parsed.leads.length} names. ${parsed.competitors.length} competitor suppliers.`
   run.contextState = "done"
   log(run, "context", context.detail)
 }
@@ -135,10 +139,10 @@ function rescore(run: Run) {
   const classify = stage(run, "classify")
   classify.status = "done"
   classify.finishedAt = now()
-  const best = run.leads.find((lead) => lead.score && !lead.score.disqualified)
-  classify.detail = best?.score
-    ? `${run.leads.length} leads scored. Top account: ${best.name} at ${best.score.total}.`
-    : `${run.leads.length} leads scored.`
+  const scoredByParallel = run.leads.filter((lead) => lead.context?.icp).length
+  classify.detail = scoredByParallel
+    ? `Evidence checklist filed for ${run.leads.length} leads. Parallel assigned best fit on ${scoredByParallel}.`
+    : `Evidence checklist filed for ${run.leads.length} leads. Best fit still waits on Parallel.`
   run.status = "complete"
   run.error = undefined
   log(run, "classify", classify.detail)
@@ -328,7 +332,7 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
       context.status = "blocked"
       context.finishedAt = now()
       context.detail =
-        "Parallel API key is missing. Scoring uses search and page evidence only."
+        "Parallel API key is missing. The desk can file an evidence checklist only."
       run.contextState = "skipped"
       run.status = "scoring"
       log(run, "context", context.detail)
@@ -414,7 +418,7 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
         run.contextState = "deferred"
         const context = stage(run, "context")
         context.status = "blocked"
-        context.detail = `Parallel is still running (${snapshot.parallelRunId}). Scored on the evidence already collected. Reopen this run to attach the report.`
+        context.detail = `Parallel is still running (${snapshot.parallelRunId}). The evidence checklist is filed. Reopen this run to attach best fit.`
         log(run, "context", context.detail)
         run.status = "scoring"
       })
@@ -451,7 +455,7 @@ async function doScore(id: string) {
     const classify = stage(run, "classify")
     classify.status = "running"
     classify.startedAt = classify.startedAt ?? now()
-    classify.detail = "Scoring product fit, buyer role, geography, and evidence."
+    classify.detail = "Filing the evidence checklist. Best fit comes from Parallel."
     rescore(run)
   })
 }

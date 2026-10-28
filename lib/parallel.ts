@@ -14,6 +14,10 @@ export type ParsedResearch = {
     knownSuppliers: string[]
     risks: string[]
     citations: string[]
+    icp?: "high" | "medium" | "low"
+    supplierFits: { supplier: string; level: "high" | "medium" | "low" }[]
+    bestFit: string
+    qualificationNeeded: string
   }[]
 }
 
@@ -58,8 +62,40 @@ const OUTPUT_SCHEMA = {
             known_suppliers: { type: "array", items: { type: "string" } },
             risks: { type: "array", items: { type: "string" } },
             citations: { type: "array", items: { type: "string" } },
+            icp: {
+              type: "string",
+              enum: ["high", "medium", "low"],
+              description: "Overall product and channel fit. Not a confirmed purchase.",
+            },
+            supplier_fits: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  supplier: { type: "string" },
+                  level: { type: "string", enum: ["high", "medium", "low"] },
+                },
+                required: ["supplier", "level"],
+              },
+            },
+            best_fit: {
+              type: "string",
+              description: "Supplier name, both, or neither.",
+            },
+            qualification_needed: { type: "string" },
           },
-          required: ["company", "fit_narrative", "known_suppliers", "risks", "citations"],
+          required: [
+            "company",
+            "fit_narrative",
+            "known_suppliers",
+            "risks",
+            "citations",
+            "icp",
+            "supplier_fits",
+            "best_fit",
+            "qualification_needed",
+          ],
         },
       },
     },
@@ -150,6 +186,25 @@ function basisUrls(value: unknown): string[] {
   return urls
 }
 
+function levelOf(value: unknown): "high" | "medium" | "low" | undefined {
+  const text = asString(value).toLowerCase()
+  if (text === "high" || text === "medium" || text === "low") return text
+  return undefined
+}
+
+function supplierFits(value: unknown): { supplier: string; level: "high" | "medium" | "low" }[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => {
+      const row = (item ?? {}) as Record<string, unknown>
+      const level = levelOf(row.level)
+      const supplier = asString(row.supplier)
+      if (!supplier || !level) return null
+      return { supplier, level }
+    })
+    .filter((item): item is { supplier: string; level: "high" | "medium" | "low" } => Boolean(item))
+}
+
 export function parseResearch(data: unknown): ParsedResearch | null {
   if (!data || typeof data !== "object") return null
   const root = data as { output?: { content?: unknown; basis?: unknown }; content?: unknown }
@@ -202,6 +257,10 @@ export function parseResearch(data: unknown): ParsedResearch | null {
           knownSuppliers: asStringArray(row.known_suppliers).slice(0, 6),
           risks: asStringArray(row.risks).slice(0, 6),
           citations: asStringArray(row.citations).slice(0, 6),
+          icp: levelOf(row.icp),
+          supplierFits: supplierFits(row.supplier_fits),
+          bestFit: asString(row.best_fit),
+          qualificationNeeded: asString(row.qualification_needed),
         }
       })
       .filter((item) => item.company),

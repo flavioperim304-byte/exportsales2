@@ -13,8 +13,8 @@ import type { IcpLevel } from "@/lib/qualify"
 const STAGE_META = {
   search: { n: "01", source: "Exa", title: "Search and enrichment" },
   extract: { n: "02", source: "Firecrawl", title: "Data extraction" },
-  context: { n: "03", source: "Parallel", title: "Market context" },
-  classify: { n: "04", source: "Meridian", title: "ICP classification" },
+  context: { n: "03", source: "Parallel", title: "Best fit and market" },
+  classify: { n: "04", source: "Checklist", title: "Evidence check" },
 } as const
 
 export function RunDesk({ initial }: { initial: Run }) {
@@ -91,7 +91,7 @@ export function RunDesk({ initial }: { initial: Run }) {
           </h1>
         </div>
         {run.mode === "sample" ? (
-          <Button variant="outline" render={<Link href="/qualify" />}>
+          <Button variant="outline" nativeButton={false} render={<Link href="/qualify" />}>
             Start a live qualification
           </Button>
         ) : run.status === "complete" || run.status === "failed" ? (
@@ -247,7 +247,11 @@ export function RunDesk({ initial }: { initial: Run }) {
                           "Waiting for the rest of the pipeline."}
                       </p>
                     </div>
-                    <ScoreMark score={item.score?.total} band={item.score?.band} />
+                    <ScoreMark
+                      score={item.score?.total}
+                      band={item.score?.band}
+                      parallel={item.context?.icp}
+                    />
                   </div>
                 </button>
               </li>
@@ -303,7 +307,25 @@ function StageCard({ stage }: { stage: StageState }) {
   )
 }
 
-function ScoreMark({ score, band }: { score?: number; band?: Band }) {
+function ScoreMark({
+  score,
+  band,
+  parallel,
+}: {
+  score?: number
+  band?: Band
+  parallel?: "high" | "medium" | "low"
+}) {
+  if (parallel) {
+    return (
+      <span className="text-right">
+        <span className="block font-serif text-2xl uppercase leading-none">{parallel}</span>
+        <span className="mt-1 inline-block text-[11px] uppercase tracking-wide text-muted-foreground">
+          Parallel
+        </span>
+      </span>
+    )
+  }
   if (score === undefined || !band) {
     return <span className="text-xs text-muted-foreground">···</span>
   }
@@ -432,12 +454,14 @@ function Dossier({ lead }: { lead: Lead }) {
 
 function QualificationTable({ run }: { run: Run }) {
   const rows = qualificationRows(run.leads, run.brief, run.also)
+  const fromParallel = rows.some((row) => row.fromParallel)
   return (
     <section className="rounded-xl border border-border bg-card p-4">
-      <h2 className="font-serif text-2xl">Qualification</h2>
+      <h2 className="font-serif text-2xl">{fromParallel ? "Best fit" : "Evidence checklist"}</h2>
       <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-        Product and channel fit only. A high score is not a confirmed order. Parallel, when it
-        finishes, checks competitor overlap and whether the company can actually buy.
+        {fromParallel
+          ? "Parallel assigned these levels from the pages and its own research. High means product and channel fit. It is not a confirmed order."
+          : "Parallel has not scored this list yet. The levels below are a local checklist from the pages already read. They are not the best-fit call."}
       </p>
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[760px] border-collapse text-left text-sm">
