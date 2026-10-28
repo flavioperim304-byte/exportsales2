@@ -251,7 +251,7 @@ export function QualifyForm({
           <Field
             label="Prompt"
             htmlFor="instructions"
-            hint="Products, buyer types, must-haves, and exclusions go in this text. Exa, Firecrawl, OpenAI, and Parallel receive it."
+            hint="Up to 8,000 characters. Anything longer is cut. The company cards sent to Parallel stay in the request, so a long prompt does not push them out."
           >
             <Textarea
               id="instructions"

@@ -147,6 +147,15 @@ export type MarketContext = {
   buyerDynamics: string
   importSignals: string[]
   citations: string[]
+  purchaseProbability?: "high" | "medium" | "low" | ""
+  purchaseNote?: string
+  entryStrategy?: string
+}
+
+export type MarketEntry = {
+  purchaseProbability: "high" | "medium" | "low" | ""
+  purchaseNote: string
+  strategy: string
 }
 
 export type Competitor = {
@@ -184,6 +193,8 @@ export type Run = {
   leads: Lead[]
   market?: MarketContext
   competitors: Competitor[]
+  /** OpenAI's market call. Parallel replaces it on run.market when it returns. */
+  entry?: MarketEntry
   parallelRunId?: string
   parallelInteractionId?: string
   parallelCheckedAt?: string

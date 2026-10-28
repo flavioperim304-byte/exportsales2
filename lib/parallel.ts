@@ -27,6 +27,16 @@ const OUTPUT_SCHEMA = {
     type: "object",
     additionalProperties: false,
     properties: {
+      purchase_probability: {
+        type: "string",
+        enum: ["high", "medium", "low"],
+        description: "Chance a qualified buyer in this search market would take the brand on. Not a percentage.",
+      },
+      purchase_probability_note: { type: "string" },
+      entry_strategy: {
+        type: "string",
+        description: "How to enter this market, from practices that have worked for professional brands. Cite the practice.",
+      },
       outlook: {
         type: "string",
         description: "Market outlook for the supplier products in the target markets. Include figures only when a source states them.",
@@ -100,6 +110,9 @@ const OUTPUT_SCHEMA = {
       },
     },
     required: [
+      "purchase_probability",
+      "purchase_probability_note",
+      "entry_strategy",
       "outlook",
       "buyer_dynamics",
       "import_signals",
@@ -219,6 +232,9 @@ export function parseResearch(data: unknown): ParsedResearch | null {
         buyerDynamics: "",
         importSignals: [],
         citations,
+        purchaseProbability: "",
+        purchaseNote: "",
+        entryStrategy: "",
       },
       competitors: [],
       leads: [],
@@ -235,6 +251,9 @@ export function parseResearch(data: unknown): ParsedResearch | null {
       buyerDynamics: asString(record.buyer_dynamics),
       importSignals: asStringArray(record.import_signals).slice(0, 8),
       citations: [...new Set(marketCitations)].slice(0, 12),
+      purchaseProbability: levelOf(record.purchase_probability) ?? "",
+      purchaseNote: asString(record.purchase_probability_note),
+      entryStrategy: asString(record.entry_strategy),
     },
     competitors: competitors
       .map((item) => {

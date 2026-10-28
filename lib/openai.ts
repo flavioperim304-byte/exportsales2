@@ -5,6 +5,12 @@ import { asString, clip } from "./text"
 
 export type OpenAIJudgment = FitJudgment & { company: string }
 
+export type OpenAIEntry = {
+  purchaseProbability: "high" | "medium" | "low" | ""
+  purchaseNote: string
+  strategy: string
+}
+
 const MODELS = ["gpt-4.1-mini", "gpt-4o-mini"]
 
 function levelOf(value: unknown): "high" | "medium" | "low" | undefined {
@@ -60,6 +66,27 @@ export function judgmentsFromOpenAI(data: unknown): OpenAIJudgment[] {
     .filter((item): item is OpenAIJudgment => Boolean(item))
 }
 
+export function entryFromOpenAI(data: unknown): OpenAIEntry {
+  const empty: OpenAIEntry = { purchaseProbability: "", purchaseNote: "", strategy: "" }
+  const content = (() => {
+    if (!data || typeof data !== "object") return ""
+    const choice = (data as { choices?: { message?: { content?: unknown } }[] }).choices?.[0]
+    const raw = choice?.message?.content
+    return typeof raw === "string" ? raw : ""
+  })()
+  if (!content.trim()) return empty
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>
+    return {
+      purchaseProbability: levelOf(parsed.purchase_probability) ?? "",
+      purchaseNote: asString(parsed.purchase_probability_note),
+      strategy: asString(parsed.entry_strategy),
+    }
+  } catch {
+    return empty
+  }
+}
+
 function schema(suppliers: string[]) {
   return {
     type: "object",
@@ -99,8 +126,18 @@ function schema(suppliers: string[]) {
           ],
         },
       },
+      purchase_probability: {
+        type: "string",
+        enum: ["high", "medium", "low"],
+        description: "Chance a qualified buyer in this search market would take the brand on. Not a percentage.",
+      },
+      purchase_probability_note: { type: "string" },
+      entry_strategy: {
+        type: "string",
+        description: "How to enter this market, from practices that have worked for professional brands.",
+      },
     },
-    required: ["leads"],
+    required: ["leads", "purchase_probability", "purchase_probability_note", "entry_strategy"],
   }
 }
 
@@ -132,7 +169,7 @@ export async function scoreLeads(
   leads: Lead[],
   key: string,
   also?: Brief
-): Promise<OpenAIJudgment[]> {
+): Promise<{ leads: OpenAIJudgment[]; entry: OpenAIEntry }> {
   const suppliers = [brief.supplierName, also?.supplierName].filter((name): name is string =>
     Boolean(name)
   )
@@ -155,7 +192,7 @@ export async function scoreLeads(
         headers: { Authorization: `Bearer ${key}` },
         body: JSON.stringify({ ...body, model }),
       })
-      return judgmentsFromOpenAI(data)
+      return { leads: judgmentsFromOpenAI(data), entry: entryFromOpenAI(data) }
     } catch (error) {
       lastError = error
       if (!(error instanceof ApiError) || (error.status !== 400 && error.status !== 404)) {

@@ -471,7 +471,7 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
   }
 }
 
-function applyOpenAI(run: Run, judgments: Awaited<ReturnType<typeof scoreLeads>>) {
+function applyOpenAI(run: Run, judgments: Awaited<ReturnType<typeof scoreLeads>>["leads"]) {
   for (const note of judgments) {
     const lead = run.leads.find(
       (item) => namesMatch(item.name, note.company) || namesMatch(item.domain, note.company)
@@ -515,14 +515,15 @@ async function doScore(id: string) {
     classify.detail = "OpenAI is scoring product fit and naming a preliminary best fit."
   })
   try {
-    const judgments = await scoreLeads(snapshot.brief, snapshot.leads, keys.openai, snapshot.also)
+    const scored = await scoreLeads(snapshot.brief, snapshot.leads, keys.openai, snapshot.also)
     await updateRun(id, (run) => {
-      applyOpenAI(run, judgments)
+      applyOpenAI(run, scored.leads)
+      if (scored.entry.purchaseProbability || scored.entry.strategy) run.entry = scored.entry
       const classify = stage(run, "classify")
-      classify.status = judgments.length ? "done" : "failed"
+      classify.status = scored.leads.length ? "done" : "failed"
       classify.finishedAt = now()
-      classify.detail = judgments.length
-        ? `OpenAI scored ${judgments.length} companies. Parallel still refines the best fit.`
+      classify.detail = scored.leads.length
+        ? `OpenAI scored ${scored.leads.length} companies and set a purchase probability. Parallel still refines it.`
         : "OpenAI returned no scores. Parallel can still set best fit."
       log(run, "classify", classify.detail)
       run.status = "researching"

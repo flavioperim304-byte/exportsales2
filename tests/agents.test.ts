@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { companiesFromAgent } from "../lib/exa"
 import { profileFromAgent } from "../lib/firecrawl"
-import { judgmentsFromOpenAI } from "../lib/openai"
+import { entryFromOpenAI, judgmentsFromOpenAI } from "../lib/openai"
 
 test("Exa Agent search output becomes companies", () => {
   const companies = companiesFromAgent({
@@ -58,6 +58,9 @@ test("OpenAI score JSON becomes a preliminary best fit", () => {
                 qualification_needed: "Confirm an open slot.",
               },
             ],
+            purchase_probability: "medium",
+            purchase_probability_note: "Importers already carry a professional tier.",
+            entry_strategy: "Appoint one importer and train the salon channel before retail.",
           }),
         },
       },
@@ -66,4 +69,19 @@ test("OpenAI score JSON becomes a preliminary best fit", () => {
   assert.equal(rows[0].bestFit, "Kanechom")
   assert.equal(rows[0].icp, "high")
   assert.equal(rows[0].supplierFits[0].level, "high")
+  const entry = entryFromOpenAI({
+    choices: [
+      {
+        message: {
+          content: JSON.stringify({
+            purchase_probability: "medium",
+            purchase_probability_note: "Importers already carry a professional tier.",
+            entry_strategy: "Appoint one importer and train the salon channel before retail.",
+          }),
+        },
+      },
+    ],
+  })
+  assert.equal(entry.purchaseProbability, "medium")
+  assert.match(entry.strategy, /one importer/)
 })

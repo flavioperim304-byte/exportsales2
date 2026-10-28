@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { DownloadResults } from "@/components/download-results"
+import { MarketEntry } from "@/components/market-entry"
 import { QualifyForm } from "@/components/qualify-form"
 import { Badge } from "@/components/ui/badge"
 import { STATUS_LABEL, formatWhen, isHttpUrl } from "@/lib/format"
@@ -175,6 +176,8 @@ export function Dashboard({
               </li>
             ))}
           </ol>
+
+          <MarketEntry run={run} />
 
           <OutputTable run={run} />
 

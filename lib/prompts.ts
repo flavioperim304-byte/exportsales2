@@ -7,6 +7,13 @@ export function targetCountries(brief: Brief): string[] {
   return splitList(brief.markets)
 }
 
+function marketAsk(): string {
+  return [
+    "purchase_probability is high, medium, or low for the market in this search: the chance a qualified buyer there would take the brand on. Keep it separate from icp. Do not invent a percentage.",
+    "entry_strategy is a short plan for this market, using practices that have worked when professional brands enter a new country: appoint one importer before many retailers, train that channel, open with a non-exclusive trial, and price inside the local professional tier. Name a practice only when a source supports it. Do not invent a statistic.",
+  ].join(" ")
+}
+
 function extra(brief: Brief): string {
   const note = brief.instructions?.trim()
   return note ? `Additional instructions: ${note}` : ""
@@ -189,7 +196,8 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       "A high score means the company distributes this brand, or it is a direct competitor distributor of a rival brand in the same country. Low means a retailer, a salon, or an unrelated company.",
       "Set best_fit to the brand name when they distribute it, direct competitor when they import a rival, or neither.",
       brief.instructions?.trim() ?? "",
-      "qualification_needed is what a salesperson still has to confirm. This is not a purchase score.",
+      "qualification_needed is what a salesperson still has to confirm. icp is not the purchase probability.",
+      marketAsk(),
     ]
       .filter(Boolean)
       .join("\n")
@@ -202,7 +210,8 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       "Score against the prompt below. Do not add must-haves or exclusions that the prompt does not state.",
       brief.instructions?.trim() ?? "",
       "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
-      "qualification_needed is what a salesperson still has to confirm. High means product and channel fit. It is not confirmed purchasing intent.",
+      "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
+      marketAsk(),
     ]
       .filter(Boolean)
       .join("\n")
@@ -219,7 +228,8 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       : "",
     "Score the company against the buyer type it was searched as, and against the other types in the brief. Do not lower the score only because it is a wholesaler or a trading company rather than a distributor.",
     "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
-    "qualification_needed is what a salesperson still has to confirm. High means product and channel fit. It is not confirmed purchasing intent.",
+    "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
+    marketAsk(),
     extra(brief),
   ]
     .filter(Boolean)
@@ -241,6 +251,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
       brief.instructions?.trim() ?? "",
       "Set icp high when the company is the brand’s distributor or a direct competitor distributor, medium when the role is likely but not proven, and low when it is unrelated. Set best_fit to the brand name, direct competitor, or neither.",
       "qualification_needed is what still has to be confirmed. Put rival brand names in known suppliers when a source names them. In competitors, list direct competitor distributors that are not already in the candidate list.",
+      marketAsk(),
     ]
       .filter(Boolean)
       .join("\n")
@@ -256,7 +267,8 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
       "Refine the score against this prompt only. Do not add must-haves or exclusions that the prompt does not state.",
       brief.instructions?.trim() ?? "",
       "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
-      "Say who to approach first, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and the supplier fit to high, medium, or low. Set best_fit to the supplier to pursue or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. These levels are not a probability of buying.",
+      "Say who to approach first, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and the supplier fit to high, medium, or low. Set best_fit to the supplier to pursue or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
+      marketAsk(),
       "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers (not the candidates), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
     ]
       .filter(Boolean)
@@ -282,7 +294,8 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
     extra(brief),
     also?.instructions ? `Additional instructions: ${also.instructions.trim()}` : "",
     "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
-    "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. These levels are not a probability of buying.",
+    "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
+    marketAsk(),
     "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers (not the candidates), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
   ]
     .filter(Boolean)
@@ -314,5 +327,8 @@ export function researchPrompt(brief: Brief, leads: Lead[], also?: Brief): strin
       return `${index + 1}. ${card}`
     })
     .join("\n")
-  return [parallelInstructions(brief, also), "Candidates:", cards].join("\n").slice(0, 14000)
+  const instructions = parallelInstructions(brief, also)
+  const header = `${instructions}\nCandidates:\n`
+  const room = Math.max(0, 20000 - header.length)
+  return `${header}${cards.slice(0, room)}`
 }

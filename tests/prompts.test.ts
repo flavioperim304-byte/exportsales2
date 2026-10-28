@@ -125,6 +125,42 @@ test("a live brief is locked to ten leads per country", () => {
   assert.deepEqual(targetCountries(parsed.brief!), ["Chile", "Peru", "Colombia"])
 })
 
+test("a long prompt still leaves room for the purchase probability", () => {
+  const brief = {
+    ...LQ_BRIEF,
+    products: "",
+    differentiators: "",
+    certifications: "",
+    buyerTypes: "",
+    mustHaves: "",
+    exclusions: "",
+    markets: "Chile",
+    instructions: "Prefer salons. ".repeat(400),
+  }
+  const lead = {
+    id: "lead-andes",
+    name: "Andes Beauty",
+    domain: "andes.example",
+    url: "https://andes.example",
+    country: "Chile",
+    market: "Chile",
+    exa: {
+      title: "Andes Beauty",
+      url: "https://andes.example",
+      domain: "andes.example",
+      text: "Imports professional hair care.",
+      highlights: [],
+      summary: "Distributor of professional hair care in Chile.",
+    },
+  } satisfies Lead
+  const prompt = researchPrompt(brief, [lead])
+  assert.match(prompt, /purchase_probability/)
+  assert.match(prompt, /entry_strategy/)
+  assert.match(prompt, /Andes Beauty/)
+  assert.ok(prompt.length <= 20000)
+  assert.match(openaiInstructions(brief), /purchase_probability/)
+})
+
 test("parallel prompt names the country each candidate was searched for", () => {
   const lead = {
     id: "lead-andes",

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { DownloadResults } from "@/components/download-results"
+import { MarketEntry } from "@/components/market-entry"
 import { Button } from "@/components/ui/button"
 import { PromptPreview } from "@/components/prompt-preview"
 import { qualificationRows } from "@/lib/qualify"
@@ -186,6 +187,7 @@ export function RunDesk({ initial }: { initial: Run }) {
             <h2 className="font-serif text-2xl">Market and competitors</h2>
             <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Parallel</p>
           </div>
+          <MarketEntry run={run} />
           <p className="mt-3 text-sm leading-relaxed">{run.market.outlook}</p>
           {run.market.buyerDynamics ? (
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{run.market.buyerDynamics}</p>
