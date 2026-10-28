@@ -4,8 +4,8 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
-  // The dev server is bound to 0.0.0.0, and the browser opens 127.0.0.1.
-  // Without this, Next blocks the dev channel and the page stays inert.
+  // The dev server listens on 127.0.0.1 only. Next’s own default host is
+  // 0.0.0.0, so the npm scripts set the host explicitly.
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   turbopack: {
     rules: {

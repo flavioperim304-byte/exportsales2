@@ -6,4 +6,4 @@ If the editor still shows the file as unsaved, the copy on disk is already the o
 EXA_API_KEY, FIRECRAWL_API_KEY, OPENAI_API_KEY, and PARALLEL_API_KEY are present.
 
 You can also open Sources and replace a key there:
-http://127.0.0.1:4317/sources
+http://127.0.0.1:3847/sources

@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Open [http://127.0.0.1:4317](http://127.0.0.1:4317).
+Open [http://127.0.0.1:3847](http://127.0.0.1:3847). The server listens on `127.0.0.1` only. Port 4317 is left free because OpenTelemetry uses it.
 
 ```bash
 npm test
@@ -38,7 +38,7 @@ OPENAI_API_KEY=
 PARALLEL_API_KEY=
 ```
 
-Or open [Sources](http://127.0.0.1:4317/sources) from the top bar (**Sources 0/4** means nothing is connected yet). Those values are written to `data/secrets.json` (mode 0600, gitignored) and are sent only to those four APIs. An environment variable wins over a saved key.
+Or open [Sources](http://127.0.0.1:3847/sources) from the top bar (**Sources 0/4** means nothing is connected yet). Those values are written to `data/secrets.json` (mode 0600, gitignored) and are sent only to those four APIs. An environment variable wins over a saved key. The key routes return connection flags, never the key values.
 
 Live runs are stored in `data/runs.json`. Exa Agent and Parallel can each take several minutes. Leave the run open. If Parallel is still going after eight minutes, the desk keeps OpenAI’s score and attaches Parallel’s final best fit when you reopen the run.
 
