@@ -20,6 +20,7 @@ export function Dashboard({
 }) {
   const [run, setRun] = useState(initialRun)
   const [list, setList] = useState(summaries)
+  const [inputRevision, setInputRevision] = useState(0)
   const [refreshError, setRefreshError] = useState("")
 
   useEffect(() => {
@@ -64,6 +65,7 @@ export function Dashboard({
     }
     const data = (await response.json()) as { run: Run }
     setRun(data.run)
+    setInputRevision((current) => current + 1)
     setList((current) => {
       const next = summarize(data.run)
       return [next, ...current.filter((item) => item.id !== data.run.id)]
@@ -118,7 +120,12 @@ export function Dashboard({
             The brief sent to Exa, Firecrawl, OpenAI, and Parallel.
           </p>
           <div className="mt-4">
-            <QualifyForm key={run.id} initial={run.brief} compact onStarted={started} />
+            <QualifyForm
+              key={`${run.id}:${inputRevision}`}
+              initial={run.brief}
+              compact
+              onStarted={started}
+            />
           </div>
         </section>
 
