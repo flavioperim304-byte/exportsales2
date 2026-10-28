@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Open [http://127.0.0.1:3847](http://127.0.0.1:3847). The server listens on `127.0.0.1` only. Port 4317 is left free because OpenTelemetry uses it.
+Open [http://127.0.0.1:3847](http://127.0.0.1:3847). Use `127.0.0.1`, not `localhost`. Port 4317 is left free because OpenTelemetry uses it. The process listens on `0.0.0.0` so the desktop port forward can reach it.
 
 ```bash
 npm test
