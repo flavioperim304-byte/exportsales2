@@ -51,8 +51,9 @@ export function firecrawlPrompt(brief: Brief, country: string): string {
     brief.certifications
       ? `Certifications that matter to the supplier: ${brief.certifications}.`
       : "",
-    "Use only facts stated on the page. Unknown fields stay empty.",
-    "buyerSignals must be short phrases that appear on the page about importing, distributing, retail coverage, or training.",
+    "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
+    "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
+    "buyerSignals must be short phrases about importing, distributing, retail coverage, or training.",
     extra(brief),
   ]
     .filter(Boolean)
@@ -73,13 +74,42 @@ export function searchBrief(brief: Brief, also?: Brief): Brief {
   }
 }
 
+export function exaSystemPrompt(): string {
+  return [
+    "You are in search mode.",
+    `Return at most ${LEADS_PER_COUNTRY} real companies that import, distribute, or wholesale the products in the query.`,
+    "Each company needs its official website.",
+    "Do not score the companies, do not write a market report, and do not invent email addresses or phone numbers.",
+    "Skip the supplier’s own website. Prefer a company site over a social profile.",
+  ].join(" ")
+}
+
+export function openaiInstructions(brief: Brief, also?: Brief): string {
+  const suppliers = also
+    ? `${brief.supplierName} and ${also.supplierName}`
+    : brief.supplierName
+  return [
+    "You score export leads. Use only the evidence in the candidate cards. Do not browse and do not invent contacts, volumes, or brands.",
+    `Suppliers: ${suppliers}, from ${brief.originCountry}.`,
+    `${brief.supplierName}: ${brief.products}. Buyer: ${brief.buyerTypes}. Must-haves: ${brief.mustHaves || "none"}.`,
+    also
+      ? `${also.supplierName}: ${also.products}. Buyer: ${also.buyerTypes}. Must-haves: ${also.mustHaves || "none"}.`
+      : "",
+    "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
+    "qualification_needed is what a salesperson still has to confirm. High means product and channel fit. It is not confirmed purchasing intent.",
+    extra(brief),
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
 export function parallelInstructions(brief: Brief, also?: Brief): string {
   const countries = targetCountries(brief)
   const suppliers = also
     ? `${brief.supplierName} and ${also.supplierName}`
     : brief.supplierName
   return [
-    "You are supporting an export salesperson. Score product and channel fit yourself from current web sources. High, medium, and low are not confirmed purchasing intent. Cite URLs. Do not invent companies, contacts, or figures.",
+    "You are supporting an export salesperson. OpenAI already assigned a preliminary high, medium, or low and a best fit. Those levels are not confirmed purchasing intent. Refine them with current web sources. Cite URLs. Do not invent companies, contacts, or figures. You may change icp, each supplier fit, and best_fit when the sources disagree with the preliminary score, and say what changed.",
     `Suppliers to place: ${suppliers}, from ${brief.originCountry}.`,
     `${brief.supplierName}: ${brief.products}. Buyer: ${brief.buyerTypes}. Must-haves: ${brief.mustHaves || "none"}. ${brief.differentiators || ""}`,
     also
@@ -112,6 +142,12 @@ export function researchPrompt(brief: Brief, leads: Lead[], also?: Brief): strin
         extraction?.country || lead.country,
         extraction?.role,
         extraction?.buys?.slice(0, 4).join("; "),
+        extraction?.email ? `email ${extraction.email}` : "",
+        extraction?.phone ? `phone ${extraction.phone}` : "",
+        extraction?.whatsapp ? `whatsapp ${extraction.whatsapp}` : "",
+        lead.openai
+          ? `OpenAI preliminary: ${lead.openai.icp}, best fit ${lead.openai.bestFit}. ${clip(lead.openai.rationale, 180)}`
+          : "OpenAI preliminary: unscored.",
         clip(extraction?.summary || lead.exa.summary || lead.exa.text, 180),
       ]
         .filter(Boolean)

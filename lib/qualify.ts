@@ -1,4 +1,4 @@
-import type { Brief, Lead, LeadScore } from "./types"
+import type { Brief, FitJudgment, Lead, LeadScore } from "./types"
 
 export type IcpLevel = "high" | "medium" | "low"
 
@@ -10,6 +10,7 @@ export type QualificationRow = {
   fits: { supplier: string; level: IcpLevel }[]
   bestFit: string
   qualificationNeeded: string
+  source: "parallel" | "openai" | "checklist"
   fromParallel: boolean
 }
 
@@ -38,23 +39,46 @@ function fitTotal(score: LeadScore | undefined): number {
   return score.total
 }
 
+function fromJudgment(
+  lead: Lead,
+  judgment: FitJudgment,
+  source: "parallel" | "openai",
+  rationale: string
+): QualificationRow {
+  return {
+    company: lead.name,
+    country: lead.market || lead.extraction?.country || lead.country || "",
+    level: judgment.icp,
+    rationale: rationale || "No rationale was written.",
+    fits: judgment.supplierFits,
+    bestFit: judgment.bestFit || "neither",
+    qualificationNeeded: judgment.qualificationNeeded || "Nothing further was listed.",
+    source,
+    fromParallel: source === "parallel",
+  }
+}
+
 export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): QualificationRow[] {
   return leads.map((lead) => {
-    const country = lead.market || lead.extraction?.country || lead.country || ""
     const parallelFits = lead.context?.supplierFits ?? []
     if (lead.context?.icp && parallelFits.length > 0) {
-      return {
-        company: lead.name,
-        country,
-        level: lead.context.icp,
-        rationale: lead.context.fitNarrative || "Parallel did not write a rationale.",
-        fits: parallelFits,
-        bestFit: lead.context.bestFit || "neither",
-        qualificationNeeded:
-          lead.context.qualificationNeeded ||
-          "Parallel did not say what still needs confirmation.",
-        fromParallel: true,
-      }
+      return fromJudgment(
+        lead,
+        {
+          icp: lead.context.icp,
+          supplierFits: parallelFits,
+          bestFit: lead.context.bestFit || "neither",
+          qualificationNeeded:
+            lead.context.qualificationNeeded ||
+            "Parallel did not say what still needs confirmation.",
+          rationale: lead.context.fitNarrative || "Parallel did not write a rationale.",
+        },
+        "parallel",
+        lead.context.fitNarrative || "Parallel did not write a rationale."
+      )
+    }
+    if (lead.openai && lead.openai.supplierFits.length > 0) {
+      return fromJudgment(lead, lead.openai, "openai", lead.openai.rationale)
     }
     const fits = [
       { supplier: brief.supplierName, level: icpLevel(lead.score), total: fitTotal(lead.score) },
@@ -94,6 +118,7 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
       fits: fits.map(({ supplier, level: fitLevel }) => ({ supplier, level: fitLevel })),
       bestFit,
       qualificationNeeded: needed(open[0] ? (open[0].supplier === brief.supplierName ? lead.score : lead.alsoScore) : lead.score),
+      source: "checklist",
       fromParallel: false,
     }
   })

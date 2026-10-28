@@ -1,7 +1,9 @@
 import {
   exaQuery,
+  exaSystemPrompt,
   firecrawlPrompt,
   LEADS_PER_COUNTRY,
+  openaiInstructions,
   parallelInstructions,
   targetCountries,
 } from "@/lib/prompts"
@@ -15,8 +17,8 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
       <div>
         <h2 className="font-serif text-2xl">Prompts</h2>
         <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          These are rebuilt from the brief as you type. Each country gets its own Exa search for{" "}
-          {LEADS_PER_COUNTRY} companies, then a Firecrawl read of each page.
+          These are rebuilt from the brief as you type. Exa Agent stays in search mode,{" "}
+          {LEADS_PER_COUNTRY} companies per country. Firecrawl Agent then collects ICP fields and contacts.
           {countries.length > 0
             ? ` This run would read ${reads} ${reads === 1 ? "page" : "pages"}.`
             : ""}
@@ -30,14 +32,15 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
         countries.map((country) => (
           <article key={country} className="flex flex-col gap-3 border-t border-border pt-4">
             <h3 className="font-serif text-xl">{country}</h3>
-            <PromptBlock label="Exa" text={exaQuery(brief, country)} />
-            <PromptBlock label="Firecrawl" text={firecrawlPrompt(brief, country)} />
+            <PromptBlock label="Exa Agent · search" text={`${exaSystemPrompt()}\n\n${exaQuery(brief, country)}`} />
+            <PromptBlock label="Firecrawl Agent" text={firecrawlPrompt(brief, country)} />
           </article>
         ))
       )}
       <article className="flex flex-col gap-3 border-t border-border pt-4">
         <h3 className="font-serif text-xl">All countries</h3>
-        <PromptBlock label="Parallel" text={parallelInstructions(brief)} />
+        <PromptBlock label="OpenAI" text={openaiInstructions(brief)} />
+        <PromptBlock label="Parallel · deep research" text={parallelInstructions(brief)} />
       </article>
     </section>
   )

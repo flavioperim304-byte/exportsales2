@@ -78,8 +78,8 @@ export function QualifyForm() {
         <div>
           <h1 className="font-serif text-4xl">New qualification</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Exa finds the companies and Firecrawl reads their pages. Parallel scores best fit
-            for each supplier and writes the market note. Prompts rebuild as you type, with{" "}
+            Exa Agent searches, Firecrawl Agent collects ICP fields and contacts, OpenAI scores
+            best fit, and Parallel deep research refines it. Prompts rebuild as you type, with{" "}
             {LEADS_PER_COUNTRY} leads in each country.
           </p>
         </div>

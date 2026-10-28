@@ -11,10 +11,10 @@ import type { Band, Evidence, Lead, Run, StageState } from "@/lib/types"
 import type { IcpLevel } from "@/lib/qualify"
 
 const STAGE_META = {
-  search: { n: "01", source: "Exa", title: "Search and enrichment" },
-  extract: { n: "02", source: "Firecrawl", title: "Data extraction" },
-  context: { n: "03", source: "Parallel", title: "Best fit and market" },
-  classify: { n: "04", source: "Checklist", title: "Evidence check" },
+  search: { n: "01", source: "Exa Agent", title: "Search" },
+  extract: { n: "02", source: "Firecrawl Agent", title: "ICP and contacts" },
+  classify: { n: "03", source: "OpenAI", title: "Score and best fit" },
+  context: { n: "04", source: "Parallel", title: "Refine and context" },
 } as const
 
 export function RunDesk({ initial }: { initial: Run }) {
@@ -251,6 +251,7 @@ export function RunDesk({ initial }: { initial: Run }) {
                       score={item.score?.total}
                       band={item.score?.band}
                       parallel={item.context?.icp}
+                      openai={item.openai?.icp}
                     />
                   </div>
                 </button>
@@ -311,17 +312,20 @@ function ScoreMark({
   score,
   band,
   parallel,
+  openai,
 }: {
   score?: number
   band?: Band
   parallel?: "high" | "medium" | "low"
+  openai?: "high" | "medium" | "low"
 }) {
-  if (parallel) {
+  const judged = parallel || openai
+  if (judged) {
     return (
       <span className="text-right">
-        <span className="block font-serif text-2xl uppercase leading-none">{parallel}</span>
+        <span className="block font-serif text-2xl uppercase leading-none">{judged}</span>
         <span className="mt-1 inline-block text-[11px] uppercase tracking-wide text-muted-foreground">
-          Parallel
+          {parallel ? "Parallel" : "OpenAI"}
         </span>
       </span>
     )
@@ -406,6 +410,10 @@ function Dossier({ lead }: { lead: Lead }) {
           <Fact term="Sells" value={lead.extraction.sells.join(", ")} />
           <Fact term="Markets" value={lead.extraction.markets.join(", ")} />
           <Fact term="Certifications" value={lead.extraction.certifications.join(", ")} />
+          <Fact term="Email" value={lead.extraction.email ?? ""} />
+          <Fact term="Phone" value={lead.extraction.phone ?? ""} />
+          <Fact term="WhatsApp" value={lead.extraction.whatsapp ?? ""} />
+          <Fact term="Website" value={lead.extraction.website ?? ""} />
         </dl>
       ) : lead.extraction?.error ? (
         <p className="mt-4 text-sm text-muted-foreground">
@@ -454,14 +462,17 @@ function Dossier({ lead }: { lead: Lead }) {
 
 function QualificationTable({ run }: { run: Run }) {
   const rows = qualificationRows(run.leads, run.brief, run.also)
-  const fromParallel = rows.some((row) => row.fromParallel)
+  const fromParallel = rows.some((row) => row.source === "parallel")
+  const fromOpenAI = rows.some((row) => row.source === "openai")
   return (
     <section className="rounded-xl border border-border bg-card p-4">
-      <h2 className="font-serif text-2xl">{fromParallel ? "Best fit" : "Evidence checklist"}</h2>
+      <h2 className="font-serif text-2xl">{fromParallel || fromOpenAI ? "Best fit" : "Evidence checklist"}</h2>
       <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
         {fromParallel
-          ? "Parallel assigned these levels from the pages and its own research. High means product and channel fit. It is not a confirmed order."
-          : "Parallel has not scored this list yet. The levels below are a local checklist from the pages already read. They are not the best-fit call."}
+          ? "Parallel refined these levels and set the final best fit. High means product and channel fit. It is not a confirmed order."
+          : fromOpenAI
+            ? "OpenAI scored this list. Parallel has not refined it yet. High means product and channel fit, not a confirmed order."
+            : "Neither OpenAI nor Parallel has scored this list. The levels below are a local checklist. They are not the best-fit call."}
       </p>
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[760px] border-collapse text-left text-sm">

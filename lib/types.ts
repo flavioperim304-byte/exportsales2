@@ -88,6 +88,19 @@ export type Extraction = {
   buyerSignals: string[]
   summary: string
   excerpt: string
+  /** Published contacts. Empty when the page does not state them. */
+  email?: string
+  phone?: string
+  whatsapp?: string
+  website?: string
+}
+
+export type FitJudgment = {
+  icp: "high" | "medium" | "low"
+  supplierFits: { supplier: string; level: "high" | "medium" | "low" }[]
+  bestFit: string
+  qualificationNeeded: string
+  rationale: string
 }
 
 export type LeadContext = {
@@ -115,6 +128,8 @@ export type Lead = {
   score?: LeadScore
   /** Score against the second supplier, when one run qualifies two brands. */
   alsoScore?: LeadScore
+  /** Preliminary score from OpenAI. Parallel may replace it. */
+  openai?: FitJudgment
 }
 
 export type MarketContext = {
@@ -171,9 +186,11 @@ export type Run = {
 export type KeyFlags = {
   exa: boolean
   firecrawl: boolean
+  openai: boolean
   parallel: boolean
   exaEnv: boolean
   firecrawlEnv: boolean
+  openaiEnv: boolean
   parallelEnv: boolean
 }
 

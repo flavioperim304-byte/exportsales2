@@ -256,18 +256,18 @@ function stages(): StageState[] {
       finishedAt: "2026-10-27T15:03:00.000Z",
     },
     {
-      id: "context",
-      status: "done",
-      detail: "Sample market note, competitors, and per-lead fit notes are attached.",
-      startedAt: "2026-10-27T15:03:00.000Z",
-      finishedAt: "2026-10-27T15:06:00.000Z",
-    },
-    {
       id: "classify",
       status: "done",
-      detail: "Scored against Serra Alta with the same rubric a live run uses.",
-      startedAt: "2026-10-27T15:06:00.000Z",
-      finishedAt: "2026-10-27T15:06:20.000Z",
+      detail: "This example has no OpenAI score. The table is the evidence checklist.",
+      startedAt: "2026-10-27T15:03:00.000Z",
+      finishedAt: "2026-10-27T15:04:00.000Z",
+    },
+    {
+      id: "context",
+      status: "done",
+      detail: "Sample market note and competitor notes are attached. They do not replace a best-fit score.",
+      startedAt: "2026-10-27T15:04:00.000Z",
+      finishedAt: "2026-10-27T15:06:00.000Z",
     },
   ]
 }

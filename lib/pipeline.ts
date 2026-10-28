@@ -1,7 +1,8 @@
 import { searchLeads } from "./exa"
-import { extractPage } from "./firecrawl"
+import { extractPage, failedExtraction } from "./firecrawl"
 import { publicError } from "./http"
 import { getKeys } from "./keys"
+import { scoreLeads } from "./openai"
 import {
   createResearch,
   namesMatch,
@@ -33,7 +34,7 @@ function log(run: Run, stageId: LogLine["stage"], message: string) {
 
 function secrets(): string[] {
   const keys = getKeys()
-  return [keys.exa, keys.firecrawl, keys.parallel].filter((item): item is string =>
+  return [keys.exa, keys.firecrawl, keys.openai, keys.parallel].filter((item): item is string =>
     Boolean(item)
   )
 }
@@ -43,23 +44,23 @@ export function blankStages(): StageState[] {
     {
       id: "search",
       status: "running",
-      detail: "Asking Exa for 10 companies in each target country.",
+      detail: "Exa Agent is in search mode, asking for 10 companies in each target country.",
       startedAt: now(),
     },
     {
       id: "extract",
       status: "pending",
-      detail: "Waiting to read buyer pages with Firecrawl.",
-    },
-    {
-      id: "context",
-      status: "pending",
-      detail: "Waiting for Parallel to assign best fit and research the market.",
+      detail: "Waiting for Firecrawl Agent to collect ICP fields and published contacts.",
     },
     {
       id: "classify",
       status: "pending",
-      detail: "Waiting to file an evidence checklist. Best fit comes from Parallel.",
+      detail: "Waiting for OpenAI to score fit and name a preliminary best fit.",
+    },
+    {
+      id: "context",
+      status: "pending",
+      detail: "Waiting for Parallel to refine that score and research the market.",
     },
   ]
 }
@@ -80,7 +81,7 @@ export function createRun(brief: Brief, also?: Brief): Run {
       {
         at: timestamp,
         stage: "search",
-        message: `Qualification started for ${names}. Exa finds the companies. Parallel assigns best fit after the pages are read.`,
+        message: `Qualification started for ${names}. Exa searches, Firecrawl collects contacts, OpenAI scores, and Parallel refines the best fit.`,
       },
     ],
     leads: [],
@@ -130,22 +131,37 @@ function applyResearch(
   log(run, "context", context.detail)
 }
 
-function rescore(run: Run) {
+function fitRank(lead: Lead): number {
+  const level = lead.context?.icp || lead.openai?.icp
+  if (level === "high") return 3
+  if (level === "medium") return 2
+  if (level === "low") return 1
+  return 0
+}
+
+function fileChecklist(run: Run) {
   for (const lead of run.leads) {
     lead.score = scoreLead(run.brief, lead)
     lead.alsoScore = run.also ? scoreLead(run.also, lead) : undefined
   }
-  run.leads.sort(compareLeads)
-  const classify = stage(run, "classify")
-  classify.status = "done"
-  classify.finishedAt = now()
-  const scoredByParallel = run.leads.filter((lead) => lead.context?.icp).length
-  classify.detail = scoredByParallel
-    ? `Evidence checklist filed for ${run.leads.length} leads. Parallel assigned best fit on ${scoredByParallel}.`
-    : `Evidence checklist filed for ${run.leads.length} leads. Best fit still waits on Parallel.`
+  run.leads.sort((left, right) => fitRank(right) - fitRank(left) || compareLeads(left, right))
+}
+
+function finish(run: Run) {
+  fileChecklist(run)
   run.status = "complete"
   run.error = undefined
-  log(run, "classify", classify.detail)
+  const parallel = run.leads.filter((lead) => lead.context?.icp).length
+  const openai = run.leads.filter((lead) => lead.openai).length
+  log(
+    run,
+    "system",
+    parallel
+      ? `Parallel set the final best fit on ${parallel} of ${run.leads.length} companies.`
+      : openai
+        ? `OpenAI’s preliminary best fit is still the one on the desk. Parallel did not replace it.`
+        : `No model score is attached. The table is the evidence checklist.`
+  )
 }
 
 async function doSearch(id: string) {
@@ -217,7 +233,7 @@ async function doSearch(id: string) {
         byCountry.set(country, (byCountry.get(country) ?? 0) + 1)
       }
       const counts = [...byCountry.entries()].map(([country, count]) => `${country}: ${count}`)
-      search.detail = `Exa returned ${leads.length} companies. ${counts.join(" · ")}.`
+      search.detail = `Exa Agent search returned ${leads.length} companies. ${counts.join(" · ")}.`
       log(current, "search", search.detail)
       const extract = stage(current, "extract")
       extract.status = "running"
@@ -247,9 +263,9 @@ async function doExtract(id: string): Promise<"wait" | "next"> {
       extract.status = "blocked"
       extract.finishedAt = now()
       extract.detail =
-        "Firecrawl API key is missing. Scoring will use the Exa excerpts only."
+        "Firecrawl API key is missing. OpenAI will score the Exa search notes only."
       log(run, "extract", extract.detail)
-      run.status = "researching"
+      run.status = "scoring"
       return { action: "skip" as const }
     }
     const pending = run.leads.find((lead) => !lead.extraction)
@@ -261,9 +277,9 @@ async function doExtract(id: string): Promise<"wait" | "next"> {
       extract.detail =
         failed > 0
           ? `Pages read. ${failed} ${failed === 1 ? "page" : "pages"} could not be extracted.`
-          : `Firecrawl extracted a buyer profile for ${run.leads.length} companies.`
+          : `Firecrawl Agent collected ICP fields and contacts for ${run.leads.length} companies.`
       log(run, "extract", extract.detail)
-      run.status = "researching"
+      run.status = "scoring"
       return { action: "done" as const }
     }
     const extract = stage(run, "extract")
@@ -301,21 +317,7 @@ async function doExtract(id: string): Promise<"wait" | "next"> {
     await updateRun(id, (current) => {
       const lead = current.leads.find((item) => item.id === plan.leadId)
       if (!lead) return
-      lead.extraction = {
-        ok: false,
-        error: message,
-        companyName: "",
-        headquarters: "",
-        country: "",
-        role: "",
-        buys: [],
-        sells: [],
-        markets: [],
-        certifications: [],
-        buyerSignals: [],
-        summary: "",
-        excerpt: "",
-      }
+      lead.extraction = failedExtraction(message)
       log(current, "extract", `Could not extract ${lead.name}. ${message}`)
     })
   }
@@ -332,16 +334,16 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
       context.status = "blocked"
       context.finishedAt = now()
       context.detail =
-        "Parallel API key is missing. The desk can file an evidence checklist only."
+        "Parallel API key is missing. OpenAI’s score stays as the best fit."
       run.contextState = "skipped"
-      run.status = "scoring"
+      finish(run)
       log(run, "context", context.detail)
     })
     return "next"
   }
   if (snapshot.contextState === "failed" && !snapshot.parallelRunId) {
     await updateRun(id, (run) => {
-      run.status = "scoring"
+      finish(run)
     })
     return "next"
   }
@@ -372,7 +374,7 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
         context.status = "failed"
         context.finishedAt = now()
         context.detail = message
-        run.status = "scoring"
+        finish(run)
         log(run, "context", message)
       })
     }
@@ -395,7 +397,7 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
         } else {
           applyResearch(run, parsed)
         }
-        run.status = "scoring"
+        finish(run)
       })
       return "next"
     }
@@ -406,7 +408,7 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
         context.status = "failed"
         context.finishedAt = now()
         context.detail = status.error || `Parallel status: ${status.status}.`
-        run.status = "scoring"
+        finish(run)
         log(run, "context", context.detail)
       })
       return "next"
@@ -418,9 +420,9 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
         run.contextState = "deferred"
         const context = stage(run, "context")
         context.status = "blocked"
-        context.detail = `Parallel is still running (${snapshot.parallelRunId}). The evidence checklist is filed. Reopen this run to attach best fit.`
+        context.detail = `Parallel is still running (${snapshot.parallelRunId}). OpenAI’s score stays until you reopen this run.`
         log(run, "context", context.detail)
-        run.status = "scoring"
+        finish(run)
       })
       return "next"
     }
@@ -441,7 +443,7 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
         context.status = "failed"
         context.finishedAt = now()
         context.detail = message
-        run.status = "scoring"
+        finish(run)
         return true
       }
       return false
@@ -450,14 +452,73 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
   }
 }
 
+function applyOpenAI(run: Run, judgments: Awaited<ReturnType<typeof scoreLeads>>) {
+  for (const note of judgments) {
+    const lead = run.leads.find(
+      (item) => namesMatch(item.name, note.company) || namesMatch(item.domain, note.company)
+    )
+    if (!lead) continue
+    lead.openai = {
+      icp: note.icp,
+      supplierFits: note.supplierFits,
+      bestFit: note.bestFit,
+      qualificationNeeded: note.qualificationNeeded,
+      rationale: note.rationale,
+    }
+  }
+}
+
 async function doScore(id: string) {
+  const keys = getKeys()
+  const snapshot = getRun(id)
+  if (!snapshot) return
+  if (!keys.openai) {
+    await updateRun(id, (run) => {
+      const classify = stage(run, "classify")
+      classify.status = "blocked"
+      classify.finishedAt = now()
+      classify.detail = "OpenAI API key is missing. Parallel can still set the final best fit."
+      log(run, "classify", classify.detail)
+      run.status = "researching"
+    })
+    return
+  }
+  if (snapshot.leads.length > 0 && snapshot.leads.every((lead) => lead.openai)) {
+    await updateRun(id, (run) => {
+      run.status = "researching"
+    })
+    return
+  }
   await updateRun(id, (run) => {
     const classify = stage(run, "classify")
     classify.status = "running"
     classify.startedAt = classify.startedAt ?? now()
-    classify.detail = "Filing the evidence checklist. Best fit comes from Parallel."
-    rescore(run)
+    classify.detail = "OpenAI is scoring product fit and naming a preliminary best fit."
   })
+  try {
+    const judgments = await scoreLeads(snapshot.brief, snapshot.leads, keys.openai, snapshot.also)
+    await updateRun(id, (run) => {
+      applyOpenAI(run, judgments)
+      const classify = stage(run, "classify")
+      classify.status = judgments.length ? "done" : "failed"
+      classify.finishedAt = now()
+      classify.detail = judgments.length
+        ? `OpenAI scored ${judgments.length} companies. Parallel still refines the best fit.`
+        : "OpenAI returned no scores. Parallel can still set best fit."
+      log(run, "classify", classify.detail)
+      run.status = "researching"
+    })
+  } catch (error) {
+    const message = publicError(error, secrets())
+    await updateRun(id, (run) => {
+      const classify = stage(run, "classify")
+      classify.status = "failed"
+      classify.finishedAt = now()
+      classify.detail = message
+      log(run, "classify", message)
+      run.status = "researching"
+    })
+  }
 }
 
 async function maybeAttachDeferred(id: string) {
@@ -483,7 +544,7 @@ async function maybeAttachDeferred(id: string) {
     if (!parsed) return
     await updateRun(id, (current) => {
       applyResearch(current, parsed)
-      rescore(current)
+      fileChecklist(current)
     })
   } catch (error) {
     const message = publicError(error, secrets())
@@ -495,7 +556,7 @@ async function maybeAttachDeferred(id: string) {
 
 async function pump(id: string) {
   try {
-    for (let guard = 0; guard < 80; guard += 1) {
+    for (let guard = 0; guard < 200; guard += 1) {
       const run = getRun(id)
       if (!run || run.mode === "sample") return
       if (run.status === "failed") return
@@ -511,14 +572,14 @@ async function pump(id: string) {
         await doExtract(id)
         continue
       }
+      if (run.status === "scoring") {
+        await doScore(id)
+        continue
+      }
       if (run.status === "researching") {
         const action = await doResearch(id)
         if (action === "wait") await new Promise((resolve) => setTimeout(resolve, 12000))
         continue
-      }
-      if (run.status === "scoring") {
-        await doScore(id)
-        return
       }
       return
     }

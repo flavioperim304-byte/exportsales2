@@ -14,7 +14,7 @@ export function Header() {
       .then((response) => (response.ok ? response.json() : null))
       .then((data: { flags: KeyFlags } | null) => {
         if (cancelled || !data?.flags) return
-        const count = [data.flags.exa, data.flags.firecrawl, data.flags.parallel].filter(Boolean).length
+        const count = [data.flags.exa, data.flags.firecrawl, data.flags.openai, data.flags.parallel].filter(Boolean).length
         setReady(count)
       })
       .catch(() => undefined)
@@ -41,7 +41,7 @@ export function Header() {
             nativeButton={false}
             render={<Link href="/sources" />}
           >
-            Sources {ready}/3
+            Sources {ready}/4
           </Button>
         </nav>
       </div>

@@ -8,27 +8,27 @@ import type { RunSummary } from "@/lib/types"
 const STEPS = [
   {
     n: "01",
-    source: "Exa",
-    title: "Search and enrichment",
-    copy: "Builds a fresh search prompt for each target country and asks for 10 companies there, keeping the page summary and the passages that mention products, origins, and markets.",
+    source: "Exa Agent",
+    title: "Search",
+    copy: "Exa Agent runs in search mode: 10 companies per country, with an official website. It does not score them.",
   },
   {
     n: "02",
-    source: "Firecrawl",
-    title: "Data extraction",
-    copy: "Reads each company site with a prompt built from that country’s brief, and pulls a buyer profile: role, what they buy, where they sell, certifications, and short quotes from the page.",
+    source: "Firecrawl Agent",
+    title: "ICP and contacts",
+    copy: "Reads each company for buyer role, products, markets, and published contacts: email, website, phone, and WhatsApp. A blank contact means the page did not publish one.",
   },
   {
     n: "03",
-    source: "Parallel",
-    title: "Market context",
-    copy: "Assigns high, medium, or low fit for each supplier, names the best fit, and writes the market note with citations. That judgment is not a confirmed order.",
+    source: "OpenAI",
+    title: "Score and best fit",
+    copy: "Scores high, medium, or low for each supplier and names a preliminary best fit. That level is product and channel fit, not a confirmed order.",
   },
   {
     n: "04",
-    source: "Checklist",
-    title: "Evidence check",
-    copy: "Files the page evidence next to Parallel’s score. It does not choose the best fit. Exclusions and peer exporters are still marked from the brief.",
+    source: "Parallel",
+    title: "Refine and context",
+    copy: "Deep research checks the OpenAI score, writes the market and competitor note, and sets the final best fit.",
   },
 ]
 
@@ -43,7 +43,7 @@ export function DeskHome({
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-8 sm:py-12">
       {sourcesReady === 0 ? (
         <p className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm leading-relaxed">
-          Sources are not connected. Exa, Firecrawl, and Parallel have no keys yet, so a live search cannot start.{" "}
+          Sources are not connected. Exa, Firecrawl, OpenAI, and Parallel have no keys yet, so a live search cannot start.{" "}
           <Link href="/sources" className="font-medium text-foreground underline-offset-2 hover:underline">
             Open Sources
           </Link>{" "}
@@ -59,9 +59,9 @@ export function DeskHome({
             Qualify buyers against the supplier you represent.
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
-            This desk is Meridian. Exa finds the companies, Firecrawl reads their pages, and
-            Parallel assigns high, medium, or low and the best-fit supplier. The local checklist
-            files page evidence and does not make that call.
+            This desk is Meridian. Exa Agent searches, Firecrawl Agent collects the ICP and
+            contacts, OpenAI scores a preliminary best fit, and Parallel deep research refines
+            that score and sets the final one.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <Button className="h-10 px-4" nativeButton={false} render={<Link href="/qualify" />}>

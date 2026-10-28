@@ -4,6 +4,7 @@ import { KANECHOM_BRIEF, LQ_BRIEF, validateBrief } from "../lib/example"
 import {
   LEADS_PER_COUNTRY,
   exaQuery,
+  exaSystemPrompt,
   firecrawlPrompt,
   parallelInstructions,
   researchPrompt,
@@ -18,6 +19,7 @@ test("each country gets its own prompt and ten leads", () => {
     instructions: "prefer buyers that already stock Brazilian brands",
   }
   assert.equal(LEADS_PER_COUNTRY, 10)
+  assert.match(exaSystemPrompt(), /search mode/)
   assert.deepEqual(targetCountries(brief), ["Germany", "France"])
 
   const germany = exaQuery(brief, "Germany")
@@ -28,6 +30,7 @@ test("each country gets its own prompt and ten leads", () => {
   assert.match(germany, /low-end retail/)
   assert.match(germany, /Brazilian brands/)
   assert.match(firecrawlPrompt(brief, "Germany"), /candidate for Germany/)
+  assert.match(firecrawlPrompt(brief, "Germany"), /WhatsApp/)
   assert.match(firecrawlPrompt(brief, "Germany"), /Brazilian brands/)
   assert.match(parallelInstructions(brief), /Germany, France/)
   assert.match(parallelInstructions(brief), /up to 10 candidates per country/)

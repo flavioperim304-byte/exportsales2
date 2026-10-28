@@ -1,111 +1,147 @@
 import type { Brief, Lead } from "./types"
 import { ApiError, requestJson } from "./http"
-import { exaBackupQuery, exaQuery, LEADS_PER_COUNTRY, searchBrief, targetCountries } from "./prompts"
-import { clip, domainOf, sameSite } from "./text"
-
-type ExaResult = {
-  title?: string
-  url?: string
-  publishedDate?: string
-  text?: string
-  highlights?: unknown
-  summary?: unknown
-  entities?: { properties?: { name?: string } }[]
-}
+import {
+  exaBackupQuery,
+  exaQuery,
+  exaSystemPrompt,
+  LEADS_PER_COUNTRY,
+  searchBrief,
+  targetCountries,
+} from "./prompts"
+import { asString, domainOf, sameSite } from "./text"
 
 const SOCIAL = /linkedin\.com|facebook\.com|instagram\.com|wikipedia\.org|youtube\.com/i
 
-function summaryText(value: unknown): string {
-  if (typeof value === "string") return value.trim()
-  if (value && typeof value === "object" && "text" in value) {
-    const text = (value as { text?: unknown }).text
-    return typeof text === "string" ? text.trim() : ""
+const COMPANY_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    companies: {
+      type: "array",
+      maxItems: LEADS_PER_COUNTRY,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: { type: "string" },
+          website: { type: "string" },
+          country: { type: "string" },
+          why: { type: "string" },
+        },
+        required: ["name", "website", "country", "why"],
+      },
+    },
+  },
+  required: ["companies"],
+}
+
+function exaHeaders(key: string): HeadersInit {
+  return { Authorization: `Bearer ${key}`, "x-api-key": key }
+}
+
+export type AgentCompany = { name: string; website: string; country: string; why: string }
+
+export function companiesFromAgent(data: unknown): AgentCompany[] {
+  if (!data || typeof data !== "object") return []
+  const output = (data as { output?: { structured?: unknown } }).output
+  const structured = output?.structured
+  const record =
+    structured && typeof structured === "object" && !Array.isArray(structured)
+      ? (structured as Record<string, unknown>)
+      : {}
+  const list = Array.isArray(record.companies)
+    ? record.companies
+    : Array.isArray(structured)
+      ? structured
+      : []
+  return list
+    .map((item) => {
+      const row = (item ?? {}) as Record<string, unknown>
+      return {
+        name: asString(row.name),
+        website: asString(row.website || row.url),
+        country: asString(row.country),
+        why: asString(row.why),
+      }
+    })
+    .filter((item) => item.name && item.website)
+}
+
+async function runAgentSearch(key: string, query: string, websites: string[]): Promise<AgentCompany[]> {
+  const created = await requestJson("https://api.exa.ai/agent/runs", {
+    method: "POST",
+    timeoutMs: 40000,
+    headers: exaHeaders(key),
+    body: JSON.stringify({
+      query,
+      systemPrompt: exaSystemPrompt(),
+      effort: "medium",
+      outputSchema: COMPANY_SCHEMA,
+      input: websites.length
+        ? { exclusion: websites.map((website) => ({ website })) }
+        : undefined,
+    }),
+  })
+  const id = asString((created as { id?: unknown } | null)?.id)
+  if (!id) throw new ApiError("Exa Agent did not return a run id.", 502)
+  const deadline = Date.now() + 4 * 60 * 1000
+  let latest: unknown = created
+  while (Date.now() < deadline) {
+    const status = asString((latest as { status?: unknown } | null)?.status).toLowerCase()
+    if (status === "completed") return companiesFromAgent(latest)
+    if (status === "failed" || status === "cancelled") {
+      throw new ApiError("Exa Agent search failed.", 502)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 4000))
+    latest = await requestJson(`https://api.exa.ai/agent/runs/${id}`, {
+      method: "GET",
+      timeoutMs: 30000,
+      headers: exaHeaders(key),
+    })
   }
+  throw new ApiError("Exa Agent is still searching after 4 minutes.", 408)
+}
+
+function websiteUrl(value: string): string {
+  const trimmed = value.trim()
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  if (/^[\w.-]+\.[a-z]{2,}/i.test(trimmed)) return `https://${trimmed}`
   return ""
 }
 
-function highlightsOf(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter(Boolean)
-    .slice(0, 4)
-}
-
-function companyName(result: ExaResult): string {
-  const entity = result.entities?.find((item) => item.properties?.name)?.properties?.name
-  if (entity && entity.trim()) return entity.trim().slice(0, 80)
-  const title = (result.title ?? "").split("|")[0]?.trim() ?? ""
-  const head = title.split(/\s+[–—-]\s+/)[0]?.trim() ?? ""
-  if (head) return head.slice(0, 80)
-  return domainOf(result.url ?? "") || "Untitled company"
-}
-
-function toLead(result: ExaResult): Lead | null {
-  const url = (result.url ?? "").trim()
-  if (!/^https?:\/\//i.test(url)) return null
+function companyToLead(company: AgentCompany): Lead | null {
+  const url = websiteUrl(company.website)
+  if (!url) return null
   const domain = domainOf(url)
   if (!domain) return null
-  const text = (result.text ?? "").trim()
-  const summary = summaryText(result.summary)
-  const highlights = highlightsOf(result.highlights)
+  const name = company.name.trim().slice(0, 80) || domain
   return {
     id: crypto.randomUUID(),
-    name: companyName(result),
+    name,
     domain,
     url,
-    country: "",
+    country: company.country,
     exa: {
-      title: result.title?.trim() || companyName(result),
+      title: name,
       url,
       domain,
-      publishedDate: result.publishedDate,
-      text,
-      highlights,
-      summary,
+      text: "",
+      highlights: [],
+      summary: company.why,
     },
   }
 }
 
-async function searchOnce(
-  key: string,
-  body: Record<string, unknown>
-): Promise<ExaResult[]> {
-  const data = await requestJson("https://api.exa.ai/search", {
-    method: "POST",
-    timeoutMs: 50000,
-    headers: { "x-api-key": key },
-    body: JSON.stringify(body),
-  })
-  if (!data || typeof data !== "object") return []
-  const results = (data as { results?: unknown }).results
-  return Array.isArray(results) ? (results as ExaResult[]) : []
-}
-
-function contents(brief: Brief) {
-  return {
-    text: { maxCharacters: 2200, verbosity: "compact" },
-    highlights: {
-      query: `Passages that say what this company buys, imports, or distributes, and which countries it operates in. Products of interest: ${clip(brief.products, 240)}`,
-    },
-    summary: {
-      query:
-        "In two sentences, who is this company, what do they buy or distribute, and where do they sell?",
-    },
-  }
-}
-
-function acceptResults(
-  results: ExaResult[],
-  brief: Brief,
+function acceptCompanies(
+  companies: AgentCompany[],
   country: string,
   seen: Set<string>,
   websites: string[]
 ): Lead[] {
   const local = new Set(seen)
   const leads: Lead[] = []
-  for (const result of results) {
-    const lead = toLead(result)
+  for (const company of companies) {
+    const lead = companyToLead(company)
     if (!lead) continue
     if (websites.some((site) => sameSite(site, lead.url))) continue
     if (local.has(lead.domain)) continue
@@ -125,39 +161,14 @@ async function searchCountry(
   seen: Set<string>,
   websites: string[]
 ): Promise<Lead[]> {
-  const query = exaQuery(brief, country)
-  const body = {
-    query,
-    type: "auto",
-    category: "company",
-    numResults: LEADS_PER_COUNTRY + 8,
-    contents: contents(brief),
-  }
-  let results: ExaResult[]
-  try {
-    results = await searchOnce(key, body)
-  } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 400) throw error
-    results = await searchOnce(key, {
-      query,
-      type: "auto",
-      category: "company",
-      numResults: LEADS_PER_COUNTRY + 8,
-      contents: { text: { maxCharacters: 2200 }, highlights: true },
-    })
-  }
-
-  let leads = acceptResults(results, brief, country, seen, websites)
+  const companies = await runAgentSearch(key, exaQuery(brief, country), websites)
+  let leads = acceptCompanies(companies, country, seen, websites)
   if (leads.length < LEADS_PER_COUNTRY) {
-    const extra = await searchOnce(key, {
-      query: exaBackupQuery(brief, country),
-      type: "auto",
-      numResults: LEADS_PER_COUNTRY,
-      contents: { text: { maxCharacters: 1800 }, highlights: true },
-    }).catch(() => [] as ExaResult[])
-    const more = acceptResults(
+    const extra = await runAgentSearch(key, exaBackupQuery(brief, country), websites).catch(
+      () => [] as AgentCompany[]
+    )
+    const more = acceptCompanies(
       extra,
-      brief,
       country,
       new Set([...seen, ...leads.map((lead) => lead.domain)]),
       websites

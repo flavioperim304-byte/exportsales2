@@ -23,6 +23,6 @@ async function Home() {
   await connection()
   const runs = listRuns().map(summarize)
   const flags = keyFlags()
-  const sourcesReady = [flags.exa, flags.firecrawl, flags.parallel].filter(Boolean).length
+  const sourcesReady = [flags.exa, flags.firecrawl, flags.openai, flags.parallel].filter(Boolean).length
   return <DeskHome runs={runs} sourcesReady={sourcesReady} />
 }

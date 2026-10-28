@@ -85,6 +85,39 @@ test("Parallel's levels replace the local checklist once they are attached", () 
   assert.match(row.qualificationNeeded, /Skala/)
 })
 
+test("OpenAI's preliminary score is used until Parallel replaces it", () => {
+  const item = lead("Dissol", score(82, "best_fit"), score(40, "weak"))
+  item.openai = {
+    icp: "high",
+    supplierFits: [
+      { supplier: "Kanechom", level: "high" },
+      { supplier: "LQ Professional", level: "low" },
+    ],
+    bestFit: "Kanechom",
+    qualificationNeeded: "Confirm an open slot.",
+    rationale: "Retail importer.",
+  }
+  const [row] = qualificationRows([item], KANECHOM_BRIEF, LQ_BRIEF)
+  assert.equal(row.source, "openai")
+  assert.equal(row.bestFit, "Kanechom")
+  item.context = {
+    fitNarrative: "Parallel kept Kanechom and lowered the call.",
+    knownSuppliers: [],
+    risks: [],
+    citations: [],
+    icp: "medium",
+    supplierFits: [
+      { supplier: "Kanechom", level: "medium" },
+      { supplier: "LQ Professional", level: "low" },
+    ],
+    bestFit: "Kanechom",
+    qualificationNeeded: "Ask about Skala.",
+  }
+  const [refined] = qualificationRows([item], KANECHOM_BRIEF, LQ_BRIEF)
+  assert.equal(refined.source, "parallel")
+  assert.equal(refined.level, "medium")
+})
+
 test("Parallel is asked to separate fit from the ability to buy", () => {
   const prompt = parallelInstructions(KANECHOM_BRIEF, LQ_BRIEF)
   assert.match(prompt, /not confirmed purchasing intent/)
@@ -92,6 +125,7 @@ test("Parallel is asked to separate fit from the ability to buy", () => {
   assert.match(prompt, /Skala/)
   assert.match(prompt, /straightening/)
   assert.match(prompt, /best_fit/)
+  assert.match(prompt, /OpenAI already assigned/)
   assert.match(prompt, /employee count/)
   assert.equal(icpLevel(score(70, "strong")), "high")
   assert.equal(icpLevel(score(50, "possible")), "medium")

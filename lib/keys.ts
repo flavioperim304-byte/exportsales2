@@ -5,6 +5,7 @@ import type { KeyFlags } from "./types"
 type SecretFile = {
   exa?: string
   firecrawl?: string
+  openai?: string
   parallel?: string
 }
 
@@ -35,6 +36,7 @@ function readVisibleFile(): SecretFile {
       const value = trimmed.slice(splitAt + 1).trim().replace(/^["']|["']$/g, "")
       if (key === "EXA_API_KEY") parsed.exa = value
       if (key === "FIRECRAWL_API_KEY") parsed.firecrawl = value
+      if (key === "OPENAI_API_KEY") parsed.openai = value
       if (key === "PARALLEL_API_KEY") parsed.parallel = value
     }
     return parsed
@@ -43,17 +45,19 @@ function readVisibleFile(): SecretFile {
   }
 }
 
-export function getKeys(): { exa?: string; firecrawl?: string; parallel?: string } {
+export function getKeys(): { exa?: string; firecrawl?: string; openai?: string; parallel?: string } {
   const stored = readFile()
   const visible = readVisibleFile()
   const exa = clean(process.env.EXA_API_KEY) || clean(visible.exa) || clean(stored.exa)
   const firecrawl =
     clean(process.env.FIRECRAWL_API_KEY) || clean(visible.firecrawl) || clean(stored.firecrawl)
+  const openai = clean(process.env.OPENAI_API_KEY) || clean(visible.openai) || clean(stored.openai)
   const parallel =
     clean(process.env.PARALLEL_API_KEY) || clean(visible.parallel) || clean(stored.parallel)
   return {
     exa: exa || undefined,
     firecrawl: firecrawl || undefined,
+    openai: openai || undefined,
     parallel: parallel || undefined,
   }
 }
@@ -63,9 +67,11 @@ export function keyFlags(): KeyFlags {
   return {
     exa: Boolean(keys.exa),
     firecrawl: Boolean(keys.firecrawl),
+    openai: Boolean(keys.openai),
     parallel: Boolean(keys.parallel),
     exaEnv: Boolean(clean(process.env.EXA_API_KEY)),
     firecrawlEnv: Boolean(clean(process.env.FIRECRAWL_API_KEY)),
+    openaiEnv: Boolean(clean(process.env.OPENAI_API_KEY)),
     parallelEnv: Boolean(clean(process.env.PARALLEL_API_KEY)),
   }
 }
@@ -73,6 +79,7 @@ export function keyFlags(): KeyFlags {
 export function saveKeys(input: {
   exa?: string
   firecrawl?: string
+  openai?: string
   parallel?: string
 }): { flags: KeyFlags; notes: string[] } {
   const current = readFile()
@@ -98,6 +105,7 @@ export function saveKeys(input: {
   }
   apply("exa", "EXA_API_KEY", input.exa)
   apply("firecrawl", "FIRECRAWL_API_KEY", input.firecrawl)
+  apply("openai", "OPENAI_API_KEY", input.openai)
   apply("parallel", "PARALLEL_API_KEY", input.parallel)
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.writeFileSync(file, JSON.stringify(next, null, 2), { mode: 0o600 })

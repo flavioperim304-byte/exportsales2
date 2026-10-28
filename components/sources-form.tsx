@@ -9,9 +9,11 @@ import type { KeyFlags } from "@/lib/types"
 const EMPTY_FLAGS: KeyFlags = {
   exa: false,
   firecrawl: false,
+  openai: false,
   parallel: false,
   exaEnv: false,
   firecrawlEnv: false,
+  openaiEnv: false,
   parallelEnv: false,
 }
 
@@ -19,6 +21,7 @@ export function SourcesForm() {
   const [flags, setFlags] = useState<KeyFlags>(EMPTY_FLAGS)
   const [exa, setExa] = useState("")
   const [firecrawl, setFirecrawl] = useState("")
+  const [openai, setOpenai] = useState("")
   const [parallel, setParallel] = useState("")
   const [notes, setNotes] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
@@ -54,6 +57,7 @@ export function SourcesForm() {
     const payload: Record<string, string> = {}
     if (exa.trim()) payload.exa = exa.trim()
     if (firecrawl.trim()) payload.firecrawl = firecrawl.trim()
+    if (openai.trim()) payload.openai = openai.trim()
     if (parallel.trim()) payload.parallel = parallel.trim()
     if (Object.keys(payload).length === 0) {
       setError("Paste at least one key before saving.")
@@ -75,6 +79,7 @@ export function SourcesForm() {
       setNotes(data.notes ?? [])
       setExa("")
       setFirecrawl("")
+      setOpenai("")
       setParallel("")
       setSaved(true)
     } catch {
@@ -84,7 +89,7 @@ export function SourcesForm() {
     }
   }
 
-  async function clearKey(field: "exa" | "firecrawl" | "parallel") {
+  async function clearKey(field: "exa" | "firecrawl" | "openai" | "parallel") {
     setError("")
     setSaved(false)
     const response = await fetch("/api/keys", {
@@ -98,17 +103,17 @@ export function SourcesForm() {
     await refresh()
   }
 
-  const ready = [flags.exa, flags.firecrawl, flags.parallel].filter(Boolean).length
+  const ready = [flags.exa, flags.firecrawl, flags.openai, flags.parallel].filter(Boolean).length
 
   return (
     <form onSubmit={save} className="flex max-w-xl flex-col gap-5">
       <p className="text-sm text-muted-foreground">
-        {ready} of 3 sources connected. Keys stay in <span className="font-medium text-foreground">data/secrets.json</span> on this machine and are sent only to Exa, Firecrawl, and Parallel.
+        {ready} of 4 sources connected. Keys stay in <span className="font-medium text-foreground">data/secrets.json</span> on this machine and are sent only to Exa, Firecrawl, OpenAI, and Parallel.
       </p>
       <KeyField
         id="exa-key"
         label="Exa"
-        hint="Search and enrichment. Required for a live run."
+        hint="Agent in search mode. Finds 10 companies per country. Required for a live run."
         env={flags.exaEnv}
         saved={flags.exa}
         value={exa}
@@ -118,7 +123,7 @@ export function SourcesForm() {
       <KeyField
         id="firecrawl-key"
         label="Firecrawl"
-        hint="Page extraction. Optional. The score says when this stage was skipped."
+        hint="Agent that collects ICP fields plus email, website, phone, and WhatsApp."
         env={flags.firecrawlEnv}
         saved={flags.firecrawl}
         value={firecrawl}
@@ -126,9 +131,19 @@ export function SourcesForm() {
         onClear={() => clearKey("firecrawl")}
       />
       <KeyField
+        id="openai-key"
+        label="OpenAI"
+        hint="Scores each company and names a preliminary best fit."
+        env={flags.openaiEnv}
+        saved={flags.openai}
+        value={openai}
+        onChange={setOpenai}
+        onClear={() => clearKey("openai")}
+      />
+      <KeyField
         id="parallel-key"
         label="Parallel"
-        hint="Market, competitor, and lead research. Optional."
+        hint="Deep research. Refines the OpenAI score, adds market context, and sets the final best fit."
         env={flags.parallelEnv}
         saved={flags.parallel}
         value={parallel}
