@@ -38,6 +38,7 @@ yarn-error.log*
 /data/runs.json
 /data/secrets.json
 /data/*.tmp
+/api-keys.env
 
 # fetched docs used while building
 /agent-tools

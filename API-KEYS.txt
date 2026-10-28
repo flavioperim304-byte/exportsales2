@@ -1,14 +1,9 @@
-You are already in the project folder. There is no extra folder named workspace.
+The keys are saved. Meridian reads them from api-keys.env in this folder.
 
-Paste your keys into api-keys.env in this same folder.
-It is a normal project file next to this note and package.json.
-A previous paste did not arrive because the file was hidden. Paste again and save.
+That file stays on this machine and is left out of git, so a later commit cannot publish the secrets.
+If the editor still shows the file as unsaved, the copy on disk is already the one the desk uses.
 
-EXA_API_KEY is the one a live search needs.
-FIRECRAWL_API_KEY and PARALLEL_API_KEY can stay empty.
+EXA_API_KEY, FIRECRAWL_API_KEY, and PARALLEL_API_KEY are all present.
 
-The file .env is hidden, which is why it does not appear in the file list.
-Use api-keys.env instead.
-
-You can also open the desk and go to Sources:
+You can also open Sources and replace a key there:
 http://127.0.0.1:4317/sources
