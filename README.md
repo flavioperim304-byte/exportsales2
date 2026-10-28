@@ -5,7 +5,7 @@ Export sales intelligence for a supplier you already represent. The desk qualifi
 1. **Search — Exa Agent.** One agent run per target country, locked to search mode (`effort: medium` on `POST /agent/runs`). It returns up to 10 companies and their websites. It does not score them. The query is built from the brief.
 2. **ICP and contacts — Firecrawl Agent.** Each company is read by `POST /v2/agent` for role, products, markets, and published email, website, phone, and WhatsApp. A blank field means it was not published.
 3. **Score and best fit — OpenAI.** A structured score assigns high, medium, or low for each supplier and a preliminary best fit (`supplier`, `both`, or `neither`). That is not a confirmed order.
-4. **Refine and context — Parallel Task API.** One task (`core`, falling back to `core-fast`, about $0.025 a run) checks the OpenAI score, writes the market and competitor note with citations, and sets the final best fit.
+4. **Refine and context — Parallel Task API.** One task (`pro-fast`, falling back to `pro`, about $0.14 a call) checks the OpenAI score, writes the market and competitor note with citations, and sets the final best fit.
 
 A local checklist still files page evidence beside those scores. It is shown only when neither OpenAI nor Parallel has scored the list. The worked example is in that state.
 

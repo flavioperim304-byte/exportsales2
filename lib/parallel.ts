@@ -130,7 +130,7 @@ export async function createResearch(
   also?: Brief
 ): Promise<{ runId: string; interactionId?: string; processor: string }> {
   const input = researchPrompt(brief, leads, also)
-  const processors = ["core", "core-fast"]
+  const processors = ["pro-fast", "pro"]
   let lastError: unknown
   for (const processor of processors) {
     try {
