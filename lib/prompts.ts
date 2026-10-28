@@ -12,11 +12,16 @@ function extra(brief: Brief): string {
   return note ? `Additional instructions: ${note}` : ""
 }
 
-export function exaQuery(brief: Brief, country: string): string {
+export function buyerTypes(brief: Brief): string[] {
+  return splitList(brief.buyerTypes)
+}
+
+export function exaQuery(brief: Brief, country: string, buyerType?: string): string {
+  const type = buyerType?.trim() || brief.buyerTypes.trim() || "importer, distributor, or wholesaler"
   return [
-    `Companies in ${country} that import, distribute, or wholesale ${brief.products}.`,
+    `Find ${type} in ${country} that buy or import ${brief.products}.`,
+    `This search is only for this buyer type: ${type}. Do not fill the list with a different type.`,
     `Supplier to place: ${brief.supplierName} from ${brief.originCountry}.`,
-    `Buyer types: ${brief.buyerTypes}.`,
     brief.mustHaves ? `The buyer must show: ${brief.mustHaves}.` : "",
     brief.exclusions ? `Do not return: ${brief.exclusions}.` : "",
     brief.certifications ? `Relevant certifications: ${brief.certifications}.` : "",
@@ -77,7 +82,8 @@ export function searchBrief(brief: Brief, also?: Brief): Brief {
 export function exaSystemPrompt(): string {
   return [
     "You are in search mode.",
-    `Return at most ${LEADS_PER_COUNTRY} real companies that import, distribute, or wholesale the products in the query.`,
+    `Return at most ${LEADS_PER_COUNTRY} real companies of the single buyer type named in the query.`,
+    "A wholesaler search must not be filled with distributors. A trading-company search must not be filled with distributors. If that type is scarce, return fewer companies.",
     "Each company needs its official website.",
     "Do not score the companies, do not write a market report, and do not invent email addresses or phone numbers.",
     "Skip the supplier’s own website. Prefer a company site over a social profile.",

@@ -122,6 +122,8 @@ export type Lead = {
   country: string
   /** Country this lead was searched for. Not treated as evidence of where the company is based. */
   market?: string
+  /** Buyer type this lead was searched under, when the brief lists more than one. */
+  buyerType?: string
   exa: ExaHit
   extraction?: Extraction
   context?: LeadContext

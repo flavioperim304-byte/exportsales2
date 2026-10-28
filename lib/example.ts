@@ -28,7 +28,7 @@ export const KANECHOM_BRIEF: Brief = {
     "Brazilian hair care for mass-market and low-end retail. Skala is a major competitor, so a distributor that already carries Skala or a similar brand is a strong lead.",
   certifications: "GMP, ANVISA",
   markets: HAIR_MARKETS,
-  buyerTypes: "mass-market distributor or wholesaler that imports retail hair care",
+  buyerTypes: "mass-market distributor, wholesaler, trading company",
   mustHaves:
     "imports retail hair care, coverage in mass-market and low-end retail, experience importing an international brand",
   exclusions: "salons with no wholesale, equipment-only suppliers",
@@ -46,7 +46,7 @@ export const LQ_BRIEF: Brief = {
     "Brazilian professional hair care for beauty salons, including straightening sets. The buyer should be able to train hairdressers.",
   certifications: "GMP, ANVISA",
   markets: HAIR_MARKETS,
-  buyerTypes: "distributor of professional products for beauty salons",
+  buyerTypes: "distributor, wholesaler, trading company",
   mustHaves:
     "distributes professional salon hair care, capacity to train hairdressers, experience importing an international brand",
   exclusions: "salons with no wholesale, equipment-only suppliers",

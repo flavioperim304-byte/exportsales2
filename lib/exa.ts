@@ -1,6 +1,7 @@
 import type { Brief, Lead } from "./types"
 import { ApiError, requestJson } from "./http"
 import {
+  buyerTypes,
   exaBackupQuery,
   exaQuery,
   exaSystemPrompt,
@@ -136,7 +137,8 @@ function acceptCompanies(
   companies: AgentCompany[],
   country: string,
   seen: Set<string>,
-  websites: string[]
+  websites: string[],
+  buyerType = ""
 ): Lead[] {
   const local = new Set(seen)
   const leads: Lead[] = []
@@ -147,11 +149,31 @@ function acceptCompanies(
     if (local.has(lead.domain)) continue
     local.add(lead.domain)
     lead.market = country
+    lead.buyerType = buyerType
     leads.push(lead)
   }
   const ownSites = leads.filter((lead) => !SOCIAL.test(lead.domain))
   const social = leads.filter((lead) => SOCIAL.test(lead.domain))
   return [...ownSites, ...social]
+}
+
+function mixTypes(groups: Lead[][]): Lead[] {
+  const mixed: Lead[] = []
+  const cursors = groups.map(() => 0)
+  while (mixed.length < LEADS_PER_COUNTRY) {
+    let added = false
+    for (let index = 0; index < groups.length; index += 1) {
+      const cursor = cursors[index]
+      const lead = groups[index][cursor]
+      if (!lead) continue
+      cursors[index] = cursor + 1
+      mixed.push(lead)
+      added = true
+      if (mixed.length >= LEADS_PER_COUNTRY) break
+    }
+    if (!added) break
+  }
+  return mixed
 }
 
 async function searchCountry(
@@ -161,8 +183,21 @@ async function searchCountry(
   seen: Set<string>,
   websites: string[]
 ): Promise<Lead[]> {
-  const companies = await runAgentSearch(key, exaQuery(brief, country), websites)
-  let leads = acceptCompanies(companies, country, seen, websites)
+  const types = buyerTypes(brief)
+  const wanted = types.length ? types : [""]
+  const groups: Lead[][] = []
+  const found = new Set(seen)
+  for (const type of wanted) {
+    const companies = await runAgentSearch(
+      key,
+      type ? exaQuery(brief, country, type) : exaQuery(brief, country),
+      websites
+    )
+    const leads = acceptCompanies(companies, country, found, websites, type)
+    for (const lead of leads) found.add(lead.domain)
+    groups.push(leads)
+  }
+  let leads = mixTypes(groups)
   if (leads.length < LEADS_PER_COUNTRY) {
     const extra = await runAgentSearch(key, exaBackupQuery(brief, country), websites).catch(
       () => [] as AgentCompany[]

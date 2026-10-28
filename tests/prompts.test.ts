@@ -3,6 +3,7 @@ import test from "node:test"
 import { KANECHOM_BRIEF, LQ_BRIEF, validateBrief } from "../lib/example"
 import {
   LEADS_PER_COUNTRY,
+  buyerTypes,
   exaQuery,
   exaSystemPrompt,
   firecrawlPrompt,
@@ -20,6 +21,7 @@ test("each country gets its own prompt and ten leads", () => {
   }
   assert.equal(LEADS_PER_COUNTRY, 10)
   assert.match(exaSystemPrompt(), /search mode/)
+  assert.match(exaSystemPrompt(), /must not be filled with distributors/)
   assert.deepEqual(targetCountries(brief), ["Germany", "France"])
 
   const germany = exaQuery(brief, "Germany")
@@ -47,6 +49,13 @@ test("Kanechom and LQ Professional prompts follow different must-haves", () => {
   assert.match(lq, /train hairdressers/)
   assert.doesNotMatch(kanechom, /train hairdressers/)
   assert.match(firecrawlPrompt(LQ_BRIEF, "Mexico"), /GMP, ANVISA/)
+})
+
+test("each listed buyer type is searched on its own", () => {
+  assert.deepEqual(buyerTypes(LQ_BRIEF), ["distributor", "wholesaler", "trading company"])
+  const wholesale = exaQuery(LQ_BRIEF, "Dominican Republic", "wholesaler")
+  assert.match(wholesale, /only for this buyer type: wholesaler/)
+  assert.doesNotMatch(wholesale, /buyer type: distributor,/)
 })
 
 test("both hair briefs search the three markets from the form", () => {

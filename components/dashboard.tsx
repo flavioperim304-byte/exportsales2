@@ -220,7 +220,12 @@ function OutputTable({ run }: { run: Run }) {
               const website = lead?.extraction?.website || lead?.url || ""
               return (
                 <tr key={row.company} className="border-b border-border/70 align-top">
-                  <td className="py-3 pr-3 font-medium">{row.company}</td>
+                  <td className="py-3 pr-3 font-medium">
+                    {row.company}
+                    {lead?.buyerType ? (
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">{lead.buyerType}</span>
+                    ) : null}
+                  </td>
                   <td className="py-3 pr-3 text-muted-foreground">{row.country}</td>
                   <td className="py-3 pr-3 uppercase">{row.level}</td>
                   <td className="py-3 pr-3">{row.bestFit}</td>
