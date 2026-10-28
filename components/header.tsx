@@ -33,10 +33,14 @@ export function Header() {
           </span>
         </Link>
         <nav className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" render={<Link href="/qualify" />}>
+          <Button variant="ghost" nativeButton={false} render={<Link href="/qualify" />}>
             New qualification
           </Button>
-          <Button variant={ready === 0 ? "default" : "outline"} render={<Link href="/sources" />}>
+          <Button
+            variant={ready === 0 ? "default" : "outline"}
+            nativeButton={false}
+            render={<Link href="/sources" />}
+          >
             Sources {ready}/3
           </Button>
         </nav>
