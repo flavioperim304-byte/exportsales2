@@ -38,10 +38,23 @@ test("Kanechom and LQ Professional prompts follow different must-haves", () => {
   const lq = exaQuery({ ...LQ_BRIEF, markets: "Mexico" }, "Mexico")
   assert.match(kanechom, /Kanechom/)
   assert.match(kanechom, /low-end retail/)
+  assert.match(kanechom, /Skala/)
   assert.match(lq, /LQ Professional/)
+  assert.match(lq, /straightening/)
   assert.match(lq, /train hairdressers/)
   assert.doesNotMatch(kanechom, /train hairdressers/)
   assert.match(firecrawlPrompt(LQ_BRIEF, "Mexico"), /GMP, ANVISA/)
+})
+
+test("both hair briefs search the three markets from the form", () => {
+  assert.deepEqual(targetCountries(KANECHOM_BRIEF), [
+    "Dominican Republic",
+    "South Africa",
+    "Chile",
+  ])
+  assert.deepEqual(targetCountries(LQ_BRIEF), targetCountries(KANECHOM_BRIEF))
+  assert.match(exaQuery(KANECHOM_BRIEF, "South Africa"), /Skala/)
+  assert.match(exaQuery(LQ_BRIEF, "Dominican Republic"), /beauty salons/)
 })
 
 test("a live brief is locked to ten leads per country", () => {

@@ -17,20 +17,23 @@ export const EXAMPLE_BRIEF: Brief = {
   leadCount: LEADS_PER_COUNTRY,
 }
 
-const HAIR_PRODUCTS = "hair care products: shampoo, conditioner, treatments, and styling"
+export const HAIR_MARKETS = "Dominican Republic, South Africa, Chile"
 
 export const KANECHOM_BRIEF: Brief = {
   supplierName: "Kanechom",
   originCountry: "Brazil",
   website: "https://kanechom.com",
-  products: HAIR_PRODUCTS,
+  products: "mass-market retail hair care: shampoo, conditioner, treatments, and styling",
   differentiators:
-    "Brazilian hair care aimed at low-end retail. The buyer needs coverage in that channel.",
+    "Brazilian hair care for mass-market and low-end retail. Skala is a major competitor, so a distributor that already carries Skala or a similar brand is a strong lead.",
   certifications: "GMP, ANVISA",
-  markets: "",
-  buyerTypes: "distributor, wholesaler, or importer of hair care products",
-  mustHaves: "experience importing an international brand, coverage in low-end retail",
+  markets: HAIR_MARKETS,
+  buyerTypes: "mass-market distributor or wholesaler that imports retail hair care",
+  mustHaves:
+    "imports retail hair care, coverage in mass-market and low-end retail, experience importing an international brand",
   exclusions: "salons with no wholesale, equipment-only suppliers",
+  instructions:
+    "A strong signal is a distributor of competitor hair-care brands, especially Skala.",
   leadCount: LEADS_PER_COUNTRY,
 }
 
@@ -38,14 +41,17 @@ export const LQ_BRIEF: Brief = {
   supplierName: "LQ Professional",
   originCountry: "Brazil",
   website: "https://lqprofessional.com.br",
-  products: HAIR_PRODUCTS,
+  products: "professional hair care for beauty salons, including straightening sets",
   differentiators:
-    "Brazilian professional hair care for salons. The buyer needs the capacity to train hairdressers.",
+    "Brazilian professional hair care for beauty salons, including straightening sets. The buyer should be able to train hairdressers.",
   certifications: "GMP, ANVISA",
-  markets: "",
-  buyerTypes: "distributor, wholesaler, or importer of hair care products",
-  mustHaves: "experience importing an international brand, capacity to train hairdressers",
+  markets: HAIR_MARKETS,
+  buyerTypes: "distributor of professional products for beauty salons",
+  mustHaves:
+    "distributes professional salon hair care, capacity to train hairdressers, experience importing an international brand",
   exclusions: "salons with no wholesale, equipment-only suppliers",
+  instructions:
+    "Look for distributors of professional salon brands and straightening systems, not mass-market grocery hair care.",
   leadCount: LEADS_PER_COUNTRY,
 }
 

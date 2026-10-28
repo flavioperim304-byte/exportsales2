@@ -106,6 +106,17 @@ const ALIASES: Record<string, string[]> = {
   portugal: ["portugal", "portuguese"],
   india: ["india", "indian"],
   singapore: ["singapore"],
+  "dominican republic": [
+    "dominican republic",
+    "republica dominicana",
+    "dominicana",
+  ],
+  "south africa": ["south africa", "sudafrica"],
+  chile: ["chile", "chilean"],
+}
+
+function fold(value: string): string {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase()
 }
 
 function escapeReg(value: string): string {
@@ -133,11 +144,11 @@ export function significant(value: string): string[] {
 }
 
 function placeMatch(target: string, corpus: string): boolean {
-  const needle = target.toLowerCase().trim()
-  const hay = corpus.toLowerCase()
+  const needle = fold(target).trim()
+  const hay = fold(corpus)
   if (!needle || !hay) return false
   if (hay.includes(needle)) return true
-  const aliases = ALIASES[needle] ?? [needle]
+  const aliases = (ALIASES[needle] ?? [needle]).map(fold)
   return aliases.some((alias) =>
     new RegExp(`(?:^|[^a-z])${escapeReg(alias)}(?:[^a-z]|$)`, "i").test(hay)
   )

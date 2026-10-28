@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { EXAMPLE_BRIEF } from "../lib/example"
+import { EXAMPLE_BRIEF, KANECHOM_BRIEF } from "../lib/example"
 import { sampleRun } from "../lib/sample"
 import { scoreLead } from "../lib/score"
 import type { Lead } from "../lib/types"
@@ -95,6 +95,53 @@ test("“not exclusive” is an open book, not a locked account", () => {
   const competitive = score.dimensions.find((item) => item.key === "competitive")
   assert.equal(competitive?.points, 10)
   assert.match(competitive?.rationale ?? "", /open buying book/i)
+})
+
+test("República Dominicana and South África count as the target markets", () => {
+  const dominicana: Lead = {
+    id: "rd",
+    name: "Caribe Belleza",
+    domain: "caribe.example",
+    url: "https://caribe.example/",
+    country: "",
+    exa: {
+      title: "Caribe Belleza",
+      url: "https://caribe.example/",
+      domain: "caribe.example",
+      text: "Distribuidor de cuidado capilar.",
+      highlights: [],
+      summary: "Distribuidor.",
+    },
+    extraction: {
+      ok: true,
+      companyName: "Caribe Belleza",
+      headquarters: "Santo Domingo",
+      country: "República Dominicana",
+      role: "distributor",
+      buys: ["hair care"],
+      sells: [],
+      markets: [],
+      certifications: [],
+      buyerSignals: [],
+      summary: "Imports retail hair care.",
+      excerpt: "Imports retail hair care.",
+    },
+  }
+  const africa: Lead = {
+    ...dominicana,
+    id: "za",
+    name: "Cape Retail",
+    extraction: {
+      ...dominicana.extraction!,
+      companyName: "Cape Retail",
+      headquarters: "Cape Town, South África",
+      country: "",
+    },
+  }
+  const geo = (lead: Lead) =>
+    scoreLead(KANECHOM_BRIEF, lead).dimensions.find((item) => item.key === "geography")
+  assert.equal(geo(dominicana)?.points, 15)
+  assert.equal(geo(africa)?.points, 15)
 })
 
 test("a thin excerpt still returns a score without invented evidence", () => {
