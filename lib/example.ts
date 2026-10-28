@@ -1,4 +1,4 @@
-import { LEADS_PER_COUNTRY } from "./prompts"
+import { LEADS_PER_COUNTRY, isPromptOnly } from "./prompts"
 import type { Brief } from "./types"
 
 export const EXAMPLE_BRIEF: Brief = {
@@ -72,6 +72,34 @@ export function emptyBrief(): Brief {
   }
 }
 
+export function presentBrief(brief: Brief): Brief {
+  if (isPromptOnly(brief)) {
+    return { ...brief, instructions: brief.instructions?.trim() ?? "", leadCount: LEADS_PER_COUNTRY }
+  }
+  const prompt = [
+    brief.instructions?.trim(),
+    brief.products && `Products: ${brief.products}`,
+    brief.differentiators && `Why a buyer would add this supplier: ${brief.differentiators}`,
+    brief.certifications && `Certifications: ${brief.certifications}`,
+    brief.buyerTypes && `Buyer types: ${brief.buyerTypes}`,
+    brief.mustHaves && `The buyer must show: ${brief.mustHaves}`,
+    brief.exclusions && `Do not include: ${brief.exclusions}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+  return {
+    ...brief,
+    products: "",
+    differentiators: "",
+    certifications: "",
+    buyerTypes: "",
+    mustHaves: "",
+    exclusions: "",
+    instructions: prompt,
+    leadCount: LEADS_PER_COUNTRY,
+  }
+}
+
 export function validateBrief(input: unknown): { brief?: Brief; error?: string } {
   if (!input || typeof input !== "object") {
     return { error: "The brief was empty." }
@@ -89,14 +117,18 @@ export function validateBrief(input: unknown): { brief?: Brief; error?: string }
     buyerTypes: text(raw.buyerTypes),
     mustHaves: text(raw.mustHaves),
     exclusions: text(raw.exclusions),
-    instructions: text(raw.instructions).slice(0, 800),
+    instructions: text(raw.instructions).slice(0, 8000),
     leadCount: LEADS_PER_COUNTRY,
   }
   if (!brief.supplierName) return { error: "Name the supplier you are representing." }
   if (!brief.originCountry) return { error: "Add the supplier’s origin country." }
-  if (!brief.products) return { error: "Describe the products this supplier exports." }
   if (!brief.markets) return { error: "Add at least one target market." }
-  if (!brief.buyerTypes) return { error: "Describe the buyer types you want." }
+  if (!brief.products && !brief.instructions) {
+    return { error: "Write the prompt for this search." }
+  }
+  if (!brief.buyerTypes && !brief.instructions) {
+    return { error: "Write the prompt for this search." }
+  }
   if (brief.website && !/^https?:\/\//i.test(brief.website)) {
     brief.website = `https://${brief.website}`
   }

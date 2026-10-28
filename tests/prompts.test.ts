@@ -1,10 +1,11 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { KANECHOM_BRIEF, LQ_BRIEF, validateBrief } from "../lib/example"
+import { KANECHOM_BRIEF, LQ_BRIEF, presentBrief, validateBrief } from "../lib/example"
 import {
   LEADS_PER_COUNTRY,
   buyerTypes,
   exaQuery,
+  isPromptOnly,
   exaSystemPrompt,
   firecrawlPrompt,
   openaiInstructions,
@@ -53,6 +54,23 @@ test("Kanechom and LQ Professional prompts follow different must-haves", () => {
   assert.match(lq, /train hairdressers/)
   assert.doesNotMatch(kanechom, /train hairdressers/)
   assert.match(firecrawlPrompt(LQ_BRIEF, "Mexico"), /GMP, ANVISA/)
+})
+
+test("a single prompt replaces buyer type, must-have, and exclusion fields", () => {
+  const folded = presentBrief({ ...KANECHOM_BRIEF, markets: "Costa Rica" })
+  assert.equal(isPromptOnly(folded), true)
+  assert.equal(folded.buyerTypes, "")
+  assert.equal(folded.mustHaves, "")
+  assert.equal(folded.exclusions, "")
+  assert.match(folded.instructions ?? "", /Skala/)
+  assert.match(folded.instructions ?? "", /Buyer types:/)
+  const query = exaQuery(folded, "Costa Rica")
+  assert.match(query, /Search only in Costa Rica/)
+  assert.match(query, /Skala/)
+  assert.doesNotMatch(query, /Must-haves: none/)
+  const parsed = validateBrief(folded)
+  assert.equal(parsed.error, undefined)
+  assert.equal(validateBrief({ ...folded, instructions: "" }).error, "Write the prompt for this search.")
 })
 
 test("each listed buyer type is searched on its own", () => {

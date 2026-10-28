@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { DownloadResults } from "@/components/download-results"
 import { Button } from "@/components/ui/button"
 import { PromptPreview } from "@/components/prompt-preview"
 import { qualificationRows } from "@/lib/qualify"
@@ -90,15 +91,18 @@ export function RunDesk({ initial }: { initial: Run }) {
             {run.also ? `${run.brief.supplierName} and ${run.also.supplierName}` : run.brief.supplierName}
           </h1>
         </div>
-        {run.mode === "sample" ? (
-          <Button variant="outline" nativeButton={false} render={<Link href="/qualify" />}>
-            Start a live qualification
-          </Button>
-        ) : run.status === "complete" || run.status === "failed" ? (
-          <Button variant="outline" onClick={restart} disabled={restarting}>
-            {restarting ? "Starting…" : "Run this brief again"}
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadResults run={run} />
+          {run.mode === "sample" ? (
+            <Button variant="outline" nativeButton={false} render={<Link href="/qualify" />}>
+              Start a live qualification
+            </Button>
+          ) : run.status === "complete" || run.status === "failed" ? (
+            <Button variant="outline" onClick={restart} disabled={restarting}>
+              {restarting ? "Starting…" : "Run this brief again"}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {run.mode === "sample" ? (
@@ -116,6 +120,8 @@ export function RunDesk({ initial }: { initial: Run }) {
       {refreshError ? <p className="text-sm text-destructive">{refreshError}</p> : null}
 
       <section className="rounded-xl border border-border bg-card p-4">
+        {run.brief.products || run.brief.buyerTypes || run.brief.exclusions ? (
+        <>
         <div className="grid gap-4 md:grid-cols-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Selling</p>
@@ -148,6 +154,15 @@ export function RunDesk({ initial }: { initial: Run }) {
         {run.brief.instructions ? (
           <p className="mt-3 text-sm text-muted-foreground">Prompt note: {run.brief.instructions}</p>
         ) : null}
+        </>
+        ) : (
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              Prompt · {run.brief.markets}
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{run.brief.instructions}</p>
+          </div>
+        )}
       </section>
 
       <details className="rounded-xl border border-border bg-card p-4">

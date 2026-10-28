@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { DownloadResults } from "@/components/download-results"
 import { QualifyForm } from "@/components/qualify-form"
 import { Badge } from "@/components/ui/badge"
 import { STATUS_LABEL, formatWhen, isHttpUrl } from "@/lib/format"
@@ -147,6 +148,7 @@ export function Dashboard({
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <DownloadResults run={run} />
               {run.mode === "sample" ? <Badge variant="outline">Sample</Badge> : null}
               <Badge variant="secondary">{STATUS_LABEL[run.status]}</Badge>
             </div>

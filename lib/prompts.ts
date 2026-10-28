@@ -12,11 +12,34 @@ function extra(brief: Brief): string {
   return note ? `Additional instructions: ${note}` : ""
 }
 
+/** The salesperson wrote one prompt. The split buyer fields are empty. */
+export function isPromptOnly(brief: Brief): boolean {
+  const prompt = brief.instructions?.trim()
+  if (!prompt) return false
+  return ![
+    brief.products,
+    brief.buyerTypes,
+    brief.mustHaves,
+    brief.exclusions,
+    brief.differentiators,
+    brief.certifications,
+  ].some((value) => value.trim())
+}
+
+function promptSearch(brief: Brief, country: string): string {
+  return [
+    brief.instructions?.trim() ?? "",
+    `Search only in ${country}. Every company must operate in ${country}. Do not return a company based in another country.`,
+    `These are buyers for ${brief.supplierName}, from ${brief.originCountry}. Do not return ${brief.supplierName} itself or a different supplier.`,
+  ].join("\n\n")
+}
+
 export function buyerTypes(brief: Brief): string[] {
   return splitList(brief.buyerTypes)
 }
 
 export function exaQuery(brief: Brief, country: string, buyerType?: string): string {
+  if (isPromptOnly(brief)) return promptSearch(brief, country)
   const type = buyerType?.trim() || brief.buyerTypes.trim() || "importer, distributor, or wholesaler"
   return [
     `Find ${type} in ${country} that buy or import ${brief.products}.`,
@@ -35,6 +58,7 @@ export function exaQuery(brief: Brief, country: string, buyerType?: string): str
 }
 
 export function exaBackupQuery(brief: Brief, country: string, buyerType?: string): string {
+  if (isPromptOnly(brief)) return promptSearch(brief, country)
   const type = buyerType?.trim() || brief.buyerTypes.trim() || "importer, distributor, or wholesaler"
   return [
     `More ${type} in ${country} that buy or import ${brief.products}.`,
@@ -50,6 +74,20 @@ export function exaBackupQuery(brief: Brief, country: string, buyerType?: string
 }
 
 export function firecrawlPrompt(brief: Brief, country: string, buyerType?: string): string {
+  if (isPromptOnly(brief)) {
+    return [
+      "Extract a buyer profile for an export salesperson.",
+      `Supplier: ${brief.supplierName} (${brief.originCountry}).`,
+      country
+        ? `This company was retrieved as a candidate for ${country}.`
+        : `Target markets: ${brief.markets}.`,
+      "Judge the page only against this prompt:",
+      brief.instructions?.trim() ?? "",
+      "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
+      "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
+      "buyerSignals must be short phrases taken from the page about how this company buys or sells.",
+    ].join("\n")
+  }
   const type = buyerType?.trim()
   return [
     "Extract a buyer profile for an export salesperson.",
@@ -101,6 +139,19 @@ export function exaSystemPrompt(): string {
 }
 
 export function openaiInstructions(brief: Brief, also?: Brief): string {
+  if (isPromptOnly(brief) && !also) {
+    return [
+      "You score export leads. Use only the evidence in the candidate cards. Do not browse and do not invent contacts, volumes, or brands.",
+      `Supplier: ${brief.supplierName}, from ${brief.originCountry}.`,
+      brief.website ? `Do not treat ${brief.website} as a buyer.` : "",
+      "Score against the prompt below. Do not add must-haves or exclusions that the prompt does not state.",
+      brief.instructions?.trim() ?? "",
+      "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
+      "qualification_needed is what a salesperson still has to confirm. High means product and channel fit. It is not confirmed purchasing intent.",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }
   const suppliers = also
     ? `${brief.supplierName} and ${also.supplierName}`
     : brief.supplierName
@@ -122,6 +173,23 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
 
 export function parallelInstructions(brief: Brief, also?: Brief): string {
   const countries = targetCountries(brief)
+  if (isPromptOnly(brief) && !also) {
+    return [
+      "You are supporting an export salesperson. OpenAI already assigned a preliminary high, medium, or low and a best fit. Those levels are not confirmed purchasing intent. Refine them with current web sources. Cite URLs. Do not invent companies, contacts, or figures. You may change icp, each supplier fit, and best_fit when the sources disagree with the preliminary score, and say what changed.",
+      `Supplier to place: ${brief.supplierName}, from ${brief.originCountry}.`,
+      brief.website ? `Website to exclude as a buyer: ${brief.website}.` : "",
+      countries.length
+        ? `Write the outlook for ${countries.join(", ")}. The shortlist has up to ${LEADS_PER_COUNTRY} candidates per country.`
+        : `Target markets: ${brief.markets || "unpublished"}.`,
+      "Refine the score against this prompt only. Do not add must-haves or exclusions that the prompt does not state.",
+      brief.instructions?.trim() ?? "",
+      "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
+      "Say who to approach first, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and the supplier fit to high, medium, or low. Set best_fit to the supplier to pursue or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. These levels are not a probability of buying.",
+      "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers (not the candidates), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }
   const suppliers = also
     ? `${brief.supplierName} and ${also.supplierName}`
     : brief.supplierName

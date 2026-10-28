@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { PromptPreview } from "@/components/prompt-preview"
-import { EXAMPLE_BRIEF, KANECHOM_BRIEF, LQ_BRIEF, emptyBrief } from "@/lib/example"
+import { EXAMPLE_BRIEF, KANECHOM_BRIEF, LQ_BRIEF, emptyBrief, presentBrief } from "@/lib/example"
+import { formatWhen } from "@/lib/format"
 import { LEADS_PER_COUNTRY, targetCountries } from "@/lib/prompts"
+import type { SavedPrompt } from "@/lib/prompt-library"
 import type { Brief, KeyFlags } from "@/lib/types"
 
 export function QualifyForm({
@@ -21,10 +23,12 @@ export function QualifyForm({
   onStarted?: (id: string) => void
 }) {
   const router = useRouter()
-  const [brief, setBrief] = useState<Brief>(initial ?? emptyBrief())
+  const [brief, setBrief] = useState<Brief>(() => presentBrief(initial ?? emptyBrief()))
   const [flags, setFlags] = useState<KeyFlags | null>(null)
+  const [saved, setSaved] = useState<SavedPrompt[]>([])
   const [error, setError] = useState("")
   const [pending, setPending] = useState(false)
+  const [notice, setNotice] = useState("")
 
   useEffect(() => {
     fetch("/api/keys")
@@ -33,7 +37,15 @@ export function QualifyForm({
         if (data?.flags) setFlags(data.flags)
       })
       .catch(() => undefined)
+    void loadSaved()
   }, [])
+
+  async function loadSaved() {
+    const response = await fetch("/api/prompts", { cache: "no-store" }).catch(() => null)
+    if (!response?.ok) return
+    const data = (await response.json()) as { prompts?: SavedPrompt[] }
+    setSaved(data.prompts ?? [])
+  }
 
   function set<K extends keyof Brief>(key: K, value: Brief[K]) {
     setBrief((current) => ({ ...current, [key]: value }))
@@ -54,6 +66,7 @@ export function QualifyForm({
         setPending(false)
         return
       }
+      void loadSaved()
       if (onStarted) {
         onStarted(data.id)
         setPending(false)
@@ -68,7 +81,24 @@ export function QualifyForm({
 
   function submit(event: React.FormEvent) {
     event.preventDefault()
-    void launch(brief)
+    void launch(presentBrief(brief))
+  }
+
+  async function savePrompt() {
+    setError("")
+    setNotice("")
+    const response = await fetch("/api/prompts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(presentBrief(brief)),
+    }).catch(() => null)
+    const data = (await response?.json().catch(() => null)) as { error?: string } | null
+    if (!response?.ok) {
+      setError(data?.error || "The prompt could not be saved.")
+      return
+    }
+    setNotice("Prompt saved. Use it on a later search, or leave it unused.")
+    await loadSaved()
   }
 
   const exaReady = flags?.exa ?? false
@@ -85,13 +115,13 @@ export function QualifyForm({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => setBrief({ ...KANECHOM_BRIEF })}>
+          <Button type="button" variant="outline" onClick={() => setBrief(presentBrief(KANECHOM_BRIEF))}>
             Load Kanechom
           </Button>
-          <Button type="button" variant="outline" onClick={() => setBrief({ ...LQ_BRIEF })}>
+          <Button type="button" variant="outline" onClick={() => setBrief(presentBrief(LQ_BRIEF))}>
             Load LQ Professional
           </Button>
-          <Button type="button" variant="outline" onClick={() => setBrief({ ...EXAMPLE_BRIEF })}>
+          <Button type="button" variant="outline" onClick={() => setBrief(presentBrief(EXAMPLE_BRIEF))}>
             Load the coffee example
           </Button>
         </div>
@@ -129,33 +159,6 @@ export function QualifyForm({
               />
             </Field>
           </div>
-          <Field label="Products you export" htmlFor="products">
-            <Textarea
-              id="products"
-              value={brief.products}
-              onChange={(event) => set("products", event.target.value)}
-              required
-            />
-          </Field>
-          <Field label="Why a buyer would add you" htmlFor="differentiators">
-            <Textarea
-              id="differentiators"
-              value={brief.differentiators}
-              onChange={(event) => set("differentiators", event.target.value)}
-            />
-          </Field>
-          <Field label="Certifications" htmlFor="certifications" hint="Comma separated.">
-            <Input
-              id="certifications"
-              value={brief.certifications}
-              onChange={(event) => set("certifications", event.target.value)}
-              className="h-10"
-            />
-          </Field>
-        </section>
-
-        <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
-          <h2 className="font-serif text-2xl">Ideal buyer</h2>
           <Field
             label="Target markets"
             htmlFor="markets"
@@ -169,45 +172,60 @@ export function QualifyForm({
               required
             />
           </Field>
-          <Field label="Buyer types" htmlFor="buyerTypes">
-            <Textarea
-              id="buyerTypes"
-              value={brief.buyerTypes}
-              onChange={(event) => set("buyerTypes", event.target.value)}
-              required
-            />
-          </Field>
-          <Field label="Must-haves" htmlFor="mustHaves">
-            <Textarea
-              id="mustHaves"
-              value={brief.mustHaves}
-              onChange={(event) => set("mustHaves", event.target.value)}
-            />
-          </Field>
-          <Field label="Exclusions" htmlFor="exclusions" hint="A matching phrase disqualifies the lead.">
-            <Textarea
-              id="exclusions"
-              value={brief.exclusions}
-              onChange={(event) => set("exclusions", event.target.value)}
-            />
-          </Field>
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
+          <h2 className="font-serif text-2xl">Prompt</h2>
           <Field
-            label="Prompt instructions"
+            label="Prompt"
             htmlFor="instructions"
-            hint="Added to every prompt. The text below changes as you type."
+            hint="Products, buyer types, must-haves, and exclusions go in this text. Exa, Firecrawl, OpenAI, and Parallel receive it."
           >
             <Textarea
               id="instructions"
               value={brief.instructions ?? ""}
               onChange={(event) => set("instructions", event.target.value)}
-              placeholder="Example: prefer buyers that already stock Brazilian brands."
+              className="min-h-48"
+              required
+              placeholder="Find distributors, wholesalers, and trading companies that import retail hair care. Skip ecommerce shops."
             />
           </Field>
-          <p className="text-sm text-muted-foreground">
-            {targetCountries(brief).length === 0
-              ? `Add countries to size the run. Each one asks Exa for ${LEADS_PER_COUNTRY} companies.`
-              : `${targetCountries(brief).length} ${targetCountries(brief).length === 1 ? "country" : "countries"} × ${LEADS_PER_COUNTRY} leads = ${targetCountries(brief).length * LEADS_PER_COUNTRY} company reads.`}
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" variant="outline" onClick={() => void savePrompt()}>
+              Save prompt
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              {targetCountries(brief).length === 0
+                ? `Add countries to size the run. Each one asks Exa for ${LEADS_PER_COUNTRY} companies.`
+                : `${targetCountries(brief).length} ${targetCountries(brief).length === 1 ? "country" : "countries"} × ${LEADS_PER_COUNTRY} leads = ${targetCountries(brief).length * LEADS_PER_COUNTRY} company reads.`}
+            </p>
+          </div>
+          {notice ? <p className="text-sm text-muted-foreground">{notice}</p> : null}
+          {saved.length > 0 ? (
+            <div className="flex flex-col gap-2 border-t border-border pt-3">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Saved prompts</p>
+              {saved.map((item) => (
+                <div key={item.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatWhen(item.createdAt)}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 px-3"
+                    onClick={() => setBrief(presentBrief(item.brief))}
+                  >
+                    Use
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Saved prompts stay here. Use one on another search, or leave it unused.
+            </p>
+          )}
         </section>
       </div>
 

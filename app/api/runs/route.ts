@@ -1,7 +1,8 @@
 import { connection } from "next/server"
-import { validateBrief } from "@/lib/example"
+import { presentBrief, validateBrief } from "@/lib/example"
 import { getKeys } from "@/lib/keys"
 import { startRun } from "@/lib/pipeline"
+import { savePrompt } from "@/lib/prompt-store"
 
 export async function POST(request: Request) {
   await connection()
@@ -19,6 +20,8 @@ export async function POST(request: Request) {
       { status: 400 }
     )
   }
-  const run = await startRun(parsed.brief)
+  const brief = presentBrief(parsed.brief)
+  savePrompt(brief)
+  const run = await startRun(brief)
   return Response.json({ id: run.id })
 }
