@@ -20,8 +20,9 @@ export function exaQuery(brief: Brief, country: string, buyerType?: string): str
   const type = buyerType?.trim() || brief.buyerTypes.trim() || "importer, distributor, or wholesaler"
   return [
     `Find ${type} in ${country} that buy or import ${brief.products}.`,
+    `Every company must operate in ${country}. Do not return a company based in another country.`,
     `This search is only for this buyer type: ${type}. Do not fill the list with a different type.`,
-    `Supplier to place: ${brief.supplierName} from ${brief.originCountry}.`,
+    `These are buyers for ${brief.supplierName}, from ${brief.originCountry}. Do not return ${brief.supplierName} itself or a different supplier.`,
     brief.mustHaves ? `The buyer must show: ${brief.mustHaves}.` : "",
     brief.exclusions ? `Do not return: ${brief.exclusions}.` : "",
     brief.certifications ? `Relevant certifications: ${brief.certifications}.` : "",
@@ -37,7 +38,9 @@ export function exaBackupQuery(brief: Brief, country: string, buyerType?: string
   const type = buyerType?.trim() || brief.buyerTypes.trim() || "importer, distributor, or wholesaler"
   return [
     `More ${type} in ${country} that buy or import ${brief.products}.`,
+    `Every company must operate in ${country}. Do not return a company based in another country.`,
     `This search is only for this buyer type: ${type}. Do not fill the list with a different type.`,
+    `These are buyers for ${brief.supplierName}. Do not return ${brief.supplierName} itself or a different supplier.`,
     brief.mustHaves ? `Must show: ${brief.mustHaves}.` : "",
     brief.exclusions ? `Do not return: ${brief.exclusions}.` : "",
     extra(brief),
@@ -88,6 +91,8 @@ export function exaSystemPrompt(): string {
   return [
     "You are in search mode.",
     `Return at most ${LEADS_PER_COUNTRY} real companies of the single buyer type named in the query.`,
+    "Every company must be in the one country named in the query. Omit a company from any other country.",
+    "Return buyers for the supplier named in the query. Do not return that supplier, and do not return a different supplier.",
     "A wholesaler search must not be filled with distributors. A trading-company search must not be filled with distributors. If that type is scarce, return fewer companies.",
     "Each company needs its official website.",
     "Do not score the companies, do not write a market report, and do not invent email addresses or phone numbers.",

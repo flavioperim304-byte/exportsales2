@@ -164,7 +164,9 @@ function finish(run: Run) {
   )
 }
 
-async function doSearch(id: string) {
+const activeSearches = new Set<string>()
+
+async function doSearch(id: string): Promise<"busy" | "done"> {
   const keys = getKeys()
   const claimed = await updateRun(id, (run) => {
     if (run.status === "failed" || run.status === "complete") return "stop" as const
@@ -179,8 +181,11 @@ async function doSearch(id: string) {
   })
   if (claimed !== "go") {
     if (claimed === "busy") {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      return
+      if (activeSearches.has(id)) return "busy"
+      await updateRun(id, (run) => {
+        if (run.status === "searching") run.searchClaimed = false
+      })
+      return "done"
     }
     if (claimed === "resume") {
       await updateRun(id, (run) => {
@@ -192,7 +197,7 @@ async function doSearch(id: string) {
         }
       })
     }
-    return
+    return "done"
   }
   if (!keys.exa) {
     await updateRun(id, (run) => {
@@ -204,17 +209,21 @@ async function doSearch(id: string) {
       search.finishedAt = now()
       log(run, "search", run.error ?? "Exa key missing.")
     })
-    return
+    return "done"
   }
+  activeSearches.add(id)
   try {
     const run = getRun(id)
-    if (!run) return
-    const leads = await searchLeads(run.brief, keys.exa, run.also)
+    if (!run) return "done"
+    const found = await searchLeads(run.brief, keys.exa, run.also)
+    const leads = found.leads
     await updateRun(id, (current) => {
       if (leads.length === 0) {
         current.status = "failed"
         current.error =
-          "Exa returned no company pages after the supplier’s own domain was removed. Broaden the products or the markets and run again."
+          found.outside > 0
+            ? `Exa suggested ${found.outside} ${found.outside === 1 ? "company" : "companies"} from another country or another supplier. None were in ${current.brief.markets}.`
+            : "Exa returned no company pages after the supplier’s own domain was removed. Broaden the products or the markets and run again."
         const search = stage(current, "search")
         search.status = "failed"
         search.detail = current.error
@@ -252,7 +261,10 @@ async function doSearch(id: string) {
       search.finishedAt = now()
       log(run, "search", message)
     })
+  } finally {
+    activeSearches.delete(id)
   }
+  return "done"
 }
 
 async function doExtract(id: string): Promise<"wait" | "next"> {
@@ -572,7 +584,8 @@ async function pump(id: string) {
         return
       }
       if (run.status === "queued" || run.status === "searching") {
-        await doSearch(id)
+        const pace = await doSearch(id)
+        if (pace === "busy") return
         continue
       }
       if (run.status === "extracting") {

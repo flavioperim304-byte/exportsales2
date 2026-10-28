@@ -56,7 +56,13 @@ export function Dashboard({
     }
   }, [run.id, run.mode, run.status])
 
+  function remember(id: string) {
+    const path = `/?run=${encodeURIComponent(id)}`
+    window.history.replaceState(null, "", path)
+  }
+
   async function openRun(id: string) {
+    remember(id)
     setRefreshError("")
     const response = await fetch(`/api/runs/${id}`, { cache: "no-store" })
     if (!response.ok) {
@@ -146,6 +152,11 @@ export function Dashboard({
             </div>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">{formatWhen(run.updatedAt || run.createdAt)}</p>
+          {run.mode === "sample" ? (
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              This table is the coffee sample for Germany, the Netherlands, and Japan. It is not a Kanechom or LQ search.
+            </p>
+          ) : null}
           {refreshError ? <p className="mt-2 text-sm text-destructive">{refreshError}</p> : null}
           {run.error ? <p className="mt-2 text-sm text-destructive">{run.error}</p> : null}
 

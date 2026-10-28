@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { KANECHOM_BRIEF, LQ_BRIEF } from "../lib/example"
 import { icpLevel, qualificationRows } from "../lib/qualify"
+import { fitsRequestedMarket } from "../lib/score"
 import { parallelInstructions } from "../lib/prompts"
 import type { Lead, LeadScore } from "../lib/types"
 
@@ -116,6 +117,16 @@ test("OpenAI's preliminary score is used until Parallel replaces it", () => {
   const [refined] = qualificationRows([item], KANECHOM_BRIEF, LQ_BRIEF)
   assert.equal(refined.source, "parallel")
   assert.equal(refined.level, "medium")
+})
+
+test("a company from another country is not a Dominican Republic lead", () => {
+  assert.equal(fitsRequestedMarket("Republica Domincana", "Dominican Republic", "cofaca.com.do"), true)
+  assert.equal(fitsRequestedMarket("Republica Domincana", "República Dominicana", "zalmanproducts.com"), true)
+  assert.equal(fitsRequestedMarket("Republica Domincana", "", "distribuidora.com.do"), true)
+  assert.equal(fitsRequestedMarket("Republica Domincana", "Chile", "comprador.cl"), false)
+  assert.equal(fitsRequestedMarket("Republica Domincana", "", "comprador.cl"), false)
+  assert.equal(fitsRequestedMarket("Republica Domincana", "Brazil", "kanechom.com"), false)
+  assert.equal(fitsRequestedMarket("South Africa", "Germany", "nordlicht.example"), false)
 })
 
 test("Parallel is asked to separate fit from the ability to buy", () => {

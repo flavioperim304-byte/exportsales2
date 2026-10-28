@@ -109,7 +109,9 @@ const ALIASES: Record<string, string[]> = {
   "dominican republic": [
     "dominican republic",
     "republica dominicana",
+    "republica domincana",
     "dominicana",
+    "domincana",
   ],
   "south africa": ["south africa", "sudafrica"],
   chile: ["chile", "chilean"],
@@ -156,6 +158,51 @@ function placeMatch(target: string, corpus: string): boolean {
 
 function anyMarket(markets: string, corpus: string): boolean {
   return splitList(markets).some((market) => placeMatch(market, corpus))
+}
+
+const COUNTRY_TLD: Record<string, string> = {
+  ar: "argentina",
+  br: "brazil",
+  cl: "chile",
+  co: "colombia",
+  de: "germany",
+  do: "dominican republic",
+  ec: "ecuador",
+  fr: "france",
+  gb: "united kingdom",
+  jp: "japan",
+  mx: "mexico",
+  nl: "netherlands",
+  pe: "peru",
+  pt: "portugal",
+  uk: "united kingdom",
+  us: "united states",
+  za: "south africa",
+}
+
+function sharesMarket(left: string, right: string): boolean {
+  if (placeMatch(left, right) || placeMatch(right, left)) return true
+  const leftFold = fold(left)
+  const rightFold = fold(right)
+  for (const aliases of Object.values(ALIASES)) {
+    const folded = aliases.map(fold)
+    const leftHit = folded.some((alias) => leftFold.includes(alias))
+    const rightHit = folded.some((alias) => rightFold.includes(alias))
+    if (leftHit && rightHit) return true
+  }
+  return false
+}
+
+/** True when a search hit belongs to the country that was requested. */
+export function fitsRequestedMarket(target: string, reportedCountry: string, domain = ""): boolean {
+  const wanted = fold(target).trim()
+  if (!wanted) return true
+  const reported = fold(reportedCountry).trim()
+  if (reported && !sharesMarket(target, reported)) return false
+  const tld = domain.split(".").pop()?.toLowerCase() ?? ""
+  const fromDomain = tld.length === 2 ? COUNTRY_TLD[tld] : ""
+  if (fromDomain && !sharesMarket(target, fromDomain)) return false
+  return true
 }
 
 function bandFor(total: number): Band {

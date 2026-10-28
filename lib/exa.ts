@@ -9,6 +9,7 @@ import {
   searchBrief,
   targetCountries,
 } from "./prompts"
+import { fitsRequestedMarket } from "./score"
 import { asString, domainOf, sameSite } from "./text"
 
 const SOCIAL = /linkedin\.com|facebook\.com|instagram\.com|wikipedia\.org|youtube\.com/i
@@ -133,19 +134,35 @@ function companyToLead(company: AgentCompany): Lead | null {
   }
 }
 
+function namesSupplier(name: string, suppliers: string[]): boolean {
+  const folded = name.toLowerCase()
+  return suppliers.some((supplier) => {
+    const token = supplier.toLowerCase().trim()
+    if (token.length < 4) return false
+    return folded === token || folded.startsWith(`${token} `) || folded.includes(` ${token}`)
+  })
+}
+
 function acceptCompanies(
   companies: AgentCompany[],
   country: string,
   seen: Set<string>,
   websites: string[],
-  buyerType = ""
-): Lead[] {
+  buyerType = "",
+  suppliers: string[] = []
+): { leads: Lead[]; outside: number } {
   const local = new Set(seen)
   const leads: Lead[] = []
+  let outside = 0
   for (const company of companies) {
     const lead = companyToLead(company)
     if (!lead) continue
     if (websites.some((site) => sameSite(site, lead.url))) continue
+    if (namesSupplier(lead.name, suppliers)) continue
+    if (!fitsRequestedMarket(country, company.country, lead.domain)) {
+      outside += 1
+      continue
+    }
     if (local.has(lead.domain)) continue
     local.add(lead.domain)
     lead.market = country
@@ -154,7 +171,7 @@ function acceptCompanies(
   }
   const ownSites = leads.filter((lead) => !SOCIAL.test(lead.domain))
   const social = leads.filter((lead) => SOCIAL.test(lead.domain))
-  return [...ownSites, ...social]
+  return { leads: [...ownSites, ...social], outside }
 }
 
 function mixTypes(groups: Lead[][]): Lead[] {
@@ -181,21 +198,24 @@ async function searchCountry(
   key: string,
   country: string,
   seen: Set<string>,
-  websites: string[]
-): Promise<Lead[]> {
+  websites: string[],
+  suppliers: string[]
+): Promise<{ leads: Lead[]; outside: number }> {
   const types = buyerTypes(brief)
   const wanted = types.length ? types : [""]
   const groups: Lead[][] = []
   const found = new Set(seen)
+  let outside = 0
   for (const type of wanted) {
     const companies = await runAgentSearch(
       key,
       type ? exaQuery(brief, country, type) : exaQuery(brief, country),
       websites
     )
-    const leads = acceptCompanies(companies, country, found, websites, type)
-    for (const lead of leads) found.add(lead.domain)
-    groups.push(leads)
+    const accepted = acceptCompanies(companies, country, found, websites, type, suppliers)
+    outside += accepted.outside
+    for (const lead of accepted.leads) found.add(lead.domain)
+    groups.push(accepted.leads)
   }
   let leads = mixTypes(groups)
   if (leads.length < LEADS_PER_COUNTRY) {
@@ -207,27 +227,37 @@ async function searchCountry(
         exaBackupQuery(brief, country, type || undefined),
         websites
       ).catch(() => [] as AgentCompany[])
-      const more = acceptCompanies(extra, country, taken, websites, type)
-      for (const lead of more) taken.add(lead.domain)
-      leads = [...leads, ...more]
+      const more = acceptCompanies(extra, country, taken, websites, type, suppliers)
+      outside += more.outside
+      for (const lead of more.leads) taken.add(lead.domain)
+      leads = [...leads, ...more.leads]
     }
   }
-  return leads.slice(0, LEADS_PER_COUNTRY)
+  return { leads: leads.slice(0, LEADS_PER_COUNTRY), outside }
 }
 
-export async function searchLeads(brief: Brief, key: string, also?: Brief): Promise<Lead[]> {
+export async function searchLeads(
+  brief: Brief,
+  key: string,
+  also?: Brief
+): Promise<{ leads: Lead[]; outside: number }> {
   const queryBrief = searchBrief(brief, also)
   const websites = [brief.website, also?.website].filter((site): site is string => Boolean(site))
+  const suppliers = [brief.supplierName, also?.supplierName].filter((name): name is string =>
+    Boolean(name)
+  )
   const countries = targetCountries(queryBrief)
   const targets = countries.length ? countries : [queryBrief.markets.trim() || "the target market"]
   const seen = new Set<string>()
   const leads: Lead[] = []
+  let outside = 0
   for (const country of targets) {
-    const found = await searchCountry(queryBrief, key, country, seen, websites)
-    for (const lead of found) {
+    const found = await searchCountry(queryBrief, key, country, seen, websites, suppliers)
+    outside += found.outside
+    for (const lead of found.leads) {
       seen.add(lead.domain)
       leads.push(lead)
     }
   }
-  return leads
+  return { leads, outside }
 }
