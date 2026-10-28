@@ -59,9 +59,9 @@ export function DeskHome({
             Qualify buyers against the supplier you represent.
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
-            This desk is Meridian. Exa Agent searches, Firecrawl Agent collects the ICP and
-            contacts, OpenAI scores a preliminary best fit, and Parallel deep research refines
-            that score and sets the final one.
+            Exa Agent searches, Firecrawl Agent collects the ICP and contacts, OpenAI scores a
+            preliminary best fit, and Parallel deep research refines that score and sets the final
+            one.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <Button className="h-10 px-4" nativeButton={false} render={<Link href="/qualify" />}>

@@ -157,10 +157,10 @@
 }
 
 .stage-running {
-  animation: meridian-pulse 1.6s ease-in-out infinite;
+  animation: stage-pulse 1.6s ease-in-out infinite;
 }
 
-@keyframes meridian-pulse {
+@keyframes stage-pulse {
   50% {
     opacity: 0.55;
   }

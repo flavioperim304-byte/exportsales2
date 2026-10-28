@@ -1,6 +1,6 @@
-# Meridian
+# Export desk
 
-Export sales intelligence for a supplier you already represent. Meridian qualifies buyers in four steps and keeps the evidence next to the score.
+Export sales intelligence for a supplier you already represent. The desk qualifies buyers in four steps and keeps the evidence next to the score.
 
 1. **Search — Exa Agent.** One agent run per target country, locked to search mode (`effort: medium` on `POST /agent/runs`). It returns up to 10 companies and their websites. It does not score them. The query is built from the brief.
 2. **ICP and contacts — Firecrawl Agent.** Each company is read by `POST /v2/agent` for role, products, markets, and published email, website, phone, and WhatsApp. A blank field means it was not published.

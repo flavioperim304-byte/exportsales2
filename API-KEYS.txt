@@ -1,4 +1,4 @@
-The keys are saved. Meridian reads them from api-keys.env in this folder.
+The keys are saved. The desk reads them from api-keys.env in this folder.
 
 That file stays on this machine and is left out of git, so a later commit cannot publish the secrets.
 If the editor still shows the file as unsaved, the copy on disk is already the one the desk uses.

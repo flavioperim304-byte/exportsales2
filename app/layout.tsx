@@ -14,7 +14,7 @@ const fraunces = Fraunces({
 })
 
 export const metadata: Metadata = {
-  title: "Meridian — Export sales intelligence",
+  title: "Export desk",
   description:
     "Search buyers, read their pages, research the market, and score each lead against the supplier you represent.",
 }
