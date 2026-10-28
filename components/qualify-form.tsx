@@ -11,9 +11,17 @@ import { EXAMPLE_BRIEF, HAIR_MARKETS, KANECHOM_BRIEF, LQ_BRIEF, emptyBrief } fro
 import { LEADS_PER_COUNTRY, targetCountries } from "@/lib/prompts"
 import type { Brief, KeyFlags } from "@/lib/types"
 
-export function QualifyForm() {
+export function QualifyForm({
+  initial,
+  compact = false,
+  onStarted,
+}: {
+  initial?: Brief
+  compact?: boolean
+  onStarted?: (id: string) => void
+}) {
   const router = useRouter()
-  const [brief, setBrief] = useState<Brief>(emptyBrief())
+  const [brief, setBrief] = useState<Brief>(initial ?? emptyBrief())
   const [flags, setFlags] = useState<KeyFlags | null>(null)
   const [error, setError] = useState("")
   const [pending, setPending] = useState(false)
@@ -43,6 +51,11 @@ export function QualifyForm() {
       const data = (await response.json()) as { id?: string; error?: string }
       if (!response.ok || !data.id) {
         setError(data.error || "The qualification could not be started.")
+        setPending(false)
+        return
+      }
+      if (onStarted) {
+        onStarted(data.id)
         setPending(false)
         return
       }
@@ -76,7 +89,7 @@ export function QualifyForm() {
     <form onSubmit={submit} className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-serif text-4xl">New qualification</h1>
+          {compact ? null : <h1 className="font-serif text-4xl">New qualification</h1>}
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Exa Agent searches, Firecrawl Agent collects ICP fields and contacts, OpenAI scores
             best fit, and Parallel deep research refines it. Prompts rebuild as you type, with{" "}
@@ -96,7 +109,7 @@ export function QualifyForm() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className={compact ? "grid gap-6" : "grid gap-6 lg:grid-cols-2"}>
         <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
           <h2 className="font-serif text-2xl">Supplier</h2>
           <Field label="Trade name" htmlFor="supplierName">
@@ -210,7 +223,16 @@ export function QualifyForm() {
         </section>
       </div>
 
-      <PromptPreview brief={brief} />
+      {compact ? (
+        <details className="rounded-xl border border-border bg-card p-4">
+          <summary className="cursor-pointer text-sm font-medium">Prompts for this input</summary>
+          <div className="mt-4">
+            <PromptPreview brief={brief} bare />
+          </div>
+        </details>
+      ) : (
+        <PromptPreview brief={brief} />
+      )}
 
       {flags && !exaReady ? (
         <p className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm">

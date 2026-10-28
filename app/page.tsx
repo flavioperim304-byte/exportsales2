@@ -1,28 +1,47 @@
 import { Suspense } from "react"
 import { connection } from "next/server"
-import { DeskHome } from "@/components/desk-home"
+import { Dashboard } from "@/components/dashboard"
 import { keyFlags } from "@/lib/keys"
 import { summarize } from "@/lib/summary"
-import { listRuns } from "@/lib/store"
+import { getRun, listRuns } from "@/lib/store"
 
-export default function Page() {
+export default function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ run?: string }>
+}) {
   return (
     <Suspense
       fallback={
         <main className="mx-auto w-full max-w-6xl px-4 py-10">
-          <p className="text-sm text-muted-foreground">Opening the desk…</p>
+          <p className="text-sm text-muted-foreground">Opening the dashboard…</p>
         </main>
       }
     >
-      <Home />
+      <Home searchParams={searchParams} />
     </Suspense>
   )
 }
 
-async function Home() {
+async function Home({ searchParams }: { searchParams: Promise<{ run?: string }> }) {
   await connection()
-  const runs = listRuns().map(summarize)
+  const { run: requested } = await searchParams
+  const runs = listRuns()
+  const selected = (requested && getRun(requested)) || runs[0]
   const flags = keyFlags()
   const sourcesReady = [flags.exa, flags.firecrawl, flags.openai, flags.parallel].filter(Boolean).length
-  return <DeskHome runs={runs} sourcesReady={sourcesReady} />
+  if (!selected) {
+    return (
+      <main className="mx-auto w-full max-w-6xl px-4 py-10">
+        <p className="text-sm text-muted-foreground">No qualification is on the desk yet.</p>
+      </main>
+    )
+  }
+  return (
+    <Dashboard
+      initialRun={selected}
+      summaries={runs.map(summarize)}
+      sourcesReady={sourcesReady}
+    />
+  )
 }

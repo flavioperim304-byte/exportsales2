@@ -25,13 +25,16 @@ export function Header() {
 
   return (
     <header className="border-b border-border/80 bg-card/80 backdrop-blur-sm">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
         <Link href="/" className="min-w-0">
           <span className="font-serif text-xl tracking-tight text-foreground">Export desk</span>
         </Link>
         <nav className="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" nativeButton={false} render={<Link href="/" />}>
+            Dashboard
+          </Button>
           <Button variant="ghost" nativeButton={false} render={<Link href="/qualify" />}>
-            New qualification
+            Full form
           </Button>
           <Button
             variant={ready === 0 ? "default" : "outline"}
