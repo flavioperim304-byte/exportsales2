@@ -73,7 +73,7 @@ export function companiesFromAgent(data: unknown): AgentCompany[] {
     .filter((item) => item.name && item.website)
 }
 
-async function runAgentSearch(
+export async function startAgentRun(
   key: string,
   query: string,
   websites: string[],
@@ -82,9 +82,8 @@ async function runAgentSearch(
     systemPrompt?: string
     schema?: unknown
     budget?: { maxCostDollars: number; maxDurationSeconds: number }
-    waitMs?: number
   }
-): Promise<AgentCompany[]> {
+): Promise<string> {
   const created = await requestJson("https://api.exa.ai/agent/runs", {
     method: "POST",
     timeoutMs: 40000,
@@ -102,20 +101,43 @@ async function runAgentSearch(
   })
   const id = asString((created as { id?: unknown } | null)?.id)
   if (!id) throw new ApiError("Exa Agent did not return a run id.", 502)
+  return id
+}
+
+export async function pollAgentRun(
+  key: string,
+  id: string
+): Promise<{ status: string; companies: AgentCompany[] }> {
+  const latest = await requestJson(`https://api.exa.ai/agent/runs/${id}`, {
+    method: "GET",
+    timeoutMs: 20000,
+    headers: exaHeaders(key),
+  })
+  const status = asString((latest as { status?: unknown } | null)?.status).toLowerCase() || "running"
+  return { status, companies: status === "completed" ? companiesFromAgent(latest) : [] }
+}
+
+async function runAgentSearch(
+  key: string,
+  query: string,
+  websites: string[],
+  options?: {
+    effort?: string
+    systemPrompt?: string
+    schema?: unknown
+    budget?: { maxCostDollars: number; maxDurationSeconds: number }
+    waitMs?: number
+  }
+): Promise<AgentCompany[]> {
+  const id = await startAgentRun(key, query, websites, options)
   const deadline = Date.now() + (options?.waitMs ?? 4 * 60 * 1000)
-  let latest: unknown = created
   while (Date.now() < deadline) {
-    const status = asString((latest as { status?: unknown } | null)?.status).toLowerCase()
-    if (status === "completed") return companiesFromAgent(latest)
-    if (status === "failed" || status === "cancelled") {
+    const polled = await pollAgentRun(key, id)
+    if (polled.status === "completed") return polled.companies
+    if (polled.status === "failed" || polled.status === "cancelled") {
       throw new ApiError("Exa Agent search failed.", 502)
     }
     await new Promise((resolve) => setTimeout(resolve, 4000))
-    latest = await requestJson(`https://api.exa.ai/agent/runs/${id}`, {
-      method: "GET",
-      timeoutMs: 30000,
-      headers: exaHeaders(key),
-    })
   }
   const minutes = Math.round((options?.waitMs ?? 4 * 60 * 1000) / 60000)
   throw new ApiError(`Exa Agent is still searching after ${minutes} minutes.`, 408)
@@ -362,4 +384,191 @@ export async function searchLeads(
     }
   }
   return { leads, outside }
+}
+
+export type SearchTask = { country: string; buyerType: string; backup: boolean }
+
+export type ExaProgress = {
+  tasks: SearchTask[]
+  index: number
+  jobId?: string
+  outside: number
+}
+
+function buyerTasks(brief: Brief): SearchTask[] {
+  const countries = targetCountries(brief)
+  const markets = countries.length ? countries : [brief.markets.trim() || "the target market"]
+  const types = buyerTypes(brief)
+  const wanted = types.length ? types : [""]
+  const tasks: SearchTask[] = []
+  for (const country of markets) {
+    for (const buyerType of wanted) tasks.push({ country, buyerType, backup: false })
+  }
+  return tasks
+}
+
+function withBackups(tasks: SearchTask[], index: number, task: SearchTask, leads: Lead[]): SearchTask[] {
+  if (task.backup || !task.country) return tasks
+  const rest = tasks.slice(index + 1)
+  if (rest.some((item) => !item.backup && item.country === task.country)) return tasks
+  const count = leads.filter((lead) => lead.market === task.country).length
+  if (count >= LEADS_PER_COUNTRY) return tasks
+  const types = tasks
+    .filter((item) => !item.backup && item.country === task.country)
+    .map((item) => item.buyerType)
+  const backups = (types.length ? types : [""]).map((buyerType) => ({
+    country: task.country,
+    buyerType,
+    backup: true,
+  }))
+  return [...tasks.slice(0, index + 1), ...backups, ...rest]
+}
+
+export async function advanceExa(
+  brief: Brief,
+  key: string,
+  progress: ExaProgress | undefined,
+  leads: Lead[],
+  also?: Brief
+): Promise<{
+  progress: ExaProgress
+  leads: Lead[]
+  outside: number
+  done: boolean
+  pending: boolean
+  error?: string
+}> {
+  const queryBrief = searchBrief(brief, also)
+  const state: ExaProgress = progress ?? {
+    tasks:
+      queryBrief.searchKind === "competitors"
+        ? [{ country: "", buyerType: "", backup: false }]
+        : buyerTasks(queryBrief),
+    index: 0,
+    outside: 0,
+  }
+  const websites = [brief.website, also?.website].filter((site): site is string => Boolean(site))
+  const suppliers = [brief.supplierName, also?.supplierName].filter((name): name is string => Boolean(name))
+
+  if (queryBrief.searchKind === "competitors" && queryBrief.exaEffort === "deep" && !state.jobId) {
+    const companies = await runDeepSearch(key, competitorQuery(queryBrief))
+    const merged = mergeCompanies(queryBrief, state.tasks[0], companies, leads, websites, suppliers)
+    return {
+      progress: { ...state, index: 1, outside: state.outside + merged.outside },
+      leads: merged.leads,
+      outside: state.outside + merged.outside,
+      done: true,
+      pending: false,
+    }
+  }
+
+  if (state.jobId) {
+    const task = state.tasks[state.index]
+    const polled = await pollAgentRun(key, state.jobId)
+    if (polled.status !== "completed" && polled.status !== "failed" && polled.status !== "cancelled") {
+      return { progress: state, leads, outside: state.outside, done: false, pending: true }
+    }
+    if ((polled.status === "failed" || polled.status === "cancelled") && !task?.backup) {
+      return {
+        progress: { ...state, jobId: undefined },
+        leads,
+        outside: state.outside,
+        done: false,
+        pending: false,
+        error: "Exa Agent search failed.",
+      }
+    }
+    const merged =
+      polled.status === "completed" && task
+        ? mergeCompanies(queryBrief, task, polled.companies, leads, websites, suppliers)
+        : { leads, outside: 0 }
+    const nextLeads = merged.leads
+    const outside = state.outside + merged.outside
+    const tasks = task ? withBackups(state.tasks, state.index, task, nextLeads) : state.tasks
+    const index = state.index + 1
+    const done = index >= tasks.length
+    return {
+      progress: { tasks, index, outside },
+      leads: nextLeads,
+      outside,
+      done,
+      pending: false,
+    }
+  }
+
+  if (state.index >= state.tasks.length) {
+    return { progress: state, leads, outside: state.outside, done: true, pending: false }
+  }
+  const task = state.tasks[state.index]
+  const planned = queryFor(queryBrief, task)
+  const jobId = await startAgentRun(key, planned.query, websites, planned.options)
+  return {
+    progress: { ...state, jobId },
+    leads,
+    outside: state.outside,
+    done: false,
+    pending: true,
+  }
+}
+
+function queryFor(
+  brief: Brief,
+  task: SearchTask
+): {
+  query: string
+  options?: { effort?: string; systemPrompt?: string; schema?: unknown; budget?: { maxCostDollars: number; maxDurationSeconds: number } }
+} {
+  if (brief.searchKind === "competitors") {
+    return {
+      query: competitorQuery(brief),
+      options: {
+        effort: "ultra",
+        systemPrompt: competitorSystemPrompt(),
+        schema: COMPETITOR_SCHEMA,
+        budget: { maxCostDollars: 8, maxDurationSeconds: 900 },
+      },
+    }
+  }
+  const query = task.backup
+    ? exaBackupQuery(brief, task.country, task.buyerType || undefined)
+    : task.buyerType
+      ? exaQuery(brief, task.country, task.buyerType)
+      : exaQuery(brief, task.country)
+  return { query }
+}
+
+function mergeCompanies(
+  brief: Brief,
+  task: SearchTask,
+  companies: AgentCompany[],
+  leads: Lead[],
+  websites: string[],
+  suppliers: string[]
+): { leads: Lead[]; outside: number } {
+  const seen = new Set(leads.map((lead) => lead.domain))
+  if (brief.searchKind === "competitors") {
+    const next = [...leads]
+    let outside = 0
+    for (const company of companies) {
+      const lead = companyToLead({ ...company, role: company.role })
+      if (!lead) continue
+      if (websites.some((site) => sameSite(site, lead.url))) continue
+      if (countryIsExcluded(company.country, lead.domain, brief.excludedMarkets ?? "")) {
+        outside += 1
+        continue
+      }
+      if (seen.has(lead.domain)) continue
+      seen.add(lead.domain)
+      lead.market = company.country || "Unassigned"
+      lead.buyerType = company.role
+      next.push(lead)
+    }
+    return { leads: next.slice(0, 24), outside }
+  }
+  const accepted = acceptCompanies(companies, task.country, seen, websites, task.buyerType, suppliers)
+  const room = LEADS_PER_COUNTRY - leads.filter((lead) => lead.market === task.country).length
+  return {
+    leads: [...leads, ...accepted.leads.slice(0, Math.max(0, room))],
+    outside: accepted.outside,
+  }
 }

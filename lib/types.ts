@@ -204,6 +204,14 @@ export type Run = {
   parallelCheckedAt?: string
   parallelErrors?: number
   searchClaimed?: boolean
+  /** Resumable Exa work for hosts that stop between requests, such as Netlify. */
+  searchTasks?: { country: string; buyerType: string; backup: boolean }[]
+  searchTaskIndex?: number
+  searchJobId?: string
+  searchOutside?: number
+  /** Resumable Firecrawl read. */
+  extractJobId?: string
+  extractLeadId?: string
   contextState: ContextState
   error?: string
 }

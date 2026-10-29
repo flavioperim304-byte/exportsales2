@@ -148,3 +148,50 @@ export async function extractPage(
   if (!profile.website) profile.website = url
   return profile
 }
+
+export async function startExtractJob(
+  url: string,
+  brief: Brief,
+  key: string,
+  country = "",
+  buyerType = ""
+): Promise<string> {
+  const started = await requestJson("https://api.firecrawl.dev/v2/agent", {
+    method: "POST",
+    timeoutMs: 20000,
+    headers: { Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      urls: [url],
+      prompt: firecrawlPrompt(brief, country, buyerType),
+      model: "spark-2",
+      maxCredits: 20,
+      schema: SCHEMA,
+    }),
+  })
+  const id = asString((started as { id?: unknown } | null)?.id)
+  if (!id) throw new Error("Firecrawl Agent did not return an id.")
+  return id
+}
+
+export async function pollExtractJob(
+  key: string,
+  id: string,
+  pageUrl: string
+): Promise<{ pending: true } | { pending: false; extraction: Extraction }> {
+  const latest = await requestJson(`https://api.firecrawl.dev/v2/agent/${id}`, {
+    method: "GET",
+    timeoutMs: 20000,
+    headers: { Authorization: `Bearer ${key}` },
+  })
+  const record = (latest ?? {}) as { success?: boolean; status?: string; error?: string; data?: unknown }
+  if (record.status !== "completed" && record.status !== "failed") return { pending: true }
+  if (record.success === false || record.status === "failed") {
+    return { pending: false, extraction: empty(record.error || "Firecrawl Agent could not read this company.") }
+  }
+  const profile = profileFromAgent(record.data ? { data: record.data } : latest)
+  if (!profile) {
+    return { pending: false, extraction: empty("Firecrawl Agent returned neither a profile nor contacts.") }
+  }
+  if (!profile.website) profile.website = pageUrl
+  return { pending: false, extraction: profile }
+}

@@ -1,5 +1,5 @@
-import { searchLeads } from "./exa"
-import { extractPage, failedExtraction } from "./firecrawl"
+import { advanceExa, searchLeads } from "./exa"
+import { extractPage, failedExtraction, pollExtractJob, startExtractJob } from "./firecrawl"
 import { publicError } from "./http"
 import { getKeys } from "./keys"
 import { scoreLeads } from "./openai"
@@ -214,7 +214,7 @@ async function doSearch(id: string): Promise<"busy" | "done"> {
   }
   activeSearches.add(id)
   try {
-    const run = getRun(id)
+    const run = await getRun(id)
     if (!run) return "done"
     const found = await searchLeads(run.brief, keys.exa, run.also)
     const leads = found.leads
@@ -310,7 +310,7 @@ async function doExtract(id: string): Promise<"wait" | "next"> {
   })
   if (!plan || plan.action !== "read") return "next"
   try {
-    const run = getRun(id)
+    const run = await getRun(id)
     if (!run || !keys.firecrawl) return "next"
     const extraction = await extractPage(
       plan.url,
@@ -346,7 +346,7 @@ async function doExtract(id: string): Promise<"wait" | "next"> {
 
 async function doResearch(id: string): Promise<"wait" | "next"> {
   const keys = getKeys()
-  const snapshot = getRun(id)
+  const snapshot = await getRun(id)
   if (!snapshot) return "next"
   if (!keys.parallel) {
     await updateRun(id, (run) => {
@@ -528,7 +528,7 @@ function applyOpenAI(run: Run, judgments: Awaited<ReturnType<typeof scoreLeads>>
 
 async function doScore(id: string) {
   const keys = getKeys()
-  const snapshot = getRun(id)
+  const snapshot = await getRun(id)
   if (!snapshot) return
   if (!keys.openai) {
     await updateRun(id, (run) => {
@@ -581,7 +581,7 @@ async function doScore(id: string) {
 }
 
 async function maybeAttachDeferred(id: string) {
-  const run = getRun(id)
+  const run = await getRun(id)
   const keys = getKeys()
   if (!run || run.contextState !== "deferred" || run.market || !run.parallelRunId || !keys.parallel) {
     return
@@ -616,7 +616,7 @@ async function maybeAttachDeferred(id: string) {
 async function pump(id: string) {
   try {
     for (let guard = 0; guard < 200; guard += 1) {
-      const run = getRun(id)
+      const run = await getRun(id)
       if (!run || run.mode === "sample") return
       if (run.status === "failed") return
       if (run.status === "complete") {
@@ -658,9 +658,190 @@ async function pump(id: string) {
   }
 }
 
-export function ensurePump(id: string) {
+async function doSearchTick(id: string) {
+  const keys = getKeys()
+  const current = await getRun(id)
+  if (!current) return
+  if (!keys.exa) {
+    await updateRun(id, (run) => {
+      run.status = "failed"
+      run.error = "Add an Exa API key under Sources, then start a new qualification."
+      const search = stage(run, "search")
+      search.status = "failed"
+      search.detail = run.error
+      search.finishedAt = now()
+      log(run, "search", run.error ?? "Exa key missing.")
+    })
+    return
+  }
+  if (current.leads.length > 0 && !current.searchTasks && !current.searchJobId) {
+    await updateRun(id, (run) => {
+      if (run.status === "searching" || run.status === "queued") run.status = "extracting"
+      const search = stage(run, "search")
+      if (search.status === "running" || search.status === "pending") {
+        search.status = "done"
+        search.finishedAt = now()
+      }
+    })
+    return
+  }
+  const result = await advanceExa(
+    current.brief,
+    keys.exa,
+    current.searchTasks
+      ? {
+          tasks: current.searchTasks,
+          index: current.searchTaskIndex ?? 0,
+          jobId: current.searchJobId,
+          outside: current.searchOutside ?? 0,
+        }
+      : undefined,
+    current.leads,
+    current.also
+  )
+  await updateRun(id, (run) => {
+    run.searchTasks = result.progress.tasks
+    run.searchTaskIndex = result.progress.index
+    run.searchJobId = result.progress.jobId
+    run.searchOutside = result.outside
+    run.leads = result.leads
+    run.status = "searching"
+    const search = stage(run, "search")
+    search.status = "running"
+    search.startedAt = search.startedAt ?? now()
+    if (result.error) {
+      run.status = "failed"
+      run.error = result.error
+      search.status = "failed"
+      search.detail = result.error
+      search.finishedAt = now()
+      log(run, "search", result.error)
+      return
+    }
+    if (!result.done) {
+      search.detail = result.pending ? "Exa Agent is searching." : "Starting the next Exa search."
+      return
+    }
+    if (result.leads.length === 0) {
+      run.status = "failed"
+      run.error =
+        result.outside > 0
+          ? `Exa suggested ${result.outside} ${result.outside === 1 ? "company" : "companies"} from another country or another supplier. None were in ${run.brief.markets}.`
+          : "Exa returned no company pages after the supplier’s own domain was removed. Broaden the products or the markets and run again."
+      search.status = "failed"
+      search.detail = run.error
+      search.finishedAt = now()
+      log(run, "search", run.error)
+      return
+    }
+    run.status = "extracting"
+    search.status = "done"
+    search.finishedAt = now()
+    search.detail = `Exa Agent search returned ${result.leads.length} companies.`
+    log(run, "search", search.detail)
+    const extract = stage(run, "extract")
+    extract.status = "running"
+    extract.startedAt = now()
+    extract.detail = "Reading the first company page."
+  })
+}
+
+async function doExtractTick(id: string) {
+  const keys = getKeys()
+  const current = await getRun(id)
+  if (!current) return
+  if (!keys.firecrawl) {
+    await doExtract(id)
+    return
+  }
+  if (current.extractJobId && current.extractLeadId) {
+    const lead = current.leads.find((item) => item.id === current.extractLeadId)
+    if (!lead) {
+      await updateRun(id, (run) => {
+        run.extractJobId = undefined
+        run.extractLeadId = undefined
+      })
+      return
+    }
+    const polled = await pollExtractJob(keys.firecrawl, current.extractJobId, lead.url)
+    if (polled.pending) return
+    await updateRun(id, (run) => {
+      const target = run.leads.find((item) => item.id === current.extractLeadId)
+      run.extractJobId = undefined
+      run.extractLeadId = undefined
+      if (!target) return
+      target.extraction = polled.extraction
+      if (!target.country && polled.extraction.country) target.country = polled.extraction.country
+      log(
+        run,
+        "extract",
+        polled.extraction.ok
+          ? `Extracted ${target.name}: ${polled.extraction.role || "role unpublished"}.`
+          : `Could not extract ${target.name}. ${polled.extraction.error ?? "Unknown page error."}`
+      )
+    })
+    return
+  }
+  const pending = current.leads.find((lead) => !lead.extraction)
+  if (!pending) {
+    await doExtract(id)
+    return
+  }
+  if (!/^https?:\/\//i.test(pending.url)) {
+    await updateRun(id, (run) => {
+      const target = run.leads.find((item) => item.id === pending.id)
+      if (!target) return
+      target.extraction = failedExtraction("The lead has no http(s) page to read.")
+    })
+    return
+  }
+  const jobId = await startExtractJob(
+    pending.url,
+    current.brief,
+    keys.firecrawl,
+    pending.market ?? "",
+    pending.buyerType ?? ""
+  )
+  await updateRun(id, (run) => {
+    run.extractJobId = jobId
+    run.extractLeadId = pending.id
+    const extract = stage(run, "extract")
+    extract.status = "running"
+    extract.startedAt = extract.startedAt ?? now()
+    const index = run.leads.findIndex((item) => item.id === pending.id) + 1
+    extract.detail = `Reading ${pending.name} (${index} of ${run.leads.length}).`
+  })
+}
+
+async function stepOnce(id: string) {
+  const run = await getRun(id)
+  if (!run || run.mode === "sample" || run.status === "failed") return
+  if (run.status === "complete") {
+    await maybeAttachDeferred(id)
+    return
+  }
+  if (run.status === "queued" || run.status === "searching") {
+    await doSearchTick(id)
+    return
+  }
+  if (run.status === "extracting") {
+    await doExtractTick(id)
+    return
+  }
+  if (run.status === "scoring") {
+    await doScore(id)
+    return
+  }
+  if (run.status === "researching") await doResearch(id)
+}
+
+export async function ensurePump(id: string) {
+  if (process.env.NETLIFY === "true") {
+    await stepOnce(id)
+    return
+  }
   if (id === SAMPLE_RUN_ID || running.has(id)) return
-  const run = getRun(id)
+  const run = await getRun(id)
   if (!run || run.mode === "sample") return
   const active = run.status !== "complete" && run.status !== "failed"
   const deferred =
@@ -677,7 +858,7 @@ export function ensurePump(id: string) {
 export async function startRun(brief: Brief, also?: Brief): Promise<Run> {
   const run = createRun(brief, also)
   await insertRun(run)
-  ensurePump(run.id)
+  await ensurePump(run.id)
   return run
 }
 

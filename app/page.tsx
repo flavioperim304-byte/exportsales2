@@ -26,9 +26,9 @@ export default function Page({
 async function Home({ searchParams }: { searchParams: Promise<{ run?: string }> }) {
   await connection()
   const { run: requested } = await searchParams
-  const runs = listRuns()
+  const runs = await listRuns()
   const latestLive = runs.find((run) => run.mode !== "sample")
-  const selected = (requested && getRun(requested)) || latestLive || runs[0]
+  const selected = (requested && (await getRun(requested))) || latestLive || runs[0]
   const flags = keyFlags()
   const sourcesReady = [flags.exa, flags.firecrawl, flags.openai, flags.parallel].filter(Boolean).length
   if (!selected) {

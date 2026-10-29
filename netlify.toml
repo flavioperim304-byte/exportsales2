@@ -7,3 +7,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
+
+[functions]
+  # A search step (start Exa, poll Firecrawl, score) has to finish inside one request.
+  timeout = 60

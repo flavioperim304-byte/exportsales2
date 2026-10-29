@@ -1,5 +1,7 @@
 import { connection } from "next/server"
 import { presentBrief, validateBrief } from "@/lib/example"
+
+export const maxDuration = 60
 import { getKeys } from "@/lib/keys"
 import { startRun } from "@/lib/pipeline"
 import { savePrompt } from "@/lib/prompt-store"
@@ -21,7 +23,11 @@ export async function POST(request: Request) {
     )
   }
   const brief = presentBrief(parsed.brief)
-  savePrompt(brief)
+  try {
+    savePrompt(brief)
+  } catch {
+    // Netlify cannot write data/prompts.json. The run still starts.
+  }
   const run = await startRun(brief)
   return Response.json({ id: run.id })
 }

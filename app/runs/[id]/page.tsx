@@ -22,8 +22,8 @@ export default function RunPage({ params }: { params: Promise<{ id: string }> })
 async function RunLoader({ params }: { params: Promise<{ id: string }> }) {
   await connection()
   const { id } = await params
-  ensurePump(id)
-  const run = getRun(id)
+  await ensurePump(id)
+  const run = await getRun(id)
   if (!run) notFound()
   return <RunDesk initial={run} />
 }

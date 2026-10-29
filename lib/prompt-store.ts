@@ -18,6 +18,7 @@ function read(): Database {
 }
 
 function write(db: Database) {
+  if (process.env.NETLIFY === "true") return
   fs.mkdirSync(path.dirname(file), { recursive: true })
   const tmp = `${file}.tmp`
   fs.writeFileSync(tmp, JSON.stringify(db))
