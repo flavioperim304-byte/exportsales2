@@ -31,17 +31,17 @@ export function Header() {
         </Link>
         <nav className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" nativeButton={false} render={<Link href="/" />}>
-            Dashboard
+            Painel
           </Button>
           <Button variant="ghost" nativeButton={false} render={<Link href="/qualify" />}>
-            Full form
+            Nova busca
           </Button>
           <Button
             variant={ready === 0 ? "default" : "outline"}
             nativeButton={false}
             render={<Link href="/sources" />}
           >
-            Sources {ready}/4
+            Fontes {ready}/4
           </Button>
         </nav>
       </div>

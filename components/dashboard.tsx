@@ -84,24 +84,41 @@ export function Dashboard({
     void openRun(id)
   }
 
+  const title =
+    run.brief.searchKind === "competitors"
+      ? `Distribuidores de ${run.brief.supplierName}`
+      : run.also
+        ? `${run.brief.supplierName} e ${run.also.supplierName}`
+        : run.brief.supplierName
+  const place =
+    run.brief.searchKind === "competitors"
+      ? `${run.brief.countryCount ?? 5} países${run.brief.excludedMarkets ? `, sem ${run.brief.excludedMarkets}` : ""}`
+      : run.brief.markets
+
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:py-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 sm:py-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Export desk</p>
-          <h1 className="mt-1 font-serif text-4xl">Dashboard</h1>
+          <h1 className="mt-1 font-serif text-4xl leading-tight">{title}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {place} · {formatWhen(run.updatedAt || run.createdAt)}
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {sourcesReady} of 4 sources connected.{" "}
-          <Link href="/sources" className="underline-offset-2 hover:underline">
-            Sources
-          </Link>
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadResults run={run} />
+          {run.mode === "sample" ? <Badge variant="outline">Exemplo</Badge> : null}
+          <Badge variant="secondary">{STATUS_LABEL[run.status]}</Badge>
+        </div>
       </div>
 
-      {sourcesReady === 0 ? (
+      {sourcesReady < 4 ? (
         <p className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm leading-relaxed">
-          Exa, Firecrawl, OpenAI, and Parallel have no keys yet. The sample output on the right does not need them.
+          {sourcesReady} de 4 fontes conectadas.{" "}
+          <Link href="/sources" className="underline-offset-2 hover:underline">
+            Abrir fontes
+          </Link>
+          . O exemplo de café abre sem chave.
         </p>
       ) : null}
 
@@ -115,86 +132,59 @@ export function Dashboard({
               item.id === run.id ? "border-primary bg-card" : "border-border bg-card/60"
             }`}
           >
-            <span className="font-medium">{item.supplierName || "Qualification"}</span>
+            <span className="font-medium">{item.supplierName || "Qualificação"}</span>
             <span className="ml-2 text-muted-foreground">{STATUS_LABEL[item.status]}</span>
           </button>
         ))}
       </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-border bg-card/40 p-4">
-          <h2 className="font-serif text-2xl">Input</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The brief sent to Exa, Firecrawl, OpenAI, and Parallel.
-          </p>
-          <div className="mt-4">
-            <QualifyForm
-              key={`${run.id}:${inputRevision}`}
-              initial={run.brief}
-              compact
-              onStarted={started}
-            />
+      {run.mode === "sample" ? (
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Esta tabela é o exemplo de café para Alemanha, Holanda e Japão. Não é uma busca da Kanechom nem da LQ.
+        </p>
+      ) : null}
+      {refreshError ? <p className="text-sm text-destructive">{refreshError}</p> : null}
+      {run.error ? <p className="text-sm text-destructive">{run.error}</p> : null}
+
+      <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {run.stages.map((stage) => (
+          <li key={stage.id} className="rounded-lg border border-border bg-card px-3 py-2">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{stage.status}</p>
+            <p className="mt-1 text-sm leading-relaxed">{stage.detail}</p>
+          </li>
+        ))}
+      </ol>
+
+      <section className="rounded-xl border border-border bg-card p-4">
+        <MarketEntry run={run} />
+        <OutputTable run={run} />
+        {run.market?.outlook ? (
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Mercado</p>
+            <p className="mt-2 text-sm leading-relaxed">{run.market.outlook}</p>
           </div>
-        </section>
+        ) : null}
+        <p className="mt-4 text-sm">
+          <Link href={`/runs/${run.id}`} className="underline-offset-2 hover:underline">
+            Abrir o dossiê completo
+          </Link>
+        </p>
+      </section>
 
-        <section className="rounded-xl border border-border bg-card p-4 lg:sticky lg:top-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="font-serif text-2xl">Output</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {run.brief.searchKind === "competitors"
-                  ? `${run.brief.supplierName} distributors`
-                  : run.also
-                    ? `${run.brief.supplierName} and ${run.also.supplierName}`
-                    : run.brief.supplierName}{" "}
-                ·{" "}
-                {run.brief.searchKind === "competitors"
-                  ? `${run.brief.countryCount ?? 5} countries${run.brief.excludedMarkets ? `, excluding ${run.brief.excludedMarkets}` : ""}`
-                  : run.brief.markets}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <DownloadResults run={run} />
-              {run.mode === "sample" ? <Badge variant="outline">Sample</Badge> : null}
-              <Badge variant="secondary">{STATUS_LABEL[run.status]}</Badge>
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">{formatWhen(run.updatedAt || run.createdAt)}</p>
-          {run.mode === "sample" ? (
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              This table is the coffee sample for Germany, the Netherlands, and Japan. It is not a Kanechom or LQ search.
-            </p>
-          ) : null}
-          {refreshError ? <p className="mt-2 text-sm text-destructive">{refreshError}</p> : null}
-          {run.error ? <p className="mt-2 text-sm text-destructive">{run.error}</p> : null}
-
-          <ol className="mt-4 grid gap-2 sm:grid-cols-2">
-            {run.stages.map((stage) => (
-              <li key={stage.id} className="rounded-lg border border-border px-3 py-2">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{stage.status}</p>
-                <p className="mt-1 text-sm leading-relaxed">{stage.detail}</p>
-              </li>
-            ))}
-          </ol>
-
-          <MarketEntry run={run} />
-
-          <OutputTable run={run} />
-
-          {run.market?.outlook ? (
-            <div className="mt-4 border-t border-border pt-4">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Market</p>
-              <p className="mt-2 text-sm leading-relaxed">{run.market.outlook}</p>
-            </div>
-          ) : null}
-
-          <p className="mt-4 text-sm">
-            <Link href={`/runs/${run.id}`} className="underline-offset-2 hover:underline">
-              Open the full dossier
-            </Link>
-          </p>
-        </section>
-      </div>
+      <section className="rounded-xl border border-border bg-card/40 p-4">
+        <h2 className="font-serif text-2xl">Nova busca</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          O pedido segue para a Exa, a Firecrawl, a OpenAI e a Parallel. A busca fica neste painel até o fim.
+        </p>
+        <div className="mt-4">
+          <QualifyForm
+            key={`${run.id}:${inputRevision}`}
+            initial={run.brief}
+            compact
+            onStarted={started}
+          />
+        </div>
+      </section>
     </main>
   )
 }
