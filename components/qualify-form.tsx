@@ -262,6 +262,21 @@ export function QualifyForm({
               placeholder="Find distributors, wholesalers, and trading companies that import retail hair care. Skip ecommerce shops."
             />
           </Field>
+          <Field
+            label="Parallel"
+            htmlFor="parallelMode"
+            hint="Task is the default. Decisions runs only when you pick it for this search."
+          >
+            <select
+              id="parallelMode"
+              value={brief.parallelMode === "decisions" ? "decisions" : "task"}
+              onChange={(event) => set("parallelMode", event.target.value === "decisions" ? "decisions" : "task")}
+              className="h-10 rounded-lg border border-input bg-transparent px-3 text-sm"
+            >
+              <option value="task">Task</option>
+              <option value="decisions">Decisions</option>
+            </select>
+          </Field>
           <div className="flex flex-wrap items-center gap-3">
             <Button type="button" variant="outline" onClick={() => void savePrompt()}>
               Save prompt
@@ -324,9 +339,11 @@ export function QualifyForm({
           {pending ? "Starting the pipeline…" : "Run the pipeline"}
         </Button>
         <p className="text-xs text-muted-foreground">
-          {brief.searchKind === "competitors" && brief.exaEffort !== "deep"
-            ? "Exa Ultra can take about 15 minutes. Parallel then checks the distributors. You can leave the run open."
-            : "Parallel uses the Task API on pro-fast, about $0.14 a call. You can leave the run open while it researches."}
+          {brief.parallelMode === "decisions"
+            ? "This run uses Parallel Decisions in fast mode. Other runs stay on the Task API."
+            : brief.searchKind === "competitors" && brief.exaEffort !== "deep"
+              ? "Exa Ultra can take about 15 minutes. Parallel Task then checks the distributors. You can leave the run open."
+              : "Parallel uses the Task API on pro-fast, about $0.14 a call. You can leave the run open while it researches."}
         </p>
       </div>
     </form>

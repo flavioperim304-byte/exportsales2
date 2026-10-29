@@ -10,6 +10,7 @@ import {
   parallelInstructions,
   targetCountries,
 } from "@/lib/prompts"
+import { decisionOutline } from "@/lib/parallel"
 import type { Brief } from "@/lib/types"
 
 export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: boolean }) {
@@ -34,7 +35,10 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
         />
         <PromptBlock label="Firecrawl Agent" text={firecrawlPrompt(brief, "")} />
         <PromptBlock label="OpenAI" text={openaiInstructions(brief)} />
-        <PromptBlock label="Parallel · deep research" text={parallelInstructions(brief)} />
+        <PromptBlock
+          label={brief.parallelMode === "decisions" ? "Parallel · Decisions" : "Parallel · deep research"}
+          text={brief.parallelMode === "decisions" ? decisionOutline(brief) : parallelInstructions(brief)}
+        />
       </section>
     )
   }
@@ -80,7 +84,10 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
       <article className="flex flex-col gap-3 border-t border-border pt-4">
         <h3 className="font-serif text-xl">All countries</h3>
         <PromptBlock label="OpenAI" text={openaiInstructions(brief)} />
-        <PromptBlock label="Parallel · deep research" text={parallelInstructions(brief)} />
+        <PromptBlock
+          label={brief.parallelMode === "decisions" ? "Parallel · Decisions" : "Parallel · deep research"}
+          text={brief.parallelMode === "decisions" ? decisionOutline(brief) : parallelInstructions(brief)}
+        />
       </article>
     </section>
   )

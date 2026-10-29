@@ -73,6 +73,7 @@ export function emptyBrief(): Brief {
     exaEffort: "ultra",
     countryCount: 5,
     excludedMarkets: "",
+    parallelMode: "task",
   }
 }
 
@@ -102,12 +103,19 @@ function countryCountOf(value: unknown): number {
   return Math.min(8, Math.round(count))
 }
 
-function searchFields(brief: Brief): Pick<Brief, "searchKind" | "exaEffort" | "countryCount" | "excludedMarkets"> {
+function parallelModeOf(value: unknown): "task" | "decisions" {
+  return value === "decisions" ? "decisions" : "task"
+}
+
+function searchFields(
+  brief: Brief
+): Pick<Brief, "searchKind" | "exaEffort" | "countryCount" | "excludedMarkets" | "parallelMode"> {
   return {
     searchKind: brief.searchKind === "competitors" ? "competitors" : "buyers",
     exaEffort: brief.exaEffort === "deep" ? "deep" : "ultra",
     countryCount: countryCountOf(brief.countryCount),
     excludedMarkets: brief.excludedMarkets?.trim() ?? "",
+    parallelMode: parallelModeOf(brief.parallelMode),
   }
 }
 
@@ -168,6 +176,7 @@ export function validateBrief(input: unknown): { brief?: Brief; error?: string }
     exaEffort: raw.exaEffort === "deep" ? "deep" : "ultra",
     countryCount: countryCountOf(raw.countryCount),
     excludedMarkets: text(raw.excludedMarkets),
+    parallelMode: parallelModeOf(raw.parallelMode),
   }
   if (!brief.supplierName) return { error: "Name the supplier you are representing." }
   if (!brief.originCountry) return { error: "Add the supplier’s origin country." }

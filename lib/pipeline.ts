@@ -5,6 +5,7 @@ import { getKeys } from "./keys"
 import { scoreLeads } from "./openai"
 import {
   createResearch,
+  decideResearch,
   namesMatch,
   researchResult,
   researchStatus,
@@ -358,6 +359,44 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
       finish(run)
       log(run, "context", context.detail)
     })
+    return "next"
+  }
+  if (snapshot.brief.parallelMode === "decisions") {
+    if (snapshot.parallelDecisionId || snapshot.contextState === "done") return "next"
+    if (snapshot.contextState === "failed") {
+      await updateRun(id, (run) => {
+        finish(run)
+      })
+      return "next"
+    }
+    try {
+      await updateRun(id, (run) => {
+        run.contextState = "running"
+        run.status = "researching"
+        const context = stage(run, "context")
+        context.status = "running"
+        context.startedAt = context.startedAt ?? now()
+        context.detail = "Parallel Decisions (fast) is answering this run. The default Task call is not used."
+        log(run, "context", context.detail)
+      })
+      const decided = await decideResearch(snapshot.brief, snapshot.leads, keys.parallel, snapshot.also)
+      await updateRun(id, (run) => {
+        run.parallelDecisionId = decided.decisionId
+        applyResearch(run, decided.research)
+        finish(run)
+      })
+    } catch (error) {
+      const message = publicError(error, secrets())
+      await updateRun(id, (run) => {
+        run.contextState = "failed"
+        const context = stage(run, "context")
+        context.status = "failed"
+        context.finishedAt = now()
+        context.detail = message
+        finish(run)
+        log(run, "context", message)
+      })
+    }
     return "next"
   }
   if (snapshot.contextState === "failed" && !snapshot.parallelRunId) {

@@ -40,6 +40,8 @@ export type Brief = {
   searchKind?: "buyers" | "competitors"
   /** Exa Deep is the faster search. Exa Ultra is the long list-building agent. */
   exaEffort?: "deep" | "ultra"
+  /** Task is the default Parallel research. Decisions is opt-in for that run. */
+  parallelMode?: "task" | "decisions"
   /** How many countries a competitor search should cover. */
   countryCount?: number
   /** Countries a competitor search must leave out. */
@@ -197,6 +199,8 @@ export type Run = {
   entry?: MarketEntry
   parallelRunId?: string
   parallelInteractionId?: string
+  /** Set when this run used Parallel Decisions instead of a Task run. */
+  parallelDecisionId?: string
   parallelCheckedAt?: string
   parallelErrors?: number
   searchClaimed?: boolean
