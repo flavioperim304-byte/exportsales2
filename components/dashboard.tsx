@@ -2,27 +2,25 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { DownloadResults } from "@/components/download-results"
-import { MarketEntry } from "@/components/market-entry"
-import { QualifyForm } from "@/components/qualify-form"
-import { Badge } from "@/components/ui/badge"
-import { STATUS_LABEL, formatWhen, isHttpUrl } from "@/lib/format"
+import { isHttpUrl } from "@/lib/format"
 import { qualificationRows } from "@/lib/qualify"
 import { summarize } from "@/lib/summary"
 import type { Run, RunSummary } from "@/lib/types"
 
 export function Dashboard({
   initialRun,
+  runs,
   summaries,
   sourcesReady,
 }: {
   initialRun: Run
+  runs: Run[]
   summaries: RunSummary[]
   sourcesReady: number
 }) {
   const [run, setRun] = useState(initialRun)
   const [list, setList] = useState(summaries)
-  const [inputRevision, setInputRevision] = useState(0)
+  const [focusId, setFocusId] = useState<string>("all")
   const [refreshError, setRefreshError] = useState("")
 
   useEffect(() => {
@@ -58,134 +56,151 @@ export function Dashboard({
     }
   }, [run.id, run.mode, run.status])
 
-  function remember(id: string) {
-    const path = `/?run=${encodeURIComponent(id)}`
-    window.history.replaceState(null, "", path)
-  }
-
-  async function openRun(id: string) {
-    remember(id)
-    setRefreshError("")
-    const response = await fetch(`/api/runs/${id}`, { cache: "no-store" })
-    if (!response.ok) {
-      setRefreshError("That run is not on the desk.")
-      return
-    }
-    const data = (await response.json()) as { run: Run }
-    setRun(data.run)
-    setInputRevision((current) => current + 1)
-    setList((current) => {
-      const next = summarize(data.run)
-      return [next, ...current.filter((item) => item.id !== data.run.id)]
-    })
-  }
-
-  function started(id: string) {
-    void openRun(id)
-  }
-
-  const title =
-    run.brief.searchKind === "competitors"
-      ? `Distribuidores de ${run.brief.supplierName}`
-      : run.also
-        ? `${run.brief.supplierName} e ${run.also.supplierName}`
-        : run.brief.supplierName
-  const place =
-    run.brief.searchKind === "competitors"
-      ? `${run.brief.countryCount ?? 5} países${run.brief.excludedMarkets ? `, sem ${run.brief.excludedMarkets}` : ""}`
-      : run.brief.markets
+  const buyers = buyerRows(runs.length > 0 ? runs : [initialRun].filter((item) => item.mode !== "sample"))
+  const visible = focusId === "all" ? buyers : buyers.filter((buyer) => buyer.runId === focusId)
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 sm:py-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
+        <div>
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Export desk</p>
-          <h1 className="mt-1 font-serif text-4xl leading-tight">{title}</h1>
+          <h1 className="mt-1 font-serif text-4xl leading-tight">Compradores</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {place} · {formatWhen(run.updatedAt || run.createdAt)}
+            {visible.length} empresas nas buscas de Kanechom e LQ Professional.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <DownloadResults run={run} />
-          {run.mode === "sample" ? <Badge variant="outline">Exemplo</Badge> : null}
-          <Badge variant="secondary">{STATUS_LABEL[run.status]}</Badge>
-        </div>
+        <Link
+          href="/qualify"
+          className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm text-primary-foreground"
+        >
+          Nova busca
+        </Link>
       </div>
 
       {sourcesReady < 4 ? (
-        <p className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm leading-relaxed">
+        <p className="text-sm text-muted-foreground">
           {sourcesReady} de 4 fontes conectadas.{" "}
           <Link href="/sources" className="underline-offset-2 hover:underline">
             Abrir fontes
           </Link>
-          . O exemplo de café abre sem chave.
-        </p>
-      ) : null}
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {list.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => void openRun(item.id)}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-left text-sm ${
-              item.id === run.id ? "border-primary bg-card" : "border-border bg-card/60"
-            }`}
-          >
-            <span className="font-medium">{item.supplierName || "Qualificação"}</span>
-            <span className="ml-2 text-muted-foreground">{STATUS_LABEL[item.status]}</span>
-          </button>
-        ))}
-      </div>
-
-      {run.mode === "sample" ? (
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Esta tabela é o exemplo de café para Alemanha, Holanda e Japão. Não é uma busca da Kanechom nem da LQ.
+          .
         </p>
       ) : null}
       {refreshError ? <p className="text-sm text-destructive">{refreshError}</p> : null}
-      {run.error ? <p className="text-sm text-destructive">{run.error}</p> : null}
 
-      <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        {run.stages.map((stage) => (
-          <li key={stage.id} className="rounded-lg border border-border bg-card px-3 py-2">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{stage.status}</p>
-            <p className="mt-1 text-sm leading-relaxed">{stage.detail}</p>
-          </li>
-        ))}
-      </ol>
+      <div className="flex gap-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setFocusId("all")}
+          className={`shrink-0 rounded-full border px-3 py-1.5 text-sm ${focusId === "all" ? "border-primary bg-card" : "border-border bg-card/60"}`}
+        >
+          Todas
+        </button>
+        {list
+          .filter((item) => item.mode !== "sample")
+          .map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setFocusId(item.id)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-left text-sm ${
+                focusId === item.id ? "border-primary bg-card" : "border-border bg-card/60"
+              }`}
+            >
+              <span className="font-medium">{item.supplierName}</span>
+              <span className="ml-2 text-muted-foreground">{item.markets}</span>
+            </button>
+          ))}
+      </div>
 
-      <section className="rounded-xl border border-border bg-card p-4">
-        <MarketEntry run={run} />
-        <OutputTable run={run} />
-        {run.market?.outlook ? (
-          <div className="mt-4 border-t border-border pt-4">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Mercado</p>
-            <p className="mt-2 text-sm leading-relaxed">{run.market.outlook}</p>
-          </div>
-        ) : null}
-        <p className="mt-4 text-sm">
-          <Link href={`/runs/${run.id}`} className="underline-offset-2 hover:underline">
-            Abrir o dossiê completo
-          </Link>
-        </p>
-      </section>
-
-      <section className="rounded-xl border border-border bg-card/40 p-4">
-        <h2 className="font-serif text-2xl">Nova busca</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          O pedido segue para a Exa, a Firecrawl, a OpenAI e a Parallel. A busca fica neste painel até o fim.
-        </p>
-        <div className="mt-4">
-          <QualifyForm
-            key={`${run.id}:${inputRevision}`}
-            initial={run.brief}
-            compact
-            onStarted={started}
-          />
-        </div>
-      </section>
+      <BuyerBoard buyers={visible} />
     </main>
+  )
+}
+
+type Buyer = {
+  runId: string
+  company: string
+  country: string
+  brand: string
+  fit: string
+  email: string
+  phone: string
+  website: string
+}
+
+function buyerRows(runs: Run[]): Buyer[] {
+  const rank: Record<string, number> = { high: 0, medium: 1, low: 2 }
+  const rows: Buyer[] = []
+  for (const run of runs) {
+    const leads = new Map(run.leads.map((lead) => [lead.name, lead]))
+    for (const row of qualificationRows(run.leads, run.brief, run.also)) {
+      const lead = leads.get(row.company)
+      rows.push({
+        runId: run.id,
+        company: row.company,
+        country: row.country || run.brief.markets,
+        brand: run.brief.supplierName,
+        fit: row.bestFit,
+        email: lead?.extraction?.email || "",
+        phone: lead?.extraction?.phone || lead?.extraction?.whatsapp || "",
+        website: lead?.extraction?.website || lead?.url || "",
+      })
+    }
+  }
+  return rows.sort(
+    (a, b) =>
+      (rank[a.fit] ?? 3) - (rank[b.fit] ?? 3) ||
+      a.country.localeCompare(b.country) ||
+      a.company.localeCompare(b.company)
+  )
+}
+
+function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
+  if (buyers.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed border-border px-4 py-8 text-sm text-muted-foreground">
+        Nenhuma empresa nesta busca.
+      </p>
+    )
+  }
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-border text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+            <th className="px-3 py-3 font-medium">Empresa</th>
+            <th className="px-3 py-3 font-medium">País</th>
+            <th className="px-3 py-3 font-medium">Marca</th>
+            <th className="px-3 py-3 font-medium">Encaixe</th>
+            <th className="px-3 py-3 font-medium">Email</th>
+            <th className="px-3 py-3 font-medium">Telefone</th>
+            <th className="px-3 py-3 font-medium">Site</th>
+          </tr>
+        </thead>
+        <tbody>
+          {buyers.map((buyer) => (
+            <tr key={`${buyer.runId}:${buyer.company}`} className="border-b border-border/70 align-top">
+              <td className="px-3 py-3 font-medium">{buyer.company}</td>
+              <td className="px-3 py-3 text-muted-foreground">{buyer.country}</td>
+              <td className="px-3 py-3">{buyer.brand}</td>
+              <td className="px-3 py-3">{buyer.fit}</td>
+              <td className="px-3 py-3">{buyer.email || "—"}</td>
+              <td className="px-3 py-3">{buyer.phone || "—"}</td>
+              <td className="px-3 py-3">
+                {buyer.website && isHttpUrl(buyer.website) ? (
+                  <a href={buyer.website} className="underline-offset-2 hover:underline" target="_blank" rel="noreferrer">
+                    site
+                  </a>
+                ) : (
+                  "—"
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

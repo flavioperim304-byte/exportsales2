@@ -41,6 +41,7 @@ async function Home({ searchParams }: { searchParams: Promise<{ run?: string }> 
   return (
     <Dashboard
       initialRun={selected}
+      runs={runs.filter((run) => run.mode !== "sample")}
       summaries={runs.map(summarize)}
       sourcesReady={sourcesReady}
     />
