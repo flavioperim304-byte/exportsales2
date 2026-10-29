@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { isHttpUrl } from "@/lib/format"
+import { isHttpUrl, mailtoHref, telHref } from "@/lib/format"
 import { qualificationRows } from "@/lib/qualify"
 import { summarize } from "@/lib/summary"
 import type { Run, RunSummary } from "@/lib/types"
@@ -61,17 +61,17 @@ export function Dashboard({
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 sm:py-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Export desk</p>
-          <h1 className="mt-1 font-serif text-4xl leading-tight">Compradores</h1>
+          <h1 className="mt-1 font-serif text-3xl leading-tight sm:text-4xl">Compradores</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {visible.length} empresas nas buscas de Kanechom e LQ Professional.
           </p>
         </div>
         <Link
           href="/qualify"
-          className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm text-primary-foreground"
+          className="inline-flex h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm text-primary-foreground sm:h-10"
         >
           Nova busca
         </Link>
@@ -88,11 +88,11 @@ export function Dashboard({
       ) : null}
       {refreshError ? <p className="text-sm text-destructive">{refreshError}</p> : null}
 
-      <div className="flex gap-2 overflow-x-auto">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onClick={() => setFocusId("all")}
-          className={`shrink-0 rounded-full border px-3 py-1.5 text-sm ${focusId === "all" ? "border-primary bg-card" : "border-border bg-card/60"}`}
+          className={`shrink-0 rounded-full border px-4 py-2 text-sm md:px-3 md:py-1.5 ${focusId === "all" ? "border-primary bg-card" : "border-border bg-card/60"}`}
         >
           Todas
         </button>
@@ -103,7 +103,7 @@ export function Dashboard({
               key={item.id}
               type="button"
               onClick={() => setFocusId(item.id)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-left text-sm ${
+              className={`shrink-0 rounded-full border px-4 py-2 text-left text-sm md:px-3 md:py-1.5 ${
                 focusId === item.id ? "border-primary bg-card" : "border-border bg-card/60"
               }`}
             >
@@ -165,7 +165,39 @@ function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
     )
   }
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+    <>
+      <ul className="flex flex-col gap-3 md:hidden">
+        {buyers.map((buyer) => (
+          <li key={`${buyer.runId}:${buyer.company}`} className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium leading-snug">{buyer.company}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {buyer.country} · {buyer.brand}
+                </p>
+              </div>
+              <p className="shrink-0 text-sm">{buyer.fit}</p>
+            </div>
+            <div className="mt-3 flex flex-col gap-1 text-sm">
+              <ContactLine label="Email" value={buyer.email} href={mailtoHref(buyer.email)} />
+              <ContactLine label="Telefone" value={buyer.phone} href={telHref(buyer.phone)} />
+              <ContactLine
+                label="Site"
+                value={buyer.website && isHttpUrl(buyer.website) ? "Abrir site" : ""}
+                href={buyer.website && isHttpUrl(buyer.website) ? buyer.website : ""}
+                external
+              />
+            </div>
+            <Link
+              href={`/runs/${buyer.runId}`}
+              className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg border border-border text-sm"
+            >
+              Abrir busca
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
       <table className="w-full min-w-[720px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-border text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
@@ -201,6 +233,36 @@ function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
         </tbody>
       </table>
     </div>
+    </>
+  )
+}
+
+function ContactLine({
+  label,
+  value,
+  href,
+  external = false,
+}: {
+  label: string
+  value: string
+  href: string
+  external?: boolean
+}) {
+  return (
+    <p className="flex min-w-0 gap-2">
+      <span className="w-16 shrink-0 text-muted-foreground">{label}</span>
+      {value && href ? (
+        <a
+          href={href}
+          className="min-w-0 break-all underline-offset-2 hover:underline"
+          {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
+        >
+          {value}
+        </a>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      )}
+    </p>
   )
 }
 

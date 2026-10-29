@@ -102,7 +102,7 @@ function PromptBlock({ label, text }: { label: string; text: string }) {
   return (
     <div>
       <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-secondary px-3 py-2 font-sans text-sm leading-relaxed text-foreground">
+      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-secondary px-3 py-2 font-sans text-sm leading-relaxed text-foreground">
         {text}
       </pre>
     </div>

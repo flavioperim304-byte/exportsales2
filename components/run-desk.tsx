@@ -8,7 +8,7 @@ import { MarketEntry } from "@/components/market-entry"
 import { Button } from "@/components/ui/button"
 import { PromptPreview } from "@/components/prompt-preview"
 import { qualificationRows } from "@/lib/qualify"
-import { BAND_LABEL, STATUS_LABEL, formatWhen, isHttpUrl, leadPlace } from "@/lib/format"
+import { BAND_LABEL, STATUS_LABEL, formatWhen, isHttpUrl, leadPlace, mailtoHref, telHref } from "@/lib/format"
 import type { Band, Evidence, Lead, Run, StageState } from "@/lib/types"
 import type { IcpLevel } from "@/lib/qualify"
 
@@ -83,23 +83,23 @@ export function RunDesk({ initial }: { initial: Run }) {
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:py-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             {run.mode === "sample" ? "Sample dossier" : "Live qualification"} · {STATUS_LABEL[run.status]}
           </p>
-          <h1 className="mt-1 font-serif text-3xl sm:text-4xl">
+          <h1 className="mt-1 break-words font-serif text-3xl sm:text-4xl">
             {run.also ? `${run.brief.supplierName} and ${run.also.supplierName}` : run.brief.supplierName}
           </h1>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <DownloadResults run={run} />
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+          <DownloadResults run={run} className="h-11 w-full sm:h-8 sm:w-auto" />
           {run.mode === "sample" ? (
-            <Button variant="outline" nativeButton={false} render={<Link href="/qualify" />}>
+            <Button className="h-11 w-full sm:h-8 sm:w-auto" variant="outline" nativeButton={false} render={<Link href="/qualify" />}>
               Start a live qualification
             </Button>
           ) : run.status === "complete" || run.status === "failed" ? (
-            <Button variant="outline" onClick={restart} disabled={restarting}>
+            <Button className="h-11 w-full sm:h-8 sm:w-auto" variant="outline" onClick={restart} disabled={restarting}>
               {restarting ? "Starting…" : "Run this brief again"}
             </Button>
           ) : null}
@@ -161,7 +161,7 @@ export function RunDesk({ initial }: { initial: Run }) {
             <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               Prompt · {run.brief.markets}
             </p>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{run.brief.instructions}</p>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">{run.brief.instructions}</p>
           </div>
         )}
       </section>
@@ -369,13 +369,13 @@ function Dossier({ lead }: { lead: Lead }) {
           <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
             {leadPlace(lead)} · {lead.domain}
           </p>
-          <h2 className="mt-1 font-serif text-3xl">{lead.name}</h2>
+          <h2 className="mt-1 break-words font-serif text-2xl sm:text-3xl">{lead.name}</h2>
           {isHttpUrl(lead.url) && !lead.url.includes(".example") ? (
             <a
               href={lead.url}
               target="_blank"
               rel="noreferrer"
-              className="mt-1 inline-block text-sm underline-offset-2 hover:underline"
+              className="mt-1 inline-block max-w-full break-all text-sm underline-offset-2 hover:underline"
             >
               {lead.url.replace(/^https?:\/\//, "")}
             </a>
@@ -427,10 +427,15 @@ function Dossier({ lead }: { lead: Lead }) {
           <Fact term="Sells" value={lead.extraction.sells.join(", ")} />
           <Fact term="Markets" value={lead.extraction.markets.join(", ")} />
           <Fact term="Certifications" value={lead.extraction.certifications.join(", ")} />
-          <Fact term="Email" value={lead.extraction.email ?? ""} />
-          <Fact term="Phone" value={lead.extraction.phone ?? ""} />
-          <Fact term="WhatsApp" value={lead.extraction.whatsapp ?? ""} />
-          <Fact term="Website" value={lead.extraction.website ?? ""} />
+          <Fact term="Email" value={lead.extraction.email ?? ""} href={mailtoHref(lead.extraction.email ?? "")} />
+          <Fact term="Phone" value={lead.extraction.phone ?? ""} href={telHref(lead.extraction.phone ?? "")} />
+          <Fact term="WhatsApp" value={lead.extraction.whatsapp ?? ""} href={telHref(lead.extraction.whatsapp ?? "")} />
+          <Fact
+            term="Website"
+            value={lead.extraction.website ?? ""}
+            href={lead.extraction.website && isHttpUrl(lead.extraction.website) ? lead.extraction.website : ""}
+            external
+          />
         </dl>
       ) : lead.extraction?.error ? (
         <p className="mt-4 text-sm text-muted-foreground">
@@ -491,7 +496,33 @@ function QualificationTable({ run }: { run: Run }) {
             ? "OpenAI scored this list. Parallel has not refined it yet. High means product and channel fit, not a confirmed order."
             : "Neither OpenAI nor Parallel has scored this list. The levels below are a local checklist. They are not the best-fit call."}
       </p>
-      <div className="mt-4 overflow-x-auto">
+      <ul className="mt-4 flex flex-col gap-3 md:hidden">
+        {rows.map((row) => (
+          <li key={row.company} className="rounded-lg border border-border px-3 py-3">
+            <p className="font-medium">{row.company}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{row.country}</p>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">ICP</dt>
+                <dd className="mt-0.5"><Level level={row.level} /></dd>
+              </div>
+              {row.fits.map((fit) => (
+                <div key={fit.supplier}>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">{fit.supplier}</dt>
+                  <dd className="mt-0.5"><Level level={fit.level} /></dd>
+                </div>
+              ))}
+              <div className="col-span-2">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Best fit</dt>
+                <dd className="mt-0.5">{row.bestFit}</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-sm text-muted-foreground">{row.rationale}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{row.qualificationNeeded}</p>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-4 hidden overflow-x-auto md:block">
         <table className="w-full min-w-[760px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-border text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
@@ -538,12 +569,34 @@ function Level({ level }: { level: IcpLevel }) {
   return <span className="uppercase tracking-wide">{level}</span>
 }
 
-function Fact({ term, value }: { term: string; value: string }) {
+function Fact({
+  term,
+  value,
+  href = "",
+  external = false,
+}: {
+  term: string
+  value: string
+  href?: string
+  external?: boolean
+}) {
   if (!value) return null
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-xs uppercase tracking-wide text-muted-foreground">{term}</dt>
-      <dd className="mt-0.5 leading-relaxed">{value}</dd>
+      <dd className="mt-0.5 break-words leading-relaxed">
+        {href ? (
+          <a
+            href={href}
+            className="underline-offset-2 hover:underline"
+            {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
+          >
+            {value}
+          </a>
+        ) : (
+          value
+        )}
+      </dd>
     </div>
   )
 }

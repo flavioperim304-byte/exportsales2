@@ -24,20 +24,21 @@ export function Header() {
   }, [])
 
   return (
-    <header className="border-b border-border/80 bg-card/80 backdrop-blur-sm">
-      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+    <header className="border-b border-border/80 bg-card/80 pt-[env(safe-area-inset-top)] backdrop-blur-sm">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/" className="min-w-0">
           <span className="font-serif text-xl tracking-tight text-foreground">Export desk</span>
         </Link>
-        <nav className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" nativeButton={false} render={<Link href="/" />}>
+        <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
+          <Button variant="ghost" className="h-11 shrink-0 px-4 sm:h-8" nativeButton={false} render={<Link href="/" />}>
             Painel
           </Button>
-          <Button variant="ghost" nativeButton={false} render={<Link href="/qualify" />}>
+          <Button variant="ghost" className="h-11 shrink-0 px-4 sm:h-8" nativeButton={false} render={<Link href="/qualify" />}>
             Nova busca
           </Button>
           <Button
             variant={ready === 0 ? "default" : "outline"}
+            className="h-11 shrink-0 px-4 sm:h-8"
             nativeButton={false}
             render={<Link href="/sources" />}
           >

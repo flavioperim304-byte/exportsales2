@@ -157,7 +157,7 @@ export function SourcesForm() {
           {note}
         </p>
       ))}
-      <Button type="submit" disabled={saving} className="h-10 w-fit px-4">
+      <Button type="submit" disabled={saving} className="h-11 w-full px-4 sm:h-10 sm:w-fit">
         {saving ? "Saving…" : "Save keys"}
       </Button>
     </form>
@@ -203,7 +203,7 @@ function KeyField({
             value={value}
             placeholder={saved ? "Key saved — paste a replacement" : "Paste API key"}
             onChange={(event) => onChange(event.target.value)}
-            className="h-10"
+            className="h-11 sm:h-10"
           />
           {saved ? (
             <button

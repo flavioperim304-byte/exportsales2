@@ -44,3 +44,13 @@ export function leadPlace(lead: Lead): string {
 export function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim())
 }
+
+export function mailtoHref(value: string): string {
+  const email = value.trim()
+  return email.includes("@") ? `mailto:${email}` : ""
+}
+
+export function telHref(value: string): string {
+  const digits = value.replace(/[^\d+]/g, "")
+  return digits ? `tel:${digits}` : ""
+}

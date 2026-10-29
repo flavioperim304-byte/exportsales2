@@ -107,24 +107,24 @@ export function QualifyForm({
     <form onSubmit={submit} className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          {compact ? null : <h1 className="font-serif text-4xl">New qualification</h1>}
+          {compact ? null : <h1 className="font-serif text-3xl sm:text-4xl">New qualification</h1>}
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Find buyers for your brand, or map who already distributes a Brazilian brand and the
             direct competitors in each country. Exa Deep is the faster pass. Exa Ultra builds the
             longer list, and Parallel checks it.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => setBrief(presentBrief(KANECHOM_BRIEF))}>
+        <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-2">
+          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => setBrief(presentBrief(KANECHOM_BRIEF))}>
             Load Kanechom
           </Button>
-          <Button type="button" variant="outline" onClick={() => setBrief(presentBrief(LQ_BRIEF))}>
+          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => setBrief(presentBrief(LQ_BRIEF))}>
             Load LQ Professional
           </Button>
-          <Button type="button" variant="outline" onClick={() => setBrief(presentBrief(EXAMPLE_BRIEF))}>
+          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => setBrief(presentBrief(EXAMPLE_BRIEF))}>
             Load the coffee example
           </Button>
-          <Button type="button" variant="outline" onClick={() => setBrief(presentBrief(CADIVEU_COMPETITOR_BRIEF))}>
+          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => setBrief(presentBrief(CADIVEU_COMPETITOR_BRIEF))}>
             Load Cadiveu competitors
           </Button>
         </div>
@@ -154,7 +154,7 @@ export function QualifyForm({
               id="supplierName"
               value={brief.supplierName}
               onChange={(event) => set("supplierName", event.target.value)}
-              className="h-10"
+              className="h-11 sm:h-10"
               required
             />
           </Field>
@@ -164,7 +164,7 @@ export function QualifyForm({
                 id="originCountry"
                 value={brief.originCountry}
                 onChange={(event) => set("originCountry", event.target.value)}
-                className="h-10"
+                className="h-11 sm:h-10"
                 required
               />
             </Field>
@@ -181,7 +181,7 @@ export function QualifyForm({
                 id="website"
                 value={brief.website}
                 onChange={(event) => set("website", event.target.value)}
-                className="h-10"
+                className="h-11 sm:h-10"
                 placeholder="https://"
               />
             </Field>
@@ -197,7 +197,7 @@ export function QualifyForm({
                     max={8}
                     value={brief.countryCount ?? 5}
                     onChange={(event) => set("countryCount", Number(event.target.value))}
-                    className="h-10"
+                    className="h-11 sm:h-10"
                   />
                 </Field>
                 <Field label="Exa" htmlFor="exaEffort" hint="Ultra is the thorough list. Deep is faster.">
@@ -205,7 +205,7 @@ export function QualifyForm({
                     id="exaEffort"
                     value={brief.exaEffort ?? "ultra"}
                     onChange={(event) => set("exaEffort", event.target.value === "deep" ? "deep" : "ultra")}
-                    className="h-10 rounded-lg border border-input bg-transparent px-3 text-sm"
+                    className="h-11 w-full rounded-lg border border-input bg-transparent px-3 text-base sm:h-10 md:text-sm"
                   >
                     <option value="ultra">Ultra</option>
                     <option value="deep">Deep</option>
@@ -217,7 +217,7 @@ export function QualifyForm({
                   id="excludedMarkets"
                   value={brief.excludedMarkets ?? ""}
                   onChange={(event) => set("excludedMarkets", event.target.value)}
-                  className="h-10"
+                  className="h-11 sm:h-10"
                 />
               </Field>
               <Field label="Only these countries" htmlFor="markets" hint="Leave blank to let Exa choose the countries.">
@@ -225,7 +225,7 @@ export function QualifyForm({
                   id="markets"
                   value={brief.markets}
                   onChange={(event) => set("markets", event.target.value)}
-                  className="h-10"
+                  className="h-11 sm:h-10"
                 />
               </Field>
             </>
@@ -239,7 +239,7 @@ export function QualifyForm({
                 id="markets"
                 value={brief.markets}
                 onChange={(event) => set("markets", event.target.value)}
-                className="h-10"
+                className="h-11 sm:h-10"
                 required
               />
             </Field>
@@ -271,7 +271,7 @@ export function QualifyForm({
               id="parallelMode"
               value={brief.parallelMode === "decisions" ? "decisions" : "task"}
               onChange={(event) => set("parallelMode", event.target.value === "decisions" ? "decisions" : "task")}
-              className="h-10 rounded-lg border border-input bg-transparent px-3 text-sm"
+              className="h-11 w-full rounded-lg border border-input bg-transparent px-3 text-base sm:h-10 md:text-sm"
             >
               <option value="task">Task</option>
               <option value="decisions">Decisions</option>
@@ -300,7 +300,7 @@ export function QualifyForm({
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-8 px-3"
+                    className="h-11 px-3 sm:h-8"
                     onClick={() => setBrief(presentBrief(item.brief))}
                   >
                     Use
@@ -335,7 +335,7 @@ export function QualifyForm({
       ) : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" className="h-10 px-4" disabled={pending || flags === null || !exaReady}>
+        <Button type="submit" className="h-11 w-full px-4 sm:h-10 sm:w-auto" disabled={pending || flags === null || !exaReady}>
           {pending ? "Starting the pipeline…" : "Run the pipeline"}
         </Button>
         <p className="text-xs text-muted-foreground">
