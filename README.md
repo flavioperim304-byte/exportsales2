@@ -48,7 +48,9 @@ Each live run spends one Exa Agent search per country (a second search only if t
 
 This is a Next.js 16 app. Netlify runs it with its OpenNext adapter. `netlify.toml` sets the build to `npm run build` and the publish directory to `.next`. Leave `@netlify/plugin-nextjs` unpinned so Netlify updates the adapter on each build.
 
-1. Create a Git repository for this project and push `main`.
+Upload this repository as it is. Do not paste files out of a text dump. Those dumps start each file with a line like `===== tsconfig.json =====`, and Netlify stops on that line. `tsconfig.json` has to start with `{`. `app/globals.css` has to be in the repository next to `app/layout.tsx`. The config file is `next.config.mjs`.
+
+1. Create a new empty Git repository and push this whole project to `main`.
 2. In Netlify, add a site from that repository. The build command is `npm run build` and the publish directory is `.next`. Node 22 is set in `netlify.toml`.
 3. Deploy. The API keys already live in the Netlify site environment. The desk is `/`. `/qualify` starts a search. `/sources` shows whether those keys are connected.
 
