@@ -66,7 +66,7 @@ export function Dashboard({
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Export desk</p>
           <h1 className="mt-1 font-serif text-3xl leading-tight sm:text-4xl">Compradores</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {visible.length} empresas nas buscas de Kanechom e LQ Professional.
+            {visible.length} empresas nas buscas de Kanechom e LQ Professional. A nota de encaixe de cada uma já está gravada; abra a busca para a ficha completa.
           </p>
         </div>
         <Link
@@ -113,6 +113,14 @@ export function Dashboard({
           ))}
       </div>
 
+      {focusId !== "all" ? (
+        <p className="text-sm">
+          <Link href={`/runs/${focusId}`} className="underline-offset-2 hover:underline">
+            Abrir a análise completa desta busca
+          </Link>
+        </p>
+      ) : null}
+
       <BuyerBoard buyers={visible} />
     </main>
   )
@@ -127,6 +135,7 @@ type Buyer = {
   email: string
   phone: string
   website: string
+  note: string
 }
 
 function buyerRows(runs: Run[]): Buyer[] {
@@ -145,6 +154,7 @@ function buyerRows(runs: Run[]): Buyer[] {
         email: lead?.extraction?.email || "",
         phone: lead?.extraction?.phone || lead?.extraction?.whatsapp || "",
         website: lead?.extraction?.website || lead?.url || "",
+        note: lead?.context?.fitNarrative || lead?.score?.headline || "",
       })
     }
   }
@@ -178,6 +188,9 @@ function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
               </div>
               <p className="shrink-0 text-sm">{buyer.fit}</p>
             </div>
+            {buyer.note ? (
+              <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-muted-foreground">{buyer.note}</p>
+            ) : null}
             <div className="mt-3 flex flex-col gap-1 text-sm">
               <ContactLine label="Email" value={buyer.email} href={mailtoHref(buyer.email)} />
               <ContactLine label="Telefone" value={buyer.phone} href={telHref(buyer.phone)} />
@@ -192,7 +205,7 @@ function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
               href={`/runs/${buyer.runId}`}
               className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg border border-border text-sm"
             >
-              Abrir busca
+              Abrir análise
             </Link>
           </li>
         ))}
@@ -213,7 +226,14 @@ function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
         <tbody>
           {buyers.map((buyer) => (
             <tr key={`${buyer.runId}:${buyer.company}`} className="border-b border-border/70 align-top">
-              <td className="px-3 py-3 font-medium">{buyer.company}</td>
+              <td className="px-3 py-3">
+                <Link href={`/runs/${buyer.runId}`} className="font-medium underline-offset-2 hover:underline">
+                  {buyer.company}
+                </Link>
+                {buyer.note ? (
+                  <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{buyer.note}</p>
+                ) : null}
+              </td>
               <td className="px-3 py-3 text-muted-foreground">{buyer.country}</td>
               <td className="px-3 py-3">{buyer.brand}</td>
               <td className="px-3 py-3">{buyer.fit}</td>
