@@ -66,7 +66,7 @@ export function Dashboard({
           <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Export desk</p>
           <h1 className="mt-1 font-serif text-3xl leading-tight sm:text-4xl">Compradores</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {visible.length} empresas nas buscas de Kanechom e LQ Professional. A nota de encaixe de cada uma já está gravada; abra a busca para a ficha completa.
+            {visible.length} empresas nas buscas de Kanechom e LQ Professional.
           </p>
         </div>
         <Link
@@ -136,6 +136,9 @@ type Buyer = {
   phone: string
   website: string
   note: string
+  needed: string
+  suppliers: string[]
+  risks: string[]
 }
 
 function buyerRows(runs: Run[]): Buyer[] {
@@ -154,7 +157,10 @@ function buyerRows(runs: Run[]): Buyer[] {
         email: lead?.extraction?.email || "",
         phone: lead?.extraction?.phone || lead?.extraction?.whatsapp || "",
         website: lead?.extraction?.website || lead?.url || "",
-        note: lead?.context?.fitNarrative || lead?.score?.headline || "",
+        note: lead?.context?.fitNarrative || row.rationale || lead?.score?.headline || "",
+        needed: lead?.context?.qualificationNeeded || row.qualificationNeeded || "",
+        suppliers: lead?.context?.knownSuppliers ?? [],
+        risks: lead?.context?.risks ?? [],
       })
     }
   }
@@ -175,85 +181,62 @@ function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
     )
   }
   return (
-    <>
-      <ul className="flex flex-col gap-3 md:hidden">
-        {buyers.map((buyer) => (
-          <li key={`${buyer.runId}:${buyer.company}`} className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-medium leading-snug">{buyer.company}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {buyer.country} · {buyer.brand}
-                </p>
-              </div>
-              <p className="shrink-0 text-sm">{buyer.fit}</p>
+    <ul className="grid gap-4 lg:grid-cols-2">
+      {buyers.map((buyer) => (
+        <li key={`${buyer.runId}:${buyer.company}`} className="flex flex-col rounded-xl border border-border bg-card p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-medium leading-snug">{buyer.company}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {buyer.country} · {buyer.brand}
+              </p>
             </div>
-            {buyer.note ? (
-              <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-muted-foreground">{buyer.note}</p>
-            ) : null}
-            <div className="mt-3 flex flex-col gap-1 text-sm">
-              <ContactLine label="Email" value={buyer.email} href={mailtoHref(buyer.email)} />
-              <ContactLine label="Telefone" value={buyer.phone} href={telHref(buyer.phone)} />
-              <ContactLine
-                label="Site"
-                value={buyer.website && isHttpUrl(buyer.website) ? "Abrir site" : ""}
-                href={buyer.website && isHttpUrl(buyer.website) ? buyer.website : ""}
-                external
-              />
+            <p className="shrink-0 text-sm font-medium">{buyer.fit}</p>
+          </div>
+          <p className="mt-3 text-sm leading-relaxed">
+            {buyer.note || "Esta empresa não tem nota de análise gravada."}
+          </p>
+          {buyer.needed ? (
+            <div className="mt-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Ainda a confirmar</p>
+              <p className="mt-1 text-sm leading-relaxed">{buyer.needed}</p>
             </div>
-            <Link
-              href={`/runs/${buyer.runId}`}
-              className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg border border-border text-sm"
-            >
-              Abrir análise
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <div className="hidden overflow-x-auto rounded-xl border border-border bg-card md:block">
-      <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-        <thead>
-          <tr className="border-b border-border text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-            <th className="px-3 py-3 font-medium">Empresa</th>
-            <th className="px-3 py-3 font-medium">País</th>
-            <th className="px-3 py-3 font-medium">Marca</th>
-            <th className="px-3 py-3 font-medium">Encaixe</th>
-            <th className="px-3 py-3 font-medium">Email</th>
-            <th className="px-3 py-3 font-medium">Telefone</th>
-            <th className="px-3 py-3 font-medium">Site</th>
-          </tr>
-        </thead>
-        <tbody>
-          {buyers.map((buyer) => (
-            <tr key={`${buyer.runId}:${buyer.company}`} className="border-b border-border/70 align-top">
-              <td className="px-3 py-3">
-                <Link href={`/runs/${buyer.runId}`} className="font-medium underline-offset-2 hover:underline">
-                  {buyer.company}
-                </Link>
-                {buyer.note ? (
-                  <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{buyer.note}</p>
-                ) : null}
-              </td>
-              <td className="px-3 py-3 text-muted-foreground">{buyer.country}</td>
-              <td className="px-3 py-3">{buyer.brand}</td>
-              <td className="px-3 py-3">{buyer.fit}</td>
-              <td className="px-3 py-3">{buyer.email || "—"}</td>
-              <td className="px-3 py-3">{buyer.phone || "—"}</td>
-              <td className="px-3 py-3">
-                {buyer.website && isHttpUrl(buyer.website) ? (
-                  <a href={buyer.website} className="underline-offset-2 hover:underline" target="_blank" rel="noreferrer">
-                    site
-                  </a>
-                ) : (
-                  "—"
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-    </>
+          ) : null}
+          {buyer.suppliers.length ? (
+            <div className="mt-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Marcas no portfólio</p>
+              <p className="mt-1 text-sm leading-relaxed">{buyer.suppliers.join(", ")}</p>
+            </div>
+          ) : null}
+          {buyer.risks.length ? (
+            <div className="mt-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Riscos</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed">
+                {buyer.risks.map((risk) => (
+                  <li key={risk}>{risk}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <div className="mt-3 flex flex-col gap-1 text-sm">
+            <ContactLine label="Email" value={buyer.email} href={mailtoHref(buyer.email)} />
+            <ContactLine label="Telefone" value={buyer.phone} href={telHref(buyer.phone)} />
+            <ContactLine
+              label="Site"
+              value={buyer.website && isHttpUrl(buyer.website) ? buyer.website.replace(/^https?:\/\//, "") : ""}
+              href={buyer.website && isHttpUrl(buyer.website) ? buyer.website : ""}
+              external
+            />
+          </div>
+          <Link
+            href={`/runs/${buyer.runId}`}
+            className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg border border-border text-sm"
+          >
+            Abrir ficha
+          </Link>
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -286,76 +269,3 @@ function ContactLine({
   )
 }
 
-function OutputTable({ run }: { run: Run }) {
-  const rows = qualificationRows(run.leads, run.brief, run.also)
-  if (rows.length === 0) {
-    return (
-      <p className="mt-4 rounded-lg border border-dashed border-border px-3 py-6 text-sm text-muted-foreground">
-        No companies yet. The output fills in as Exa returns names, Firecrawl adds contacts, and the scores arrive.
-      </p>
-    )
-  }
-  const leads = new Map(run.leads.map((lead) => [lead.name, lead]))
-  const scoredBy = rows.some((row) => row.source === "parallel")
-    ? "Parallel set the final best fit."
-    : rows.some((row) => row.source === "openai")
-      ? "OpenAI scored this list. Parallel has not refined it."
-      : "Neither OpenAI nor Parallel has scored this list. These levels are the evidence checklist."
-  return (
-    <div className="mt-4">
-      <p className="text-sm text-muted-foreground">{scoredBy}</p>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[880px] border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-border text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-              <th className="py-2 pr-3 font-medium">Company</th>
-              <th className="py-2 pr-3 font-medium">Country</th>
-              <th className="py-2 pr-3 font-medium">ICP</th>
-              <th className="py-2 pr-3 font-medium">Best fit</th>
-              <th className="py-2 pr-3 font-medium">Email</th>
-              <th className="py-2 pr-3 font-medium">Phone</th>
-              <th className="py-2 pr-3 font-medium">WhatsApp</th>
-              <th className="py-2 pr-3 font-medium">Website</th>
-              <th className="py-2 font-medium">Still to confirm</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const lead = leads.get(row.company)
-              const email = lead?.extraction?.email || ""
-              const phone = lead?.extraction?.phone || ""
-              const whatsapp = lead?.extraction?.whatsapp || ""
-              const website = lead?.extraction?.website || lead?.url || ""
-              return (
-                <tr key={row.company} className="border-b border-border/70 align-top">
-                  <td className="py-3 pr-3 font-medium">
-                    {row.company}
-                    {lead?.buyerType ? (
-                      <span className="mt-1 block text-xs font-normal text-muted-foreground">{lead.buyerType}</span>
-                    ) : null}
-                  </td>
-                  <td className="py-3 pr-3 text-muted-foreground">{row.country}</td>
-                  <td className="py-3 pr-3 uppercase">{row.level}</td>
-                  <td className="py-3 pr-3">{row.bestFit}</td>
-                  <td className="py-3 pr-3">{email || "—"}</td>
-                  <td className="py-3 pr-3">{phone || "—"}</td>
-                  <td className="py-3 pr-3">{whatsapp || "—"}</td>
-                  <td className="py-3 pr-3">
-                    {website && isHttpUrl(website) ? (
-                      <a href={website} className="underline-offset-2 hover:underline" target="_blank" rel="noreferrer">
-                        {lead?.domain || website}
-                      </a>
-                    ) : (
-                      website || "—"
-                    )}
-                  </td>
-                  <td className="py-3 text-muted-foreground">{row.qualificationNeeded}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}

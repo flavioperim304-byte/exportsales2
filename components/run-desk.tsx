@@ -257,7 +257,7 @@ export function RunDesk({ initial }: { initial: Run }) {
                         {item.market ? ` · for ${item.market}` : ""}
                       </p>
                       <p className="font-medium">{item.name}</p>
-                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                         {item.score?.headline ||
                           item.extraction?.summary ||
                           item.exa.summary ||
