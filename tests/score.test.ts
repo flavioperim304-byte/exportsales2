@@ -3,7 +3,7 @@ import test from "node:test"
 import { EXAMPLE_BRIEF, KANECHOM_BRIEF } from "../lib/example"
 import { sampleRun } from "../lib/sample"
 import { scoreLead } from "../lib/score"
-import type { Lead } from "../lib/types"
+import type { Lead, LeadScore } from "../lib/types"
 
 function explain(lead: Lead): string {
   const score = lead.score
@@ -16,13 +16,15 @@ function explain(lead: Lead): string {
 
 test("sample dossier ranks the coffee brief into the expected bands", () => {
   const run = sampleRun()
-  const byId = new Map(run.leads.map((lead) => [lead.id, lead]))
+  const byId = new Map<string, Lead>(run.leads.map((lead) => [lead.id, lead]))
   const nord = byId.get("lead-nordlicht")
   const haven = byId.get("lead-haven")
   const kumo = byId.get("lead-kumo")
   const atlas = byId.get("lead-atlas")
   const estate = byId.get("lead-estate")
-  assert.ok(nord && haven && kumo && atlas && estate)
+  if (!nord || !haven || !kumo || !atlas || !estate) {
+    throw new Error("sample dossier is missing a lead")
+  }
 
   assert.equal(nord.score?.band, "best_fit", explain(nord))
   assert.ok((nord.score?.total ?? 0) >= 80, explain(nord))
@@ -91,7 +93,7 @@ test("“not exclusive” is an open book, not a locked account", () => {
       citations: ["https://open-book.example/sources"],
     },
   }
-  const score = scoreLead(EXAMPLE_BRIEF, lead)
+  const score: LeadScore = scoreLead(EXAMPLE_BRIEF, lead)
   const competitive = score.dimensions.find((item) => item.key === "competitive")
   assert.equal(competitive?.points, 10)
   assert.match(competitive?.rationale ?? "", /open buying book/i)
@@ -138,8 +140,10 @@ test("República Dominicana and South África count as the target markets", () =
       country: "",
     },
   }
-  const geo = (lead: Lead) =>
-    scoreLead(KANECHOM_BRIEF, lead).dimensions.find((item) => item.key === "geography")
+  const geo = (lead: Lead) => {
+    const score: LeadScore = scoreLead(KANECHOM_BRIEF, lead)
+    return score.dimensions.find((item) => item.key === "geography")
+  }
   assert.equal(geo(dominicana)?.points, 15)
   assert.equal(geo(africa)?.points, 15)
 })
@@ -160,7 +164,7 @@ test("a thin excerpt still returns a score without invented evidence", () => {
       summary: "",
     },
   }
-  const score = scoreLead(EXAMPLE_BRIEF, lead)
+  const score: LeadScore = scoreLead(EXAMPLE_BRIEF, lead)
   const evidence = score.dimensions.find((item) => item.key === "evidence")
   const competitive = score.dimensions.find((item) => item.key === "competitive")
   assert.ok(evidence)
