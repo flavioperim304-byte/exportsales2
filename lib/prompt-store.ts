@@ -4,10 +4,11 @@ import { addSavedPrompt, type SavedPrompt } from "./prompt-library"
 import type { Brief } from "./types"
 
 const file = path.join(process.cwd(), "data", "prompts.json")
+const seedFile = path.join(process.cwd(), "lib", "data", "seed-prompts.json")
 
 type Database = { prompts: SavedPrompt[] }
 
-function read(): Database {
+function readDisk(): Database {
   try {
     const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as Database
     if (!parsed || !Array.isArray(parsed.prompts)) return { prompts: [] }
@@ -15,6 +16,32 @@ function read(): Database {
   } catch {
     return { prompts: [] }
   }
+}
+
+function readSeed(): SavedPrompt[] {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(seedFile, "utf8")) as Database
+    if (!parsed || !Array.isArray(parsed.prompts)) return []
+    return parsed.prompts
+  } catch {
+    return []
+  }
+}
+
+function read(): Database {
+  const disk = readDisk()
+  const seed = readSeed()
+  if (seed.length === 0) return disk
+  const have = new Set(disk.prompts.map((item) => item.id))
+  const missing = seed.filter((item) => item?.id && !have.has(item.id))
+  if (missing.length === 0) return disk
+  const merged: Database = { prompts: [...disk.prompts, ...missing] }
+  try {
+    write(merged)
+  } catch {
+    return merged
+  }
+  return merged
 }
 
 function write(db: Database) {

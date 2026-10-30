@@ -39,12 +39,13 @@ async function blobList(): Promise<Run[]> {
 }
 
 const file = path.join(process.cwd(), "data", "runs.json")
+const seedFile = path.join(process.cwd(), "lib", "data", "seed-runs.json")
 
 type Database = { runs: Run[] }
 
 let queue: Promise<void> = Promise.resolve()
 
-function read(): Database {
+function readDisk(): Database {
   try {
     const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as Database
     if (!parsed || !Array.isArray(parsed.runs)) return { runs: [] }
@@ -52,6 +53,32 @@ function read(): Database {
   } catch {
     return { runs: [] }
   }
+}
+
+function readSeed(): Run[] {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(seedFile, "utf8")) as Database
+    if (!parsed || !Array.isArray(parsed.runs)) return []
+    return parsed.runs.filter((run) => run?.id && run.id !== SAMPLE_RUN_ID)
+  } catch {
+    return []
+  }
+}
+
+function loadDatabase(): Database {
+  const disk = readDisk()
+  const seed = readSeed()
+  if (seed.length === 0) return disk
+  const have = new Set(disk.runs.map((run) => run.id))
+  const missing = seed.filter((run) => !have.has(run.id))
+  if (missing.length === 0) return disk
+  const merged: Database = { runs: [...disk.runs, ...missing] }
+  try {
+    write(merged)
+  } catch {
+    return merged
+  }
+  return merged
 }
 
 function write(db: Database) {
@@ -62,7 +89,7 @@ function write(db: Database) {
 }
 
 export async function listRuns(): Promise<Run[]> {
-  const stored = (durable() ? await blobList() : read().runs).filter((run) => run.id !== SAMPLE_RUN_ID)
+  const stored = (durable() ? await blobList() : loadDatabase().runs).filter((run) => run.id !== SAMPLE_RUN_ID)
   stored.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   return [sampleRun(), ...stored]
 }
@@ -70,7 +97,7 @@ export async function listRuns(): Promise<Run[]> {
 export async function getRun(id: string): Promise<Run | null> {
   if (id === SAMPLE_RUN_ID) return sampleRun()
   if (durable()) return blobGet(id)
-  return read().runs.find((run) => run.id === id) ?? null
+  return loadDatabase().runs.find((run) => run.id === id) ?? null
 }
 
 export async function insertRun(run: Run): Promise<void> {
@@ -79,7 +106,7 @@ export async function insertRun(run: Run): Promise<void> {
       await blobs().setJSON(`run:${run.id}`, run)
       return
     }
-    const db = read()
+    const db = loadDatabase()
     db.runs = db.runs.filter((item) => item.id !== run.id)
     db.runs.unshift(run)
     write(db)
@@ -100,13 +127,13 @@ export async function updateRun<T>(
   let failed: unknown
   const job = queue.then(async () => {
     try {
-      const run = durable() ? await blobGet(id) : read().runs.find((item) => item.id === id)
+      const run = durable() ? await blobGet(id) : loadDatabase().runs.find((item) => item.id === id)
       if (!run) return
       result = fn(run)
       run.updatedAt = new Date().toISOString()
       if (durable()) await blobs().setJSON(`run:${id}`, run)
       else {
-        const db = read()
+        const db = loadDatabase()
         const index = db.runs.findIndex((item) => item.id === id)
         if (index < 0) return
         db.runs[index] = run

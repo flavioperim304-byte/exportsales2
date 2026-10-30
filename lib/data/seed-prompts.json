@@ -1,0 +1,120 @@
+{
+  "prompts": [
+    {
+      "id": "60cbf3cc-2940-4985-a45c-5d37ffe54ec0",
+      "name": "LQ professional · Colombia",
+      "createdAt": "2026-10-30T19:19:41.779Z",
+      "brief": {
+        "supplierName": "LQ professional",
+        "originCountry": "Brazil",
+        "website": "https://lqprofessional.com.br",
+        "products": "",
+        "differentiators": "",
+        "certifications": "",
+        "markets": "Colombia",
+        "buyerTypes": "",
+        "mustHaves": "",
+        "exclusions": "",
+        "instructions": "Find distributors in Colombia that import professional hair care products with evidence of mix products, brands, if they are actively importing and social media presence. Identify key contact person with email and whatsapp. Check for any evidence of presence of Brazilian Keratin stylish products in distributors portfolio and prices listed in any available sources.",
+        "leadCount": 10,
+        "searchKind": "buyers",
+        "exaEffort": "ultra",
+        "countryCount": 5,
+        "excludedMarkets": "",
+        "parallelMode": "task",
+        "hsCode": "330590"
+      }
+    },
+    {
+      "id": "7da4cdb6-bf8d-4305-adc5-106e30ff4b9e",
+      "name": "Kanechom · Uganda",
+      "createdAt": "2026-10-30T18:48:54.469Z",
+      "brief": {
+        "supplierName": "Kanechom",
+        "originCountry": "Brazil",
+        "website": "https://kanechom.com",
+        "products": "",
+        "differentiators": "",
+        "certifications": "",
+        "markets": "Uganda",
+        "buyerTypes": "",
+        "mustHaves": "",
+        "exclusions": "",
+        "instructions": "Find distributors in Uganda that import retail hair care products with evidence of mix products, brands, retail chains clients, if they are actively importing and social media presence. Identify key contact person with email and whatsapp.",
+        "leadCount": 10,
+        "searchKind": "buyers",
+        "exaEffort": "ultra",
+        "countryCount": 5,
+        "excludedMarkets": "",
+        "parallelMode": "task",
+        "hsCode": "330590"
+      }
+    },
+    {
+      "id": "cc36c37e-d6f5-40da-bc32-139ab0acffdd",
+      "name": "LQ professional · Portugal",
+      "createdAt": "2026-10-29T20:46:56.244Z",
+      "brief": {
+        "supplierName": "LQ professional",
+        "originCountry": "Brazil",
+        "website": "https://lqprofessional.com.br",
+        "products": "",
+        "differentiators": "",
+        "certifications": "",
+        "markets": "Portugal",
+        "buyerTypes": "",
+        "mustHaves": "",
+        "exclusions": "",
+        "instructions": "Find in Portugal distributors, whosalers that imports or buy from other countries professional hair products. Bring details about ICP, mix products, brands, number of employees and outreach. Do not invent data.",
+        "leadCount": 10,
+        "searchKind": "buyers",
+        "exaEffort": "ultra",
+        "countryCount": 5,
+        "excludedMarkets": "",
+        "parallelMode": "task"
+      }
+    },
+    {
+      "id": "b888c24c-15f6-40ce-aacb-fd7846876c46",
+      "name": "LQ professional · Bolivia",
+      "createdAt": "2026-10-29T01:10:54.205Z",
+      "brief": {
+        "supplierName": "LQ professional",
+        "originCountry": "Brazil",
+        "website": "https://lqprofessional.com.br",
+        "products": "",
+        "differentiators": "",
+        "certifications": "",
+        "markets": "Bolivia",
+        "buyerTypes": "",
+        "mustHaves": "",
+        "exclusions": "",
+        "instructions": "Find distributors or importers of hair care brands in Bolivia that import professional hair care brands. Bring ICP infprmation, mix of products similarities, employees number.\n\nProducts: professional hair products such as straightening sets, treatments\n\nWhy a buyer would add this supplier: Multifunctional products and usage\n\nBuyer types: distributors, importers\n\nDo not include: ecommerce and retail shops, distributors of mutinational brands",
+        "leadCount": 10,
+        "searchKind": "buyers",
+        "exaEffort": "ultra",
+        "countryCount": 5,
+        "excludedMarkets": ""
+      }
+    },
+    {
+      "id": "a6096499-7c31-41af-ba7f-298f17a29e6b",
+      "name": "LQ professional · Morocco",
+      "createdAt": "2026-10-28T18:58:00.505Z",
+      "brief": {
+        "supplierName": "LQ professional",
+        "originCountry": "Brazil",
+        "website": "https://lqprofessional.com.br",
+        "products": "",
+        "differentiators": "",
+        "certifications": "",
+        "markets": "Morocco",
+        "buyerTypes": "",
+        "mustHaves": "",
+        "exclusions": "",
+        "instructions": "Find distributors or importers of hair care brands in Morocco that import professional hair care brands. Bring ICP infprmation, mix of products similarities, employees number.\n\nProducts: professional hair products such as straightening sets, treatments and boosters\n\nWhy a buyer would add this supplier: Multifunctional products and usage\n\nBuyer types: distributors, importers\n\nThe buyer must show: import professional brands\n\nDo not include: ecommerce and retail shops, distributors of mutinational brands",
+        "leadCount": 10
+      }
+    }
+  ]
+}
