@@ -51,6 +51,10 @@ export function QualifyForm({
     setBrief((current) => ({ ...current, [key]: value }))
   }
 
+  function loadTemplate(template: Brief) {
+    setBrief(presentBrief({ ...template, parallelMode: brief.parallelMode }))
+  }
+
   async function launch(payload: Brief) {
     setPending(true)
     setError("")
@@ -103,52 +107,79 @@ export function QualifyForm({
 
   const exaReady = flags?.exa ?? false
 
+  const usingDecisions = brief.parallelMode === "decisions"
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          {compact ? null : <h1 className="font-serif text-3xl sm:text-4xl">New qualification</h1>}
+          {compact ? null : <h1 className="font-serif text-3xl sm:text-4xl">Nova busca</h1>}
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Find buyers for your brand, or map who already distributes a Brazilian brand and the
-            direct competitors in each country. Exa Deep is the faster pass. Exa Ultra builds the
-            longer list, and Parallel checks it.
+            Escolha o tipo de busca e qual API do Parallel entra nesta rodada. Task é o padrão.
+            Decisions só roda se você selecionar o botão abaixo.
           </p>
         </div>
         <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-2">
-          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => setBrief(presentBrief(KANECHOM_BRIEF))}>
+          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => loadTemplate(KANECHOM_BRIEF)}>
             Load Kanechom
           </Button>
-          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => setBrief(presentBrief(LQ_BRIEF))}>
+          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => loadTemplate(LQ_BRIEF)}>
             Load LQ Professional
           </Button>
-          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => setBrief(presentBrief(EXAMPLE_BRIEF))}>
+          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => loadTemplate(EXAMPLE_BRIEF)}>
             Load the coffee example
           </Button>
-          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => setBrief(presentBrief(CADIVEU_COMPETITOR_BRIEF))}>
+          <Button type="button" variant="outline" className="h-11 w-full sm:h-8" onClick={() => loadTemplate(CADIVEU_COMPETITOR_BRIEF)}>
             Load Cadiveu competitors
           </Button>
         </div>
       </div>
 
+      <section className="grid gap-4 rounded-xl border border-border bg-card p-4 lg:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Tipo de busca</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <ChoiceButton
+              selected={brief.searchKind !== "competitors"}
+              title="Compradores"
+              hint="Distribuidores e importadores para a sua marca."
+              onClick={() => set("searchKind", "buyers")}
+            />
+            <ChoiceButton
+              selected={brief.searchKind === "competitors"}
+              title="Mapa de concorrentes"
+              hint="Quem já distribui a marca e os rivais diretos em cada país."
+              onClick={() => set("searchKind", "competitors")}
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">API do Parallel</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <ChoiceButton
+              selected={!usingDecisions}
+              title="Task"
+              hint="Padrão. Pesquisa profunda (pro-fast)."
+              onClick={() => set("parallelMode", "task")}
+            />
+            <ChoiceButton
+              selected={usingDecisions}
+              title="Decisions API"
+              hint="Opt-in. POST /v1/decisions em modo fast."
+              onClick={() => set("parallelMode", "decisions")}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {usingDecisions
+              ? "Esta busca usa a Decisions API. As buscas anteriores desta mesa ficaram no Task."
+              : "Task continua selecionado. Para usar a Decisions API, clique no botão ao lado."}
+          </p>
+        </div>
+      </section>
+
       <div className={compact ? "grid gap-6" : "grid gap-6 lg:grid-cols-2"}>
         <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
           <h2 className="font-serif text-2xl">{brief.searchKind === "competitors" ? "Brand" : "Supplier"}</h2>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant={brief.searchKind === "competitors" ? "outline" : "default"}
-              onClick={() => set("searchKind", "buyers")}
-            >
-              Find buyers
-            </Button>
-            <Button
-              type="button"
-              variant={brief.searchKind === "competitors" ? "default" : "outline"}
-              onClick={() => set("searchKind", "competitors")}
-            >
-              Competitor distributors
-            </Button>
-          </div>
           <Field label={brief.searchKind === "competitors" ? "Brand" : "Trade name"} htmlFor="supplierName">
             <Input
               id="supplierName"
@@ -276,21 +307,6 @@ export function QualifyForm({
               placeholder="Find distributors, wholesalers, and trading companies that import retail hair care. Skip ecommerce shops."
             />
           </Field>
-          <Field
-            label="Parallel"
-            htmlFor="parallelMode"
-            hint="Task is the default. Decisions runs only when you pick it for this search."
-          >
-            <select
-              id="parallelMode"
-              value={brief.parallelMode === "decisions" ? "decisions" : "task"}
-              onChange={(event) => set("parallelMode", event.target.value === "decisions" ? "decisions" : "task")}
-              className="h-11 w-full rounded-lg border border-input bg-transparent px-3 text-base sm:h-10 md:text-sm"
-            >
-              <option value="task">Task</option>
-              <option value="decisions">Decisions</option>
-            </select>
-          </Field>
           <div className="flex flex-wrap items-center gap-3">
             <Button type="button" variant="outline" onClick={() => void savePrompt()}>
               Save prompt
@@ -353,14 +369,39 @@ export function QualifyForm({
           {pending ? "Starting the pipeline…" : "Run the pipeline"}
         </Button>
         <p className="text-xs text-muted-foreground">
-          {brief.parallelMode === "decisions"
-            ? "This run uses Parallel Decisions in fast mode. Other runs stay on the Task API."
+          {usingDecisions
+            ? "Esta rodada chama a Decisions API em modo fast. As demais buscas continuam no Task."
             : brief.searchKind === "competitors" && brief.exaEffort !== "deep"
-              ? "Exa Ultra can take about 15 minutes. Parallel Task then checks the distributors. You can leave the run open."
-              : "Parallel uses the Task API on pro-fast, about $0.14 a call. You can leave the run open while it researches."}
+              ? "Exa Ultra pode levar cerca de 15 minutos. Depois o Parallel Task confere os distribuidores."
+              : "Parallel usa a Task API em pro-fast, cerca de US$ 0,14 por chamada. Você pode deixar a busca aberta."}
         </p>
       </div>
     </form>
+  )
+}
+
+function ChoiceButton({
+  selected,
+  title,
+  hint,
+  onClick,
+}: {
+  selected: boolean
+  title: string
+  hint: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg border px-3 py-3 text-left ${
+        selected ? "border-primary bg-secondary" : "border-border bg-transparent"
+      }`}
+    >
+      <p className="text-sm font-medium">{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{hint}</p>
+    </button>
   )
 }
 

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { CompetitorMap } from "@/components/competitor-map"
 import { DownloadResults } from "@/components/download-results"
 import { MarketEntry } from "@/components/market-entry"
 import { TradeVolume } from "@/components/trade-volume"
@@ -88,6 +89,9 @@ export function RunDesk({ initial }: { initial: Run }) {
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             {run.mode === "sample" ? "Sample dossier" : "Live qualification"} · {STATUS_LABEL[run.status]}
+            {run.brief.parallelMode === "decisions" || run.parallelDecisionId
+              ? " · Parallel Decisions"
+              : " · Parallel Task"}
           </p>
           <h1 className="mt-1 break-words font-serif text-3xl sm:text-4xl">
             {run.also ? `${run.brief.supplierName} and ${run.also.supplierName}` : run.brief.supplierName}
@@ -122,6 +126,13 @@ export function RunDesk({ initial }: { initial: Run }) {
       {refreshError ? <p className="text-sm text-destructive">{refreshError}</p> : null}
 
       {run.trade ? <TradeVolume trade={run.trade} /> : null}
+      <CompetitorMap
+        competitors={run.competitors ?? []}
+        brand={run.brief.supplierName}
+        emptyMessage={
+          run.status === "complete" ? "Nenhum concorrente foi apontado nesta busca." : undefined
+        }
+      />
 
       <section className="rounded-xl border border-border bg-card p-4">
         {run.brief.products || run.brief.buyerTypes || run.brief.exclusions ? (
@@ -187,7 +198,7 @@ export function RunDesk({ initial }: { initial: Run }) {
       {run.market ? (
         <section className="rounded-xl border border-border bg-card p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-serif text-2xl">Market and competitors</h2>
+            <h2 className="font-serif text-2xl">Mercado</h2>
             <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Parallel</p>
           </div>
           <MarketEntry run={run} />
@@ -199,27 +210,6 @@ export function RunDesk({ initial }: { initial: Run }) {
             <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
               {run.market.importSignals.map((signal) => (
                 <li key={signal}>{signal}</li>
-              ))}
-            </ul>
-          ) : null}
-          {run.competitors.length ? (
-            <ul className="mt-4 grid gap-2 sm:grid-cols-3">
-              {run.competitors.map((competitor) => (
-                <li key={competitor.name} className="rounded-lg border border-border px-3 py-2">
-                  <p className="font-medium">{competitor.name}</p>
-                  <p className="text-xs text-muted-foreground">{competitor.country}</p>
-                  <p className="mt-1 text-sm leading-relaxed">{competitor.whyRelevant}</p>
-                  {isHttpUrl(competitor.url) ? (
-                    <a
-                      href={competitor.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-1 inline-block text-xs underline-offset-2 hover:underline"
-                    >
-                      Source
-                    </a>
-                  ) : null}
-                </li>
               ))}
             </ul>
           ) : null}

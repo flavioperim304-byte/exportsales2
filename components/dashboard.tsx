@@ -2,11 +2,12 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { CompetitorMap } from "@/components/competitor-map"
 import { TradeLines } from "@/components/trade-volume"
 import { isHttpUrl, mailtoHref, telHref } from "@/lib/format"
 import { qualificationRows } from "@/lib/qualify"
 import { summarize } from "@/lib/summary"
-import type { Run, RunSummary, TradeSnapshot } from "@/lib/types"
+import type { Competitor, Run, RunSummary, TradeSnapshot } from "@/lib/types"
 
 export function Dashboard({
   initialRun,
@@ -57,8 +58,11 @@ export function Dashboard({
     }
   }, [run.id, run.mode, run.status])
 
-  const buyers = buyerRows(runs.length > 0 ? runs : [initialRun].filter((item) => item.mode !== "sample"))
+  const sourceRuns = runs.length > 0 ? runs : [initialRun].filter((item) => item.mode !== "sample")
+  const buyers = buyerRows(sourceRuns)
   const visible = focusId === "all" ? buyers : buyers.filter((buyer) => buyer.runId === focusId)
+  const focused = focusId === "all" ? undefined : list.find((item) => item.id === focusId)
+  const competitors = competitorRows(sourceRuns, focusId)
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 sm:py-8">
@@ -122,6 +126,16 @@ export function Dashboard({
         </p>
       ) : null}
 
+      <CompetitorMap
+        competitors={competitors}
+        brand={focused?.supplierName}
+        emptyMessage={
+          focused && focused.status === "complete"
+            ? "Nenhum concorrente foi apontado nesta busca."
+            : undefined
+        }
+      />
+
       <BuyerBoard buyers={visible} />
     </main>
   )
@@ -141,6 +155,21 @@ type Buyer = {
   suppliers: string[]
   risks: string[]
   trade?: TradeSnapshot
+}
+
+function competitorRows(runs: Run[], focusId: string): Competitor[] {
+  const seen = new Set<string>()
+  const rows: Competitor[] = []
+  for (const run of runs) {
+    if (focusId !== "all" && run.id !== focusId) continue
+    for (const competitor of run.competitors ?? []) {
+      const key = `${competitor.country}|${competitor.name}|${competitor.url}`.toLowerCase()
+      if (seen.has(key) || !competitor.name.trim()) continue
+      seen.add(key)
+      rows.push(competitor)
+    }
+  }
+  return rows
 }
 
 function buyerRows(runs: Run[]): Buyer[] {
