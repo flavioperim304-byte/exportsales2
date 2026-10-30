@@ -46,6 +46,26 @@ Each live run spends one Exa Agent search per country (a second search only if t
 
 An HS code on the brief asks [Comex Stat](https://api-comexstat.mdic.gov.br/docs) for Brazil’s export value (US$ FOB) and net kg to each search country for the last three years. Hair-care briefs use 3305. The search still runs if Comex Stat is slow or empty.
 
+## Deploy on Render
+
+This desk is a long-running Node process, not a static site. On Render create a **Web Service** (not Static Site).
+
+| Setting | Value |
+| --- | --- |
+| Runtime | Node |
+| Build command | `npm ci && npm run build` |
+| Start command | `npx next start -H 0.0.0.0 -p $PORT` |
+| Node | 22 |
+| Disk | 1 GB at `/opt/render/project/src/data` |
+
+Render injects `PORT`. Do not hardcode 3847 in the start command. After a successful deploy the dashboard is already running: open the service and click the `https://….onrender.com` URL at the top. There is no separate Execute button.
+
+Put the four keys in an Environment Group and link that group to this service. Do not prefix them with `NEXT_PUBLIC_`. Redeploy after linking the group. **Fontes** on the live site should read 4/4.
+
+Saved Kanechom and LQ searches from another machine are not copied over. The first load shows the coffee example until you run **Nova busca** on Render.
+
+`render.yaml` in this repo matches those settings. A starter Web Service plus a 1 GB disk is the plan this desk needs so a search can run for several minutes and keep `data/runs.json`.
+
 ## Deploy on Netlify
 
 This is a Next.js 16 app. Netlify runs it with its OpenNext adapter. `netlify.toml` sets the build to `npm run build` and the publish directory to `.next`. Leave `@netlify/plugin-nextjs` unpinned so Netlify updates the adapter on each build.
