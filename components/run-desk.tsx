@@ -11,13 +11,14 @@ import { Button } from "@/components/ui/button"
 import { PromptPreview } from "@/components/prompt-preview"
 import { qualificationRows } from "@/lib/qualify"
 import { BAND_LABEL, STATUS_LABEL, formatWhen, isHttpUrl, leadPlace, mailtoHref, telHref } from "@/lib/format"
+import { activityKindLabel, hasRecentActivity } from "@/lib/activity"
 import type { Band, Evidence, Lead, Run, StageState } from "@/lib/types"
 import type { IcpLevel } from "@/lib/qualify"
 
 const STAGE_META = {
   search: { n: "01", source: "Exa Agent", title: "Search" },
   extract: { n: "02", source: "Firecrawl Agent", title: "ICP and contacts" },
-  classify: { n: "03", source: "OpenAI", title: "Score and best fit" },
+  classify: { n: "03", source: "Exa + OpenAI", title: "Activity and best fit" },
   context: { n: "04", source: "Parallel", title: "Refine and context" },
 } as const
 
@@ -379,6 +380,8 @@ function Dossier({ lead }: { lead: Lead }) {
         {score ? <ScoreMark score={score.total} band={score.band} /> : null}
       </div>
 
+      <ActivityPanel lead={lead} />
+
       {score?.disqualified ? (
         <p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">
           {score.disqualifyReason}
@@ -507,16 +510,20 @@ function QualificationTable({ run }: { run: Run }) {
               ))}
               <div className="col-span-2">
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">Best fit</dt>
-                <dd className="mt-0.5">{row.bestFit}</dd>
+                <dd className="mt-0.5">
+                  {row.bestFit}
+                  {row.activityLive ? "" : row.activity ? " · sem atividade recente" : ""}
+                </dd>
               </div>
             </dl>
+            <p className="mt-3 text-sm text-muted-foreground">{row.activity}</p>
             <p className="mt-3 text-sm text-muted-foreground">{row.rationale}</p>
             <p className="mt-1 text-sm text-muted-foreground">{row.qualificationNeeded}</p>
           </li>
         ))}
       </ul>
       <div className="mt-4 hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[880px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-border text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               <th className="py-2 pr-3 font-medium">Company</th>
@@ -528,6 +535,7 @@ function QualificationTable({ run }: { run: Run }) {
                 </th>
               ))}
               <th className="py-2 pr-3 font-medium">Best fit</th>
+              <th className="py-2 pr-3 font-medium">Atividade</th>
               <th className="py-2 font-medium">Still to confirm</th>
             </tr>
           </thead>
@@ -544,7 +552,11 @@ function QualificationTable({ run }: { run: Run }) {
                     <Level level={fit.level} />
                   </td>
                 ))}
-                <td className="py-3 pr-3">{row.bestFit}</td>
+                <td className="py-3 pr-3">
+                  {row.bestFit}
+                  {row.activityLive ? "" : " · sem atividade recente"}
+                </td>
+                <td className="py-3 pr-3 text-muted-foreground">{row.activity}</td>
                 <td className="py-3 text-muted-foreground">
                   <p>{row.rationale}</p>
                   <p className="mt-1">{row.qualificationNeeded}</p>
@@ -590,6 +602,46 @@ function Fact({
           value
         )}
       </dd>
+    </div>
+  )
+}
+
+function ActivityPanel({ lead }: { lead: Lead }) {
+  const signals = lead.activity?.signals ?? []
+  const live = hasRecentActivity(lead)
+  return (
+    <div className="mt-4 rounded-lg border border-border px-3 py-3">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Atividade pública</p>
+      {!lead.activity ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          A busca de notícias, lançamentos e redes sociais ainda não rodou nesta ficha.
+        </p>
+      ) : live ? (
+        <ul className="mt-2 flex flex-col gap-2">
+          {signals.map((signal) => (
+            <li key={`${signal.kind}:${signal.url}`} className="text-sm leading-relaxed">
+              <span className="font-medium">{activityKindLabel(signal.kind)}</span>
+              {signal.publishedAt ? (
+                <span className="text-muted-foreground"> · {signal.publishedAt.slice(0, 10)}</span>
+              ) : null}
+              <span> · </span>
+              {isHttpUrl(signal.url) ? (
+                <a href={signal.url} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">
+                  {signal.title}
+                </a>
+              ) : (
+                signal.title
+              )}
+              {signal.quote ? <p className="mt-1 text-muted-foreground">{signal.quote}</p> : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-sm">
+          Nenhuma notícia, lançamento, marca nova ou rede social nos últimos 18 meses. Não trate como best fit
+          confirmado — empresas quietas quase não respondem.
+        </p>
+      )}
     </div>
   )
 }

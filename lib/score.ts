@@ -1,3 +1,9 @@
+import {
+  activityKindLabel,
+  activityLine,
+  hasRecentActivity,
+  recentSignals,
+} from "./activity"
 import type {
   Band,
   Brief,
@@ -341,6 +347,40 @@ function nextAction(
   return "Leave this account off the outreach list."
 }
 
+function activityDimension(lead: Lead): DimensionScore {
+  if (!lead.activity) {
+    return {
+      key: "activity",
+      label: "Public activity",
+      points: 0,
+      max: 10,
+      rationale: "Public activity has not been searched yet.",
+      evidence: [],
+    }
+  }
+  const recent = recentSignals(lead.activity)
+  const kinds = new Set(recent.map((signal) => signal.kind))
+  let points = 1
+  if (kinds.has("news") || kinds.has("launch")) points += 5
+  if (kinds.has("brand")) points += 3
+  if (kinds.has("social")) points += 3
+  if (kinds.size >= 2) points += 1
+  if (recent.length === 0) points = 1
+  return {
+    key: "activity",
+    label: "Public activity",
+    points: Math.min(10, points),
+    max: 10,
+    rationale: activityLine(lead),
+    evidence: recent.slice(0, 3).map((signal) => ({
+      source: "exa" as const,
+      label: activityKindLabel(signal.kind),
+      quote: clip(signal.quote || signal.title),
+      url: signal.url,
+    })),
+  }
+}
+
 export function scoreLead(brief: Brief, lead: Lead): LeadScore {
   const extraction = lead.extraction?.ok ? lead.extraction : undefined
   const full = corpusOf(lead)
@@ -674,6 +714,7 @@ export function scoreLead(brief: Brief, lead: Lead): LeadScore {
       : [],
   }
 
+  const activity = activityDimension(lead)
   const dimensions = [
     product,
     role,
@@ -682,6 +723,7 @@ export function scoreLead(brief: Brief, lead: Lead): LeadScore {
     commercial,
     competitive,
     evidence,
+    activity,
   ]
   const total = dimensions.reduce((sum, item) => sum + item.points, 0)
   let band = bandFor(total)
@@ -708,13 +750,18 @@ export function scoreLead(brief: Brief, lead: Lead): LeadScore {
   }
 
   if (disqualified) band = "disqualified"
+  else if (lead.activity && !hasRecentActivity(lead) && (band === "best_fit" || band === "strong")) {
+    band = "possible"
+  }
   const place =
     splitList(brief.markets).find((market) => placeMatch(market, full)) ||
     splitList(brief.markets)[0] ||
     ""
   const headline = disqualified
     ? `Disqualified. ${disqualifyReason}`
-    : `${band === "best_fit" ? "Best fit" : band === "strong" ? "Strong" : band === "possible" ? "Possible" : band === "weak" ? "Weak" : "Disqualified"} · ${product.rationale}`
+    : lead.activity && !hasRecentActivity(lead) && band === "possible"
+      ? `Possible · No recent public activity. ${product.rationale}`
+      : `${band === "best_fit" ? "Best fit" : band === "strong" ? "Strong" : band === "possible" ? "Possible" : band === "weak" ? "Weak" : "Disqualified"} · ${product.rationale}`
 
   return {
     total,
@@ -722,7 +769,9 @@ export function scoreLead(brief: Brief, lead: Lead): LeadScore {
     headline,
     nextAction: disqualified
       ? `Leave this account off the outreach list. ${disqualifyReason}`
-      : nextAction(band, matched.slice(0, 3).join(", "), place, roleLabel),
+      : lead.activity && !hasRecentActivity(lead)
+        ? `Do not treat this as a confirmed best fit. No news, launch, new brand, or social activity was found in the last 18 months. Ask one question before a full offer.`
+        : nextAction(band, matched.slice(0, 3).join(", "), place, roleLabel),
     disqualified,
     disqualifyReason,
     dimensions,

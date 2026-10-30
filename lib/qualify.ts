@@ -1,3 +1,4 @@
+import { activityLine, hasRecentActivity } from "./activity"
 import type { Brief, FitJudgment, Lead, LeadScore } from "./types"
 
 export type IcpLevel = "high" | "medium" | "low"
@@ -12,6 +13,8 @@ export type QualificationRow = {
   qualificationNeeded: string
   source: "parallel" | "openai" | "checklist"
   fromParallel: boolean
+  activity: string
+  activityLive: boolean
 }
 
 export function icpLevel(score: LeadScore | undefined): IcpLevel {
@@ -55,6 +58,24 @@ function fromJudgment(
     qualificationNeeded: judgment.qualificationNeeded || "Nothing further was listed.",
     source,
     fromParallel: source === "parallel",
+    activity: activityLine(lead),
+    activityLive: hasRecentActivity(lead),
+  }
+}
+
+function guardQuietLead(lead: Lead, row: QualificationRow): QualificationRow {
+  if (!lead.activity || hasRecentActivity(lead)) return row
+  const needed = [
+    "No recent news, product launch, new brand, or social activity was found.",
+    "Do not treat this as a confirmed best fit until a current buyer is named.",
+    row.qualificationNeeded,
+  ].join(" ")
+  return {
+    ...row,
+    level: row.level === "high" ? "medium" : row.level,
+    qualificationNeeded: needed,
+    activity: activityLine(lead),
+    activityLive: false,
   }
 }
 
@@ -62,23 +83,26 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
   return leads.map((lead) => {
     const parallelFits = lead.context?.supplierFits ?? []
     if (lead.context?.icp && parallelFits.length > 0) {
-      return fromJudgment(
+      return guardQuietLead(
         lead,
-        {
-          icp: lead.context.icp,
-          supplierFits: parallelFits,
-          bestFit: lead.context.bestFit || "neither",
-          qualificationNeeded:
-            lead.context.qualificationNeeded ||
-            "Parallel did not say what still needs confirmation.",
-          rationale: lead.context.fitNarrative || "Parallel did not write a rationale.",
-        },
-        "parallel",
-        lead.context.fitNarrative || "Parallel did not write a rationale."
+        fromJudgment(
+          lead,
+          {
+            icp: lead.context.icp,
+            supplierFits: parallelFits,
+            bestFit: lead.context.bestFit || "neither",
+            qualificationNeeded:
+              lead.context.qualificationNeeded ||
+              "Parallel did not say what still needs confirmation.",
+            rationale: lead.context.fitNarrative || "Parallel did not write a rationale.",
+          },
+          "parallel",
+          lead.context.fitNarrative || "Parallel did not write a rationale."
+        )
       )
     }
     if (lead.openai && lead.openai.supplierFits.length > 0) {
-      return fromJudgment(lead, lead.openai, "openai", lead.openai.rationale)
+      return guardQuietLead(lead, fromJudgment(lead, lead.openai, "openai", lead.openai.rationale))
     }
     const fits = [
       { supplier: brief.supplierName, level: icpLevel(lead.score), total: fitTotal(lead.score) },
@@ -110,7 +134,7 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
       .join(" ")
       .replace(/\s+/g, " ")
       .slice(0, 280)
-    return {
+    return guardQuietLead(lead, {
       company: lead.name,
       country: lead.market || lead.extraction?.country || lead.country || "",
       level,
@@ -120,6 +144,8 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
       qualificationNeeded: needed(open[0] ? (open[0].supplier === brief.supplierName ? lead.score : lead.alsoScore) : lead.score),
       source: "checklist",
       fromParallel: false,
-    }
+      activity: activityLine(lead),
+      activityLive: hasRecentActivity(lead),
+    })
   })
 }

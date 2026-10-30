@@ -67,6 +67,25 @@ function leads(): Lead[] {
       ],
       citations: ["Sample trade note · Hamburg specialty importers"],
     },
+    activity: {
+      fetchedAt: "2026-10-27T15:05:00.000Z",
+      signals: [
+        {
+          kind: "news",
+          title: "Nordlicht adds Brazilian naturals to the Hamburg book",
+          url: "https://nordlicht.example/news/brazilian-naturals",
+          publishedAt: "2026-08-12T00:00:00.000Z",
+          quote: "The importer named a new Brazilian natural program for German roasters.",
+        },
+        {
+          kind: "social",
+          title: "Nordlicht Kaffeeimport on Instagram",
+          url: "https://www.instagram.com/nordlichtkaffee",
+          publishedAt: "2026-09-03T00:00:00.000Z",
+          quote: "Harvest photos and a buying-trip reel from Minas Gerais.",
+        },
+      ],
+    },
   }
 
   const haven: Lead = {

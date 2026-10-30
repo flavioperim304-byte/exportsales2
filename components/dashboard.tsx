@@ -153,6 +153,8 @@ type Buyer = {
   website: string
   note: string
   needed: string
+  activity: string
+  activityLive: boolean
   suppliers: string[]
   risks: string[]
   trade?: TradeSnapshot
@@ -185,7 +187,9 @@ function buyerRows(runs: Run[]): Buyer[] {
         company: row.company,
         country: row.country || run.brief.markets,
         brand: run.brief.supplierName,
-        fit: row.bestFit,
+        fit: row.activityLive ? row.bestFit : row.bestFit === "neither" ? row.bestFit : `${row.bestFit} · sem atividade`,
+        activity: row.activity,
+        activityLive: row.activityLive,
         email: lead?.extraction?.email || "",
         phone: lead?.extraction?.phone || lead?.extraction?.whatsapp || "",
         website: lead?.extraction?.website || lead?.url || "",
@@ -229,6 +233,14 @@ function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
           <p className="mt-3 text-sm leading-relaxed">
             {buyer.note || "Esta empresa não tem nota de análise gravada."}
           </p>
+          {buyer.activity ? (
+            <div className="mt-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Atividade pública</p>
+              <p className={`mt-1 text-sm leading-relaxed ${buyer.activityLive ? "" : "text-muted-foreground"}`}>
+                {buyer.activity}
+              </p>
+            </div>
+          ) : null}
           {buyer.needed ? (
             <div className="mt-3">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Ainda a confirmar</p>

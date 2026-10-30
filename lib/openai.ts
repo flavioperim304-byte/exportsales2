@@ -1,3 +1,4 @@
+import { activityLine } from "./activity"
 import type { Brief, FitJudgment, Lead } from "./types"
 import { ApiError, requestJson } from "./http"
 import { openaiInstructions } from "./prompts"
@@ -156,6 +157,7 @@ function cards(leads: Lead[]): string {
         extraction?.phone ? `phone ${extraction.phone}` : "",
         extraction?.whatsapp ? `whatsapp ${extraction.whatsapp}` : "",
         extraction?.buys?.slice(0, 4).join("; "),
+        activityLine(lead),
         clip(extraction?.summary || lead.exa.summary || lead.exa.text, 320),
       ]
         .filter(Boolean)

@@ -373,7 +373,7 @@ export function QualifyForm({
             ? "Esta rodada chama a Decisions API em modo fast. As demais buscas continuam no Task."
             : brief.searchKind === "competitors" && brief.exaEffort !== "deep"
               ? "Exa Ultra pode levar cerca de 15 minutos. Depois o Parallel Task confere os distribuidores."
-              : "Parallel usa a Task API em pro-fast, cerca de US$ 0,14 por chamada. Você pode deixar a busca aberta."}
+              : "Depois das páginas, o Exa busca notícias, lançamentos e redes sociais. Sem atividade recente o best fit não fica confirmado."}
         </p>
       </div>
     </form>

@@ -57,6 +57,22 @@ export type Evidence = {
   url?: string
 }
 
+export type ActivityKind = "news" | "launch" | "brand" | "social"
+
+export type ActivitySignal = {
+  kind: ActivityKind
+  title: string
+  url: string
+  publishedAt?: string
+  quote: string
+}
+
+export type ActivitySnapshot = {
+  fetchedAt: string
+  signals: ActivitySignal[]
+  error?: string
+}
+
 export type DimensionScore = {
   key: string
   label: string
@@ -144,6 +160,8 @@ export type Lead = {
   alsoScore?: LeadScore
   /** Preliminary score from OpenAI. Parallel may replace it. */
   openai?: FitJudgment
+  /** News, launches, new brands, and social posts found after the company search. */
+  activity?: ActivitySnapshot
 }
 
 export type MarketContext = {

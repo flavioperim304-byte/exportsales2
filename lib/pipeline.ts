@@ -1,3 +1,4 @@
+import { emptyActivity, searchActivity } from "./activity"
 import { brazilExports, countriesForTrade } from "./comexstat"
 import { advanceExa, searchLeads } from "./exa"
 import { extractPage, failedExtraction, pollExtractJob, startExtractJob } from "./firecrawl"
@@ -58,7 +59,7 @@ export function blankStages(): StageState[] {
     {
       id: "classify",
       status: "pending",
-      detail: "Waiting for OpenAI to score fit and name a preliminary best fit.",
+      detail: "Waiting for Exa to collect news, launches, and social activity, then OpenAI scores fit.",
     },
     {
       id: "context",
@@ -566,10 +567,72 @@ function applyOpenAI(run: Run, judgments: Awaited<ReturnType<typeof scoreLeads>>
   }
 }
 
+async function attachMissingActivity(id: string): Promise<"wait" | "ready"> {
+  const keys = getKeys()
+  const snapshot = await getRun(id)
+  if (!snapshot) return "ready"
+  if (!keys.exa) {
+    await updateRun(id, (run) => {
+      let filled = 0
+      for (const lead of run.leads) {
+        if (lead.activity) continue
+        lead.activity = emptyActivity("Exa key missing. Activity was not searched.")
+        filled += 1
+      }
+      if (filled) {
+        const classify = stage(run, "classify")
+        classify.status = "running"
+        classify.startedAt = classify.startedAt ?? now()
+        classify.detail = "Exa is not connected, so public activity was skipped."
+        log(run, "classify", classify.detail)
+      }
+    })
+    return "ready"
+  }
+  const pending = snapshot.leads.find((lead) => !lead.activity)
+  if (!pending) return "ready"
+  await updateRun(id, (run) => {
+    const classify = stage(run, "classify")
+    classify.status = "running"
+    classify.startedAt = classify.startedAt ?? now()
+    classify.detail = `Exa is looking for news, launches, new brands, and social activity. ${pending.name}.`
+  })
+  try {
+    const snapshotActivity = await searchActivity(pending, snapshot.brief, keys.exa)
+    await updateRun(id, (run) => {
+      const lead = run.leads.find((item) => item.id === pending.id)
+      if (!lead) return
+      lead.activity = snapshotActivity
+      lead.score = scoreLead(run.brief, lead)
+      if (run.also) lead.alsoScore = scoreLead(run.also, lead)
+      const recent = snapshotActivity.signals.length
+      log(
+        run,
+        "classify",
+        recent
+          ? `Activity for ${lead.name}: ${recent} ${recent === 1 ? "signal" : "signals"}.`
+          : `Activity for ${lead.name}: no news, launch, new brand, or social post in the last 18 months.`
+      )
+    })
+  } catch (error) {
+    const message = publicError(error, secrets())
+    await updateRun(id, (run) => {
+      const lead = run.leads.find((item) => item.id === pending.id)
+      if (!lead) return
+      lead.activity = emptyActivity(message)
+      log(run, "classify", `Activity search failed for ${lead.name}. ${message}`)
+    })
+  }
+  return "wait"
+}
+
 async function doScore(id: string) {
   const keys = getKeys()
   const snapshot = await getRun(id)
   if (!snapshot) return
+  const activity = await attachMissingActivity(id)
+  if (activity === "wait") return
+  const current = (await getRun(id)) ?? snapshot
   if (!keys.openai) {
     await updateRun(id, (run) => {
       const classify = stage(run, "classify")
@@ -581,7 +644,7 @@ async function doScore(id: string) {
     })
     return
   }
-  if (snapshot.leads.length > 0 && snapshot.leads.every((lead) => lead.openai)) {
+  if (current.leads.length > 0 && current.leads.every((lead) => lead.openai)) {
     await updateRun(id, (run) => {
       run.status = "researching"
     })
@@ -591,10 +654,10 @@ async function doScore(id: string) {
     const classify = stage(run, "classify")
     classify.status = "running"
     classify.startedAt = classify.startedAt ?? now()
-    classify.detail = "OpenAI is scoring product fit and naming a preliminary best fit."
+    classify.detail = "OpenAI is scoring product fit against the activity evidence."
   })
   try {
-    const scored = await scoreLeads(snapshot.brief, snapshot.leads, keys.openai, snapshot.also)
+    const scored = await scoreLeads(current.brief, current.leads, keys.openai, current.also)
     await updateRun(id, (run) => {
       applyOpenAI(run, scored.leads)
       if (scored.entry.purchaseProbability || scored.entry.strategy) run.entry = scored.entry
