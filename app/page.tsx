@@ -2,7 +2,7 @@ import { Suspense } from "react"
 import { connection } from "next/server"
 import { Dashboard } from "@/components/dashboard"
 import { keyFlags } from "@/lib/keys"
-import { summarize } from "@/lib/summary"
+import { boardRun, summarize } from "@/lib/summary"
 import { getRun, listRuns } from "@/lib/store"
 
 export default function Page({
@@ -38,10 +38,11 @@ async function Home({ searchParams }: { searchParams: Promise<{ run?: string }> 
       </main>
     )
   }
+  const live = runs.filter((run) => run.mode !== "sample")
   return (
     <Dashboard
-      initialRun={selected}
-      runs={runs.filter((run) => run.mode !== "sample")}
+      initialRun={boardRun(selected)}
+      runs={live.map(boardRun)}
       summaries={runs.map(summarize)}
       sourcesReady={sourcesReady}
     />
