@@ -42,6 +42,8 @@ test("each country gets its own prompt and ten leads", () => {
   assert.match(firecrawlPrompt(brief, "Germany"), /Brazilian brands/)
   assert.match(parallelInstructions(brief), /Germany, France/)
   assert.match(parallelInstructions(brief), /up to 10 candidates per country/)
+  assert.match(parallelInstructions(brief), /already sell this category in Germany, France/)
+  assert.match(parallelInstructions(brief), /never headquarters/)
 })
 
 test("Kanechom and LQ Professional prompts follow different must-haves", () => {

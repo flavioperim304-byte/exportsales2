@@ -54,8 +54,16 @@ const OUTPUT_SCHEMA = {
           additionalProperties: false,
           properties: {
             name: { type: "string" },
-            country: { type: "string" },
-            why_relevant: { type: "string" },
+            country: {
+              type: "string",
+              description:
+                "The search-market country where this rival already sells. Not the brand headquarters and not the supplier origin country. If a Brazilian brand sells in Colombia, country is Colombia.",
+            },
+            why_relevant: {
+              type: "string",
+              description:
+                "Why this rival matters in the search-market country. Name the local presence a source shows.",
+            },
             url: { type: "string" },
           },
           required: ["name", "country", "why_relevant", "url"],

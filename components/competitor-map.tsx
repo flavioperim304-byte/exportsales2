@@ -20,7 +20,7 @@ export function CompetitorMap({
         </p>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Marcas e distribuidores rivais apontados nesta busca. Não são os compradores da lista abaixo.
+        Marcas e distribuidores rivais que já vendem no país desta busca. Não são os compradores da lista abaixo.
       </p>
       {competitors.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">{emptyMessage}</p>

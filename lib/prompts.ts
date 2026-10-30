@@ -248,9 +248,10 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
         : `Cover ${count} countries.`,
       brief.excludedMarkets ? `Do not include: ${brief.excludedMarkets}.` : "",
       "For each country, confirm who distributes the brand and name the direct competitor distributors who import rival brands there. A retailer or a salon is not a direct competitor distributor.",
+      competitorMarketRule(brief, countries),
       brief.instructions?.trim() ?? "",
       "Set icp high when the company is the brand’s distributor or a direct competitor distributor, medium when the role is likely but not proven, and low when it is unrelated. Set best_fit to the brand name, direct competitor, or neither.",
-      "qualification_needed is what still has to be confirmed. Put rival brand names in known suppliers when a source names them. In competitors, list direct competitor distributors that are not already in the candidate list.",
+      "qualification_needed is what still has to be confirmed. Put rival brand names in known suppliers when a source names them. In competitors, list direct competitor distributors in the searched countries that are not already in the candidate list. country is the searched country, not the rival brand’s headquarters.",
       marketAsk(),
     ]
       .filter(Boolean)
@@ -269,7 +270,8 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
       "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
       "Say who to approach first, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and the supplier fit to high, medium, or low. Set best_fit to the supplier to pursue or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
       marketAsk(),
-      "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers (not the candidates), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
+      competitorMarketRule(brief, countries),
+      "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers that already sell in those search countries (not the candidates, and not factories that only sell in the origin country), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
     ]
       .filter(Boolean)
       .join("\n")
@@ -296,10 +298,22 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
     "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
     "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
     marketAsk(),
-    "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers (not the candidates), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
+    competitorMarketRule(brief, countries),
+    "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers that already sell in those search countries (not the candidates, and not factories that only sell in the origin country), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
   ]
     .filter(Boolean)
     .join("\n")
+}
+
+function competitorMarketRule(brief: Brief, countries: string[]): string {
+  const markets = countries.length ? countries.join(", ") : "the search countries"
+  const origin = brief.originCountry.trim() || "the supplier origin country"
+  return [
+    `Competitors must already sell this category in ${markets}.`,
+    `Do not list factories, exporters, or brands that only sell in ${origin}.`,
+    "For each competitor, country is the search market where they sell, never headquarters.",
+    `A brand from ${origin} belongs on the list only when a source shows it selling in a search country, and then country is that search country.`,
+  ].join(" ")
 }
 
 export function researchPrompt(brief: Brief, leads: Lead[], also?: Brief): string {

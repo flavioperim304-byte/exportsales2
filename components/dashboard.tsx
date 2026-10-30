@@ -6,6 +6,7 @@ import { CompetitorMap } from "@/components/competitor-map"
 import { TradeLines } from "@/components/trade-volume"
 import { isHttpUrl, mailtoHref, telHref } from "@/lib/format"
 import { qualificationRows } from "@/lib/qualify"
+import { localizeCompetitors } from "@/lib/competitors"
 import { summarize } from "@/lib/summary"
 import type { Competitor, Run, RunSummary, TradeSnapshot } from "@/lib/types"
 
@@ -162,7 +163,7 @@ function competitorRows(runs: Run[], focusId: string): Competitor[] {
   const rows: Competitor[] = []
   for (const run of runs) {
     if (focusId !== "all" && run.id !== focusId) continue
-    for (const competitor of run.competitors ?? []) {
+    for (const competitor of localizeCompetitors(run.competitors ?? [], run.brief)) {
       const key = `${competitor.country}|${competitor.name}|${competitor.url}`.toLowerCase()
       if (seen.has(key) || !competitor.name.trim()) continue
       seen.add(key)

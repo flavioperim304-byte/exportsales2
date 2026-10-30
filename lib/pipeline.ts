@@ -11,6 +11,7 @@ import {
   researchResult,
   researchStatus,
 } from "./parallel"
+import { localizeCompetitors } from "./competitors"
 import { compareLeads, scoreLead } from "./score"
 import { getRun, insertRun, updateRun } from "./store"
 import type { Brief, Lead, LogLine, Run, StageId, StageState, TradeSnapshot } from "./types"
@@ -97,7 +98,7 @@ function applyResearch(
   parsed: NonNullable<Awaited<ReturnType<typeof researchResult>>>
 ) {
   run.market = parsed.market
-  run.competitors = parsed.competitors
+  run.competitors = localizeCompetitors(parsed.competitors, run.brief)
   const unmatched: string[] = []
   for (const note of parsed.leads) {
     const lead = run.leads.find(

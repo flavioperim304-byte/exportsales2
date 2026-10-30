@@ -4,6 +4,7 @@ import { connection } from "next/server"
 import { RunDesk } from "@/components/run-desk"
 import { ensurePump } from "@/lib/pipeline"
 import { getRun } from "@/lib/store"
+import { viewRun } from "@/lib/summary"
 
 export default function RunPage({ params }: { params: Promise<{ id: string }> }) {
   return (
@@ -25,5 +26,5 @@ async function RunLoader({ params }: { params: Promise<{ id: string }> }) {
   await ensurePump(id)
   const run = await getRun(id)
   if (!run) notFound()
-  return <RunDesk initial={run} />
+  return <RunDesk initial={viewRun(run)} />
 }

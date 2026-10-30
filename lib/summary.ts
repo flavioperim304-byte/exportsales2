@@ -1,4 +1,14 @@
+import { localizeCompetitors } from "./competitors"
 import type { Extraction, Lead, Run, RunSummary } from "./types"
+
+/** Saved Parallel rows still show headquarters. Stamp the search market for the desk. */
+export function viewRun(run: Run): Run {
+  if (run.mode === "sample") return run
+  return {
+    ...run,
+    competitors: localizeCompetitors(run.competitors ?? [], run.brief),
+  }
+}
 
 export function summarize(run: Run): RunSummary {
   const ranked = [...run.leads].sort(
@@ -23,11 +33,12 @@ export function summarize(run: Run): RunSummary {
 
 /** Drop page dumps so the buyer list can render without shipping every run verbatim. */
 export function boardRun(run: Run): Run {
+  const presented = viewRun(run)
   return {
-    ...run,
+    ...presented,
     logs: [],
     searchTasks: undefined,
-    leads: run.leads.map(boardLead),
+    leads: presented.leads.map(boardLead),
   }
 }
 
