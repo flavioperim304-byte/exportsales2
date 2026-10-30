@@ -1,3 +1,4 @@
+import { brazilExports, countriesForTrade } from "./comexstat"
 import { advanceExa, searchLeads } from "./exa"
 import { extractPage, failedExtraction, pollExtractJob, startExtractJob } from "./firecrawl"
 import { publicError } from "./http"
@@ -12,7 +13,7 @@ import {
 } from "./parallel"
 import { compareLeads, scoreLead } from "./score"
 import { getRun, insertRun, updateRun } from "./store"
-import type { Brief, Lead, LogLine, Run, StageId, StageState } from "./types"
+import type { Brief, Lead, LogLine, Run, StageId, StageState, TradeSnapshot } from "./types"
 import { SAMPLE_RUN_ID } from "./ids"
 
 const running = new Set<string>()
@@ -130,6 +131,43 @@ function applyResearch(
   context.detail = `Best fit attached for ${parsed.leads.length} names. ${parsed.competitors.length} competitor suppliers.`
   run.contextState = "done"
   log(run, "context", context.detail)
+}
+
+function tradeCountries(run: Run): string[] {
+  return countriesForTrade(
+    run.brief.markets,
+    run.leads.map((lead) => lead.market || lead.country)
+  )
+}
+
+function tradeIsCurrent(trade: TradeSnapshot | undefined, countries: string[]): boolean {
+  if (!trade || trade.error) return false
+  const have = new Set(trade.countries.map((item) => item.country.toLowerCase()))
+  return countries.every((country) =>
+    [...have].some((item) => item === country.toLowerCase() || item.includes(country.toLowerCase()))
+  )
+}
+
+async function attachTrade(id: string) {
+  const run = await getRun(id)
+  if (!run) return
+  const hs = run.brief.hsCode?.trim()
+  if (!hs) return
+  const countries = tradeCountries(run)
+  if (countries.length === 0) return
+  if (tradeIsCurrent(run.trade, countries)) return
+  const snapshot = await brazilExports(hs, countries)
+  await updateRun(id, (current) => {
+    current.trade = snapshot
+    const ok = snapshot.countries.filter((item) => !item.error).length
+    log(
+      current,
+      "system",
+      snapshot.error
+        ? `Comex Stat: ${snapshot.error}`
+        : `Comex Stat export volume attached for HS ${snapshot.hsCode} in ${ok} ${ok === 1 ? "country" : "countries"}.`
+    )
+  })
 }
 
 function fitRank(lead: Lead): number {
@@ -250,6 +288,7 @@ async function doSearch(id: string): Promise<"busy" | "done"> {
       extract.startedAt = now()
       extract.detail = "Reading the first company page."
     })
+    await attachTrade(id)
   } catch (error) {
     const message = publicError(error, secrets())
     await updateRun(id, (run) => {
@@ -744,6 +783,7 @@ async function doSearchTick(id: string) {
     extract.startedAt = now()
     extract.detail = "Reading the first company page."
   })
+  if (result.done && result.leads.length > 0 && !result.error) await attachTrade(id)
 }
 
 async function doExtractTick(id: string) {

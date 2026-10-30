@@ -2,10 +2,11 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { TradeLines } from "@/components/trade-volume"
 import { isHttpUrl, mailtoHref, telHref } from "@/lib/format"
 import { qualificationRows } from "@/lib/qualify"
 import { summarize } from "@/lib/summary"
-import type { Run, RunSummary } from "@/lib/types"
+import type { Run, RunSummary, TradeSnapshot } from "@/lib/types"
 
 export function Dashboard({
   initialRun,
@@ -139,6 +140,7 @@ type Buyer = {
   needed: string
   suppliers: string[]
   risks: string[]
+  trade?: TradeSnapshot
 }
 
 function buyerRows(runs: Run[]): Buyer[] {
@@ -161,6 +163,7 @@ function buyerRows(runs: Run[]): Buyer[] {
         needed: lead?.context?.qualificationNeeded || row.qualificationNeeded || "",
         suppliers: lead?.context?.knownSuppliers ?? [],
         risks: lead?.context?.risks ?? [],
+        trade: run.trade,
       })
     }
   }
@@ -218,6 +221,7 @@ function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
               </ul>
             </div>
           ) : null}
+          <TradeLines trade={buyer.trade} country={buyer.country} />
           <div className="mt-3 flex flex-col gap-1 text-sm">
             <ContactLine label="Email" value={buyer.email} href={mailtoHref(buyer.email)} />
             <ContactLine label="Telefone" value={buyer.phone} href={telHref(buyer.phone)} />

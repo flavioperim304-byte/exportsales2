@@ -46,6 +46,8 @@ export type Brief = {
   countryCount?: number
   /** Countries a competitor search must leave out. */
   excludedMarkets?: string
+  /** Harmonized System code for Brazil export volume via Comex Stat. 2, 4, 6, or 8 digits. */
+  hsCode?: string
 }
 
 export type Evidence = {
@@ -167,6 +169,31 @@ export type Competitor = {
   url: string
 }
 
+export type TradeYear = {
+  year: number
+  usdFob: number
+  kg: number
+  months: number
+}
+
+export type CountryTrade = {
+  country: string
+  years: TradeYear[]
+  error?: string
+}
+
+export type TradeSnapshot = {
+  hsCode: string
+  hsFilter: "chapter" | "heading" | "subHeading" | "ncm"
+  hsLabel: string
+  periodFrom: string
+  periodTo: string
+  source: string
+  countries: CountryTrade[]
+  error?: string
+  fetchedAt: string
+}
+
 export type StageState = {
   id: StageId
   status: StageStatus
@@ -195,6 +222,8 @@ export type Run = {
   leads: Lead[]
   market?: MarketContext
   competitors: Competitor[]
+  /** Brazil export volume to each search country, last 3 years, from Comex Stat. */
+  trade?: TradeSnapshot
   /** OpenAI's market call. Parallel replaces it on run.market when it returns. */
   entry?: MarketEntry
   parallelRunId?: string

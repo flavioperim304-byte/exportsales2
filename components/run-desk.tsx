@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { DownloadResults } from "@/components/download-results"
 import { MarketEntry } from "@/components/market-entry"
+import { TradeVolume } from "@/components/trade-volume"
 import { Button } from "@/components/ui/button"
 import { PromptPreview } from "@/components/prompt-preview"
 import { qualificationRows } from "@/lib/qualify"
@@ -119,6 +120,8 @@ export function RunDesk({ initial }: { initial: Run }) {
         </p>
       ) : null}
       {refreshError ? <p className="text-sm text-destructive">{refreshError}</p> : null}
+
+      {run.trade ? <TradeVolume trade={run.trade} /> : null}
 
       <section className="rounded-xl border border-border bg-card p-4">
         {run.brief.products || run.brief.buyerTypes || run.brief.exclusions ? (

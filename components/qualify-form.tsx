@@ -244,6 +244,20 @@ export function QualifyForm({
               />
             </Field>
           )}
+          <Field
+            label="HS code"
+            htmlFor="hsCode"
+            hint="Brazil’s Comex Stat export volume to each country, last 3 years. 2, 4, 6, or 8 digits. Hair care is 3305."
+          >
+            <Input
+              id="hsCode"
+              value={brief.hsCode ?? ""}
+              onChange={(event) => set("hsCode", event.target.value)}
+              className="h-11 sm:h-10"
+              inputMode="numeric"
+              placeholder="3305"
+            />
+          </Field>
         </section>
 
         <section className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">

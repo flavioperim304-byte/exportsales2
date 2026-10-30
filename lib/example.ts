@@ -1,3 +1,4 @@
+import { parseHsCode } from "./comexstat-map"
 import { LEADS_PER_COUNTRY, isPromptOnly } from "./prompts"
 import type { Brief } from "./types"
 
@@ -15,9 +16,11 @@ export const EXAMPLE_BRIEF: Brief = {
   mustHaves: "imports or distributes green coffee",
   exclusions: "instant coffee, equipment manufacturers, cafes with no wholesale",
   leadCount: LEADS_PER_COUNTRY,
+  hsCode: "0901",
 }
 
 export const HAIR_MARKETS = "Dominican Republic, South Africa, Chile"
+export const HAIR_HS = "3305"
 
 export const KANECHOM_BRIEF: Brief = {
   supplierName: "Kanechom",
@@ -35,6 +38,7 @@ export const KANECHOM_BRIEF: Brief = {
   instructions:
     "A strong signal is a distributor of competitor hair-care brands, especially Skala.",
   leadCount: LEADS_PER_COUNTRY,
+  hsCode: HAIR_HS,
 }
 
 export const LQ_BRIEF: Brief = {
@@ -53,6 +57,7 @@ export const LQ_BRIEF: Brief = {
   instructions:
     "Look for distributors of professional salon brands and straightening systems, not mass-market grocery hair care.",
   leadCount: LEADS_PER_COUNTRY,
+  hsCode: HAIR_HS,
 }
 
 export function emptyBrief(): Brief {
@@ -74,6 +79,7 @@ export function emptyBrief(): Brief {
     countryCount: 5,
     excludedMarkets: "",
     parallelMode: "task",
+    hsCode: "",
   }
 }
 
@@ -95,6 +101,7 @@ export const CADIVEU_COMPETITOR_BRIEF: Brief = {
   exaEffort: "ultra",
   countryCount: 5,
   excludedMarkets: "Ecuador, Colombia, India",
+  hsCode: HAIR_HS,
 }
 
 function countryCountOf(value: unknown): number {
@@ -109,13 +116,14 @@ function parallelModeOf(value: unknown): "task" | "decisions" {
 
 function searchFields(
   brief: Brief
-): Pick<Brief, "searchKind" | "exaEffort" | "countryCount" | "excludedMarkets" | "parallelMode"> {
+): Pick<Brief, "searchKind" | "exaEffort" | "countryCount" | "excludedMarkets" | "parallelMode" | "hsCode"> {
   return {
     searchKind: brief.searchKind === "competitors" ? "competitors" : "buyers",
     exaEffort: brief.exaEffort === "deep" ? "deep" : "ultra",
     countryCount: countryCountOf(brief.countryCount),
     excludedMarkets: brief.excludedMarkets?.trim() ?? "",
     parallelMode: parallelModeOf(brief.parallelMode),
+    hsCode: brief.hsCode?.replace(/\D/g, "") ?? "",
   }
 }
 
@@ -177,6 +185,7 @@ export function validateBrief(input: unknown): { brief?: Brief; error?: string }
     countryCount: countryCountOf(raw.countryCount),
     excludedMarkets: text(raw.excludedMarkets),
     parallelMode: parallelModeOf(raw.parallelMode),
+    hsCode: text(raw.hsCode).replace(/\D/g, ""),
   }
   if (!brief.supplierName) return { error: "Name the supplier you are representing." }
   if (!brief.originCountry) return { error: "Add the supplier’s origin country." }
@@ -191,6 +200,11 @@ export function validateBrief(input: unknown): { brief?: Brief; error?: string }
   }
   if (brief.website && !/^https?:\/\//i.test(brief.website)) {
     brief.website = `https://${brief.website}`
+  }
+  if (brief.hsCode) {
+    const parsed = parseHsCode(brief.hsCode)
+    if ("error" in parsed) return { error: parsed.error }
+    brief.hsCode = parsed.digits
   }
   return { brief }
 }

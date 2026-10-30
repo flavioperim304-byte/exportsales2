@@ -1,3 +1,4 @@
+import { formatKg, formatUsd, tradeForCountry, yearLabel } from "./comexstat-map"
 import type { Brief, Run } from "./types"
 import { qualificationRows } from "./qualify"
 
@@ -17,7 +18,16 @@ export function csvFilename(brief: Brief): string {
   return `${slug || "results"}.csv`
 }
 
-export function resultsCsv(run: Pick<Run, "leads" | "brief" | "also">): string {
+function tradeCell(run: Pick<Run, "trade">, country: string): string {
+  const series = tradeForCountry(run.trade, country)
+  if (!run.trade || !series) return ""
+  if (series.error) return series.error
+  return series.years
+    .map((year) => `${yearLabel(year, run.trade!.periodTo)} ${formatUsd(year.usdFob)} / ${formatKg(year.kg)}`)
+    .join("; ")
+}
+
+export function resultsCsv(run: Pick<Run, "leads" | "brief" | "also" | "trade">): string {
   const leads = new Map(run.leads.map((lead) => [lead.name, lead]))
   const rows = qualificationRows(run.leads, run.brief, run.also)
   const header = [
@@ -31,6 +41,7 @@ export function resultsCsv(run: Pick<Run, "leads" | "brief" | "also">): string {
     "WhatsApp",
     "Website",
     "Still to confirm",
+    "Brazil exports",
   ]
   const lines = rows.map((row) => {
     const lead = leads.get(row.company)
@@ -45,6 +56,7 @@ export function resultsCsv(run: Pick<Run, "leads" | "brief" | "also">): string {
       lead?.extraction?.whatsapp || "",
       lead?.extraction?.website || lead?.url || "",
       row.qualificationNeeded,
+      tradeCell(run, row.country),
     ]
       .map(cell)
       .join(",")
