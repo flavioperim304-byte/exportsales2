@@ -122,24 +122,59 @@ export function profileFromAgent(data: unknown): Extraction | null {
   }
 }
 
+export const EXTRACT_PAGE_MS = 70_000
+export const EXTRACT_STAGE_MS = 8 * 60 * 1000
+export const EXTRACT_POLL_MS = 4_000
+
+const TIMEOUT_MESSAGE = "Firecrawl took too long. Scoring uses the Exa excerpt."
+
+export function jobTimedOut(startedAt: string | undefined, now = Date.now(), limit = EXTRACT_PAGE_MS): boolean {
+  if (!startedAt) return false
+  const started = Date.parse(startedAt)
+  return Number.isFinite(started) && now - started >= limit
+}
+
+export function stageTimedOut(startedAt: string | undefined, now = Date.now()): boolean {
+  return jobTimedOut(startedAt, now, EXTRACT_STAGE_MS)
+}
+
+function agentStatus(data: unknown): string {
+  return String(((data ?? {}) as { status?: string }).status ?? "").toLowerCase()
+}
+
+function agentSettled(data: unknown): boolean {
+  const status = agentStatus(data)
+  return status === "completed" || status === "failed" || status === "cancelled" || status === "canceled"
+}
+
 async function agentResult(key: string, started: unknown): Promise<unknown> {
   const record = (started ?? {}) as { id?: string; status?: string; data?: unknown }
   if (record.status === "completed" && record.data) return started
   const id = record.id
   if (!id) return started
-  const deadline = Date.now() + 3 * 60 * 1000
+  const deadline = Date.now() + 55_000
   let latest: unknown = started
   while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 4000))
+    await new Promise((resolve) => setTimeout(resolve, EXTRACT_POLL_MS))
     latest = await requestJson(`https://api.firecrawl.dev/v2/agent/${id}`, {
       method: "GET",
-      timeoutMs: 30000,
+      timeoutMs: 20000,
       headers: { Authorization: `Bearer ${key}` },
     })
-    const status = ((latest ?? {}) as { status?: string }).status
-    if (status === "completed" || status === "failed") return latest
+    if (agentSettled(latest)) return latest
   }
   return latest
+}
+
+function profileFromScrape(data: unknown): Extraction | null {
+  if (!data || typeof data !== "object") return null
+  const record = data as { data?: Record<string, unknown>; json?: unknown }
+  const inner = record.data && typeof record.data === "object" ? record.data : (data as Record<string, unknown>)
+  return (
+    profileFromAgent({ data: inner.json ?? inner.extract ?? inner }) ||
+    profileFromAgent({ data: record.json }) ||
+    profileFromAgent(data)
+  )
 }
 
 export async function extractPage(
@@ -157,7 +192,7 @@ export async function extractPage(
 
   const started = await requestJson("https://api.firecrawl.dev/v2/agent", {
     method: "POST",
-    timeoutMs: 120000,
+    timeoutMs: 25000,
     headers: { Authorization: `Bearer ${key}` },
     body: JSON.stringify({
       urls: [url],
@@ -169,15 +204,63 @@ export async function extractPage(
   })
 
   const data = await agentResult(key, started)
+  const fromAgent = extractionFromAgent(data, url)
+  if (fromAgent.ok || (fromAgent.error && !fromAgent.error.includes("neither a profile"))) {
+    if (fromAgent.ok) return fromAgent
+    if (agentSettled(data)) return fromAgent
+  }
+  const scraped = await scrapeProfile(url, brief, key, country, buyerType)
+  if (scraped.ok) return scraped
+  if (!agentSettled(data)) return empty(TIMEOUT_MESSAGE)
+  return fromAgent.error ? fromAgent : scraped
+}
+
+function extractionFromAgent(data: unknown, pageUrl: string): Extraction {
   if (!data || typeof data !== "object") return empty("Firecrawl Agent returned an empty body.")
   const record = data as { success?: boolean; status?: string; error?: string; data?: unknown }
-  if (record.success === false || record.status === "failed") {
+  const status = agentStatus(data)
+  if (record.success === false || status === "failed" || status === "cancelled" || status === "canceled") {
     return empty(record.error || "Firecrawl Agent could not read this company.")
   }
   const profile = profileFromAgent(record.data ? { data: record.data } : data)
   if (!profile) return empty("Firecrawl Agent returned neither a profile nor contacts.")
-  if (!profile.website) profile.website = url
+  if (!profile.website) profile.website = pageUrl
   return profile
+}
+
+export async function scrapeProfile(
+  url: string,
+  brief: Brief,
+  key: string,
+  country = "",
+  buyerType = ""
+): Promise<Extraction> {
+  if (!/^https?:\/\//i.test(url)) {
+    return empty("The lead has no http(s) page to read.")
+  }
+  try {
+    const data = await requestJson("https://api.firecrawl.dev/v2/scrape", {
+      method: "POST",
+      timeoutMs: 25000,
+      headers: { Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        url,
+        formats: [
+          {
+            type: "json",
+            prompt: firecrawlPrompt(brief, country, buyerType),
+            schema: SCHEMA,
+          },
+        ],
+      }),
+    })
+    const profile = profileFromScrape(data)
+    if (!profile) return empty("Firecrawl scrape returned neither a profile nor contacts.")
+    if (!profile.website) profile.website = url
+    return profile
+  } catch (error) {
+    return empty(error instanceof Error ? error.message : "Firecrawl scrape failed.")
+  }
 }
 
 export async function startExtractJob(
@@ -214,15 +297,10 @@ export async function pollExtractJob(
     timeoutMs: 20000,
     headers: { Authorization: `Bearer ${key}` },
   })
-  const record = (latest ?? {}) as { success?: boolean; status?: string; error?: string; data?: unknown }
-  if (record.status !== "completed" && record.status !== "failed") return { pending: true }
-  if (record.success === false || record.status === "failed") {
-    return { pending: false, extraction: empty(record.error || "Firecrawl Agent could not read this company.") }
-  }
-  const profile = profileFromAgent(record.data ? { data: record.data } : latest)
-  if (!profile) {
-    return { pending: false, extraction: empty("Firecrawl Agent returned neither a profile nor contacts.") }
-  }
-  if (!profile.website) profile.website = pageUrl
-  return { pending: false, extraction: profile }
+  if (!agentSettled(latest)) return { pending: true }
+  return { pending: false, extraction: extractionFromAgent(latest, pageUrl) }
+}
+
+export function timedOutExtraction(): Extraction {
+  return empty(TIMEOUT_MESSAGE)
 }

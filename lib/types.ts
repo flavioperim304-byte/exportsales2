@@ -420,6 +420,7 @@ export type Run = {
   /** Resumable Firecrawl read. */
   extractJobId?: string
   extractLeadId?: string
+  extractJobStartedAt?: string
   contextState: ContextState
   error?: string
 }

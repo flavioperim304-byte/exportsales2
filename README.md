@@ -43,7 +43,7 @@ Or open [Sources](http://127.0.0.1:3847/sources) from the top bar (**Sources 0/4
 
 Live runs are stored in `data/runs.json`. Exa Agent and Parallel can each take several minutes. Leave the run open. If Parallel is still going after eight minutes, the desk keeps OpenAI’s score and attaches Parallel’s final best fit when you reopen the run.
 
-Each live run spends one Exa Agent search per country (a second search only if that country returned fewer than 10 companies), one Firecrawl Agent read per lead, one OpenAI score, and one Parallel task. Ten countries means about 100 company reads. The qualification form shows the prompts and the page count before you start.
+Each live run spends one Exa Agent search per country (a second search only if that country returned fewer than 10 companies), one Firecrawl Agent read per lead, one OpenAI score, and one Parallel task. Ten countries means about 100 company reads. The qualification form shows the prompts and the page count before you start. Firecrawl Agent is given about 70 seconds per page; if it stays pending, the desk tries a fast scrape and then moves on so scoring is not blocked. After eight minutes the remaining pages are skipped.
 
 An HS code on the brief asks [Comex Stat](https://api-comexstat.mdic.gov.br/docs) for Brazil’s export value (US$ FOB) and net kg to each search country for the last three years. Hair-care briefs use 3305. The search still runs if Comex Stat is slow or empty. If the API returns 429, the desk waits the requested 10 seconds, retries, and fills the volume later without stopping the run.
 

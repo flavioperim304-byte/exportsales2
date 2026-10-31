@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { companiesFromAgent } from "../lib/exa"
-import { profileFromAgent } from "../lib/firecrawl"
+import { jobTimedOut, profileFromAgent, stageTimedOut, timedOutExtraction } from "../lib/firecrawl"
 import { draftFromOpenAI, entryFromOpenAI, judgmentsFromOpenAI } from "../lib/openai"
 
 test("Exa Agent search output becomes companies", () => {
@@ -40,6 +40,14 @@ test("Firecrawl Agent output keeps published contacts and leaves the rest blank"
   assert.equal(profile?.phone, "")
   assert.equal(profile?.whatsapp, "+593 99 000 0000")
   assert.equal(profile?.role, "importer")
+})
+
+test("a Firecrawl job older than 70 seconds is treated as timed out", () => {
+  assert.equal(jobTimedOut("2026-10-31T20:00:00.000Z", Date.parse("2026-10-31T20:01:11.000Z")), true)
+  assert.equal(jobTimedOut("2026-10-31T20:00:00.000Z", Date.parse("2026-10-31T20:00:20.000Z")), false)
+  assert.equal(jobTimedOut(undefined, Date.parse("2026-10-31T20:10:00.000Z")), false)
+  assert.equal(stageTimedOut("2026-10-31T20:00:00.000Z", Date.parse("2026-10-31T20:08:01.000Z")), true)
+  assert.match(timedOutExtraction().error ?? "", /too long/)
 })
 
 test("OpenAI score JSON becomes a preliminary best fit", () => {

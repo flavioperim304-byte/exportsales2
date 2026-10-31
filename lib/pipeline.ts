@@ -12,7 +12,16 @@ import {
 import { computeFitProbability } from "./fit-probability"
 import { brazilExports, countriesForTrade, tradeCooldownActive } from "./comexstat"
 import { advanceExa, searchLeads } from "./exa"
-import { extractPage, failedExtraction, pollExtractJob, startExtractJob } from "./firecrawl"
+import {
+  EXTRACT_POLL_MS,
+  failedExtraction,
+  jobTimedOut,
+  pollExtractJob,
+  scrapeProfile,
+  stageTimedOut,
+  startExtractJob,
+  timedOutExtraction,
+} from "./firecrawl"
 import { publicError } from "./http"
 import { getKeys } from "./keys"
 import { draftDiligence, scoreLeads } from "./openai"
@@ -27,7 +36,7 @@ import { localizeCompetitors } from "./competitors"
 import { compareLeads, scoreLead } from "./score"
 import { requestJson } from "./http"
 import { getRun, insertRun, updateRun } from "./store"
-import type { Brief, DiligenceProbe, Lead, LogLine, Run, StageId, StageState, TradeSnapshot } from "./types"
+import type { Brief, DiligenceProbe, Extraction, Lead, LogLine, Run, StageId, StageState, TradeSnapshot } from "./types"
 import { SAMPLE_RUN_ID } from "./ids"
 
 const running = new Set<string>()
@@ -340,78 +349,181 @@ async function doSearch(id: string): Promise<"busy" | "done"> {
   return "done"
 }
 
+function finishExtractStage(run: Run, detail?: string) {
+  const extract = stage(run, "extract")
+  extract.status = "done"
+  extract.finishedAt = now()
+  const failed = run.leads.filter((lead) => lead.extraction && !lead.extraction.ok).length
+  extract.detail =
+    detail ??
+    (failed > 0
+      ? `Pages read. ${failed} ${failed === 1 ? "page" : "pages"} could not be extracted.`
+      : `Firecrawl Agent collected ICP fields and contacts for ${run.leads.length} companies.`)
+  run.extractJobId = undefined
+  run.extractLeadId = undefined
+  run.extractJobStartedAt = undefined
+  run.status = "scoring"
+  log(run, "extract", extract.detail)
+}
+
+function fileExtraction(run: Run, leadId: string, extraction: Extraction) {
+  const lead = run.leads.find((item) => item.id === leadId)
+  if (!lead) return
+  lead.extraction = extraction
+  if (!lead.country && extraction.country) lead.country = extraction.country
+  run.extractJobId = undefined
+  run.extractLeadId = undefined
+  run.extractJobStartedAt = undefined
+  log(
+    run,
+    "extract",
+    extraction.ok
+      ? `Extracted ${lead.name}: ${extraction.role || "role unpublished"}.`
+      : `Could not extract ${lead.name}. ${extraction.error ?? "Unknown page error."}`
+  )
+}
+
+function skipUnreadPages(run: Run, message: string) {
+  for (const lead of run.leads) {
+    if (!lead.extraction) lead.extraction = failedExtraction(message)
+  }
+  finishExtractStage(run, `${message} OpenAI will score the pages already read.`)
+}
+
 async function doExtract(id: string): Promise<"wait" | "next"> {
   const keys = getKeys()
-  const plan = await updateRun(id, (run) => {
-    if (!keys.firecrawl) {
+  const snapshot = await getRun(id)
+  if (!snapshot) return "next"
+
+  if (!keys.firecrawl) {
+    await updateRun(id, (run) => {
       const extract = stage(run, "extract")
       extract.status = "blocked"
       extract.finishedAt = now()
-      extract.detail =
-        "Firecrawl API key is missing. OpenAI will score the Exa search notes only."
+      extract.detail = "Firecrawl API key is missing. OpenAI will score the Exa search notes only."
       log(run, "extract", extract.detail)
       run.status = "scoring"
-      return { action: "skip" as const }
+    })
+    return "next"
+  }
+
+  const extractStarted = stage(snapshot, "extract").startedAt
+  if (stageTimedOut(extractStarted)) {
+    await updateRun(id, (run) => {
+      skipUnreadPages(run, "Firecrawl stage timed out after 8 minutes.")
+    })
+    return "next"
+  }
+
+  if (snapshot.extractLeadId) {
+    const lead = snapshot.leads.find((item) => item.id === snapshot.extractLeadId)
+    if (!lead) {
+      await updateRun(id, (run) => {
+        run.extractJobId = undefined
+        run.extractLeadId = undefined
+        run.extractJobStartedAt = undefined
+      })
+      return "next"
     }
-    const pending = run.leads.find((lead) => !lead.extraction)
-    if (!pending) {
-      const extract = stage(run, "extract")
-      extract.status = "done"
-      extract.finishedAt = now()
-      const failed = run.leads.filter((lead) => lead.extraction && !lead.extraction.ok).length
-      extract.detail =
-        failed > 0
-          ? `Pages read. ${failed} ${failed === 1 ? "page" : "pages"} could not be extracted.`
-          : `Firecrawl Agent collected ICP fields and contacts for ${run.leads.length} companies.`
-      log(run, "extract", extract.detail)
-      run.status = "scoring"
-      return { action: "done" as const }
+
+    if (!snapshot.extractJobStartedAt) {
+      await updateRun(id, (run) => {
+        run.extractJobStartedAt = now()
+      })
     }
+    const timedOut = jobTimedOut(snapshot.extractJobStartedAt ?? now())
+    if (snapshot.extractJobId && !timedOut) {
+      try {
+        const polled = await pollExtractJob(keys.firecrawl, snapshot.extractJobId, lead.url)
+        if (polled.pending) {
+          await updateRun(id, (run) => {
+            const extract = stage(run, "extract")
+            const index = run.leads.findIndex((item) => item.id === lead.id) + 1
+            const waited = snapshot.extractJobStartedAt
+              ? Math.max(0, Math.round((Date.now() - Date.parse(snapshot.extractJobStartedAt)) / 1000))
+              : 0
+            extract.detail = `Reading ${lead.name} (${index} of ${run.leads.length})${waited ? ` · ${waited}s` : ""}.`
+          })
+          return "wait"
+        }
+        await updateRun(id, (run) => fileExtraction(run, lead.id, polled.extraction))
+        return "next"
+      } catch (error) {
+        if (!timedOut) {
+          const message = publicError(error, secrets())
+          await updateRun(id, (run) => fileExtraction(run, lead.id, failedExtraction(message)))
+          return "next"
+        }
+      }
+    }
+
+    if (timedOut || !snapshot.extractJobId) {
+      if (timedOut) {
+        const scraped = await scrapeProfile(
+          lead.url,
+          snapshot.brief,
+          keys.firecrawl,
+          lead.market ?? "",
+          lead.buyerType ?? ""
+        )
+        await updateRun(id, (run) =>
+          fileExtraction(run, lead.id, scraped.ok ? scraped : timedOutExtraction())
+        )
+        return "next"
+      }
+    }
+  }
+
+  const pending = snapshot.leads.find((lead) => !lead.extraction)
+  if (!pending) {
+    await updateRun(id, (run) => finishExtractStage(run))
+    return "next"
+  }
+
+  if (!/^https?:\/\//i.test(pending.url)) {
+    await updateRun(id, (run) => fileExtraction(run, pending.id, failedExtraction("The lead has no http(s) page to read.")))
+    return "next"
+  }
+
+  await updateRun(id, (run) => {
+    run.extractLeadId = pending.id
+    run.extractJobStartedAt = now()
     const extract = stage(run, "extract")
     extract.status = "running"
     extract.startedAt = extract.startedAt ?? now()
-    const index = run.leads.indexOf(pending) + 1
+    const index = run.leads.findIndex((item) => item.id === pending.id) + 1
     extract.detail = `Reading ${pending.name} (${index} of ${run.leads.length}).`
-    return {
-      action: "read" as const,
-      leadId: pending.id,
-      url: pending.url,
-      country: pending.market ?? "",
-      buyerType: pending.buyerType ?? "",
-    }
   })
-  if (!plan || plan.action !== "read") return "next"
+
   try {
-    const run = await getRun(id)
-    if (!run || !keys.firecrawl) return "next"
-    const extraction = await extractPage(
-      plan.url,
-      run.brief,
+    const jobId = await startExtractJob(
+      pending.url,
+      snapshot.brief,
       keys.firecrawl,
-      plan.country,
-      plan.buyerType
+      pending.market ?? "",
+      pending.buyerType ?? ""
     )
-    await updateRun(id, (current) => {
-      const lead = current.leads.find((item) => item.id === plan.leadId)
-      if (!lead) return
-      lead.extraction = extraction
-      if (!lead.country && extraction.country) lead.country = extraction.country
-      log(
-        current,
-        "extract",
-        extraction.ok
-          ? `Extracted ${lead.name}: ${extraction.role || "role unpublished"}.`
-          : `Could not extract ${lead.name}. ${extraction.error ?? "Unknown page error."}`
-      )
+    await updateRun(id, (run) => {
+      run.extractJobId = jobId
+      run.extractLeadId = pending.id
+      run.extractJobStartedAt = run.extractJobStartedAt ?? now()
     })
   } catch (error) {
     const message = publicError(error, secrets())
-    await updateRun(id, (current) => {
-      const lead = current.leads.find((item) => item.id === plan.leadId)
-      if (!lead) return
-      lead.extraction = failedExtraction(message)
-      log(current, "extract", `Could not extract ${lead.name}. ${message}`)
-    })
+    try {
+      const scraped = await scrapeProfile(
+        pending.url,
+        snapshot.brief,
+        keys.firecrawl,
+        pending.market ?? "",
+        pending.buyerType ?? ""
+      )
+      await updateRun(id, (run) =>
+        fileExtraction(run, pending.id, scraped.ok ? scraped : failedExtraction(message))
+      )
+    } catch {
+      await updateRun(id, (run) => fileExtraction(run, pending.id, failedExtraction(message)))
+    }
   }
   return "next"
 }
@@ -750,7 +862,7 @@ async function maybeAttachDeferred(id: string) {
 
 async function pump(id: string) {
   try {
-    for (let guard = 0; guard < 200; guard += 1) {
+    for (let guard = 0; guard < 1000; guard += 1) {
       const run = await getRun(id)
       if (!run || run.mode === "sample") return
       if (run.status === "failed") return
@@ -766,7 +878,8 @@ async function pump(id: string) {
       }
       if (run.status === "extracting") {
         void attachTrade(id)
-        await doExtract(id)
+        const pace = await doExtract(id)
+        if (pace === "wait") await new Promise((resolve) => setTimeout(resolve, EXTRACT_POLL_MS))
         continue
       }
       if (run.status === "scoring") {
@@ -885,70 +998,7 @@ async function doSearchTick(id: string) {
 }
 
 async function doExtractTick(id: string) {
-  const keys = getKeys()
-  const current = await getRun(id)
-  if (!current) return
-  if (!keys.firecrawl) {
-    await doExtract(id)
-    return
-  }
-  if (current.extractJobId && current.extractLeadId) {
-    const lead = current.leads.find((item) => item.id === current.extractLeadId)
-    if (!lead) {
-      await updateRun(id, (run) => {
-        run.extractJobId = undefined
-        run.extractLeadId = undefined
-      })
-      return
-    }
-    const polled = await pollExtractJob(keys.firecrawl, current.extractJobId, lead.url)
-    if (polled.pending) return
-    await updateRun(id, (run) => {
-      const target = run.leads.find((item) => item.id === current.extractLeadId)
-      run.extractJobId = undefined
-      run.extractLeadId = undefined
-      if (!target) return
-      target.extraction = polled.extraction
-      if (!target.country && polled.extraction.country) target.country = polled.extraction.country
-      log(
-        run,
-        "extract",
-        polled.extraction.ok
-          ? `Extracted ${target.name}: ${polled.extraction.role || "role unpublished"}.`
-          : `Could not extract ${target.name}. ${polled.extraction.error ?? "Unknown page error."}`
-      )
-    })
-    return
-  }
-  const pending = current.leads.find((lead) => !lead.extraction)
-  if (!pending) {
-    await doExtract(id)
-    return
-  }
-  if (!/^https?:\/\//i.test(pending.url)) {
-    await updateRun(id, (run) => {
-      const target = run.leads.find((item) => item.id === pending.id)
-      if (!target) return
-      target.extraction = failedExtraction("The lead has no http(s) page to read.")
-    })
-    return
-  }
-  const jobId = await startExtractJob(
-    pending.url,
-    current.brief,
-    keys.firecrawl,
-    pending.market ?? "",
-    pending.buyerType ?? ""
-  )
-  await updateRun(id, (run) => {
-    run.extractJobId = jobId
-    run.extractLeadId = pending.id
-    const extract = stage(run, "extract")
-    extract.status = "running"
-    extract.startedAt = extract.startedAt ?? now()
-    const index = run.leads.findIndex((item) => item.id === pending.id) + 1
-    extract.detail = `Reading ${pending.name} (${index} of ${run.leads.length}).`
-  })
+  await doExtract(id)
 }
 
 async function stepOnce(id: string) {
