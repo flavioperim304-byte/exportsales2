@@ -65,5 +65,10 @@ function boardExtraction(extraction: Extraction): Extraction {
     buys: extraction.buys?.slice(0, 8) ?? [],
     sells: extraction.sells?.slice(0, 8) ?? [],
     buyerSignals: extraction.buyerSignals?.slice(0, 6) ?? [],
+    lastPurchase: extraction.lastPurchase?.slice(0, 180) ?? "",
+    stock: extraction.stock?.slice(0, 180) ?? "",
+    brandPerformance: extraction.brandPerformance?.slice(0, 180) ?? "",
+    salesNote: extraction.salesNote?.slice(0, 180) ?? "",
+    competitorMoves: extraction.competitorMoves?.slice(0, 4) ?? [],
   }
 }

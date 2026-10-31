@@ -57,7 +57,7 @@ test("a dual qualification names the stronger supplier and keeps low fits out", 
     LQ_BRIEF
   )
   assert.equal(rows[0].bestFit, "Kanechom")
-  assert.equal(rows[0].level, "high")
+  assert.equal(rows[0].level, "medium")
   assert.equal(rows[0].fits[1].level, "low")
   assert.equal(rows[1].bestFit, "neither")
   assert.match(rows[0].qualificationNeeded, /commercial readiness/i)

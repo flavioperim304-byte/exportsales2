@@ -50,3 +50,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# packaged download and text dumps
+/public/export-desk.zip
+/export-desk-fonte.txt

@@ -1,4 +1,5 @@
 import { activityLine, hasRecentActivity } from "./activity"
+import { computeFitProbability, fitProbabilityLine } from "./fit-probability"
 import type { Brief, FitJudgment, Lead, LeadScore } from "./types"
 
 export type IcpLevel = "high" | "medium" | "low"
@@ -15,6 +16,9 @@ export type QualificationRow = {
   fromParallel: boolean
   activity: string
   activityLive: boolean
+  fitLevel: IcpLevel
+  fitIndex: number
+  fitNote: string
 }
 
 export function icpLevel(score: LeadScore | undefined): IcpLevel {
@@ -46,8 +50,10 @@ function fromJudgment(
   lead: Lead,
   judgment: FitJudgment,
   source: "parallel" | "openai",
-  rationale: string
+  rationale: string,
+  brief: Brief
 ): QualificationRow {
+  const fit = lead.fit ?? computeFitProbability(brief, lead)
   return {
     company: lead.name,
     country: lead.market || lead.extraction?.country || lead.country || "",
@@ -60,30 +66,50 @@ function fromJudgment(
     fromParallel: source === "parallel",
     activity: activityLine(lead),
     activityLive: hasRecentActivity(lead),
+    fitLevel: fit.level,
+    fitIndex: fit.index,
+    fitNote: fitProbabilityLine(fit),
   }
 }
 
-function guardQuietLead(lead: Lead, row: QualificationRow): QualificationRow {
-  if (!lead.activity || hasRecentActivity(lead)) return row
-  const needed = [
-    "No recent news, product launch, new brand, or social activity was found.",
-    "Do not treat this as a confirmed best fit until a current buyer is named.",
-    row.qualificationNeeded,
-  ].join(" ")
-  return {
-    ...row,
-    level: row.level === "high" ? "medium" : row.level,
-    qualificationNeeded: needed,
-    activity: activityLine(lead),
-    activityLive: false,
+function guardFit(lead: Lead, row: QualificationRow): QualificationRow {
+  let next = row
+  const notes: string[] = []
+  if (lead.activity && !hasRecentActivity(lead)) {
+    next = {
+      ...next,
+      level: next.level === "high" ? "medium" : next.level,
+      activityLive: false,
+    }
+    notes.push(
+      "No recent news, product launch, new brand, or social activity was found.",
+      "Do not treat this as a confirmed best fit until a current buyer is named."
+    )
   }
+  if (next.fitLevel === "low" && row.level === "high") {
+    next = {
+      ...next,
+      level: next.level === "high" ? "medium" : next.level,
+    }
+    notes.push(
+      "Last purchase, stock, and sales were not published.",
+      "Fit probability stays medium until one of those facts is found."
+    )
+  }
+  if (notes.length) {
+    next = {
+      ...next,
+      qualificationNeeded: [...notes, next.qualificationNeeded].join(" "),
+    }
+  }
+  return next
 }
 
 export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): QualificationRow[] {
   return leads.map((lead) => {
     const parallelFits = lead.context?.supplierFits ?? []
     if (lead.context?.icp && parallelFits.length > 0) {
-      return guardQuietLead(
+      return guardFit(
         lead,
         fromJudgment(
           lead,
@@ -97,12 +123,13 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
             rationale: lead.context.fitNarrative || "Parallel did not write a rationale.",
           },
           "parallel",
-          lead.context.fitNarrative || "Parallel did not write a rationale."
+          lead.context.fitNarrative || "Parallel did not write a rationale.",
+          brief
         )
       )
     }
     if (lead.openai && lead.openai.supplierFits.length > 0) {
-      return guardQuietLead(lead, fromJudgment(lead, lead.openai, "openai", lead.openai.rationale))
+      return guardFit(lead, fromJudgment(lead, lead.openai, "openai", lead.openai.rationale, brief))
     }
     const fits = [
       { supplier: brief.supplierName, level: icpLevel(lead.score), total: fitTotal(lead.score) },
@@ -134,7 +161,8 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
       .join(" ")
       .replace(/\s+/g, " ")
       .slice(0, 280)
-    return guardQuietLead(lead, {
+    const fit = lead.fit ?? computeFitProbability(brief, lead)
+    return guardFit(lead, {
       company: lead.name,
       country: lead.market || lead.extraction?.country || lead.country || "",
       level,
@@ -146,6 +174,9 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
       fromParallel: false,
       activity: activityLine(lead),
       activityLive: hasRecentActivity(lead),
+      fitLevel: fit.level,
+      fitIndex: fit.index,
+      fitNote: fitProbabilityLine(fit),
     })
   })
 }

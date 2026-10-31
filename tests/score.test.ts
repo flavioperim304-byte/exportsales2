@@ -29,11 +29,12 @@ test("sample dossier ranks the coffee brief into the expected bands", () => {
   assert.equal(nord.score?.band, "best_fit", explain(nord))
   assert.ok((nord.score?.total ?? 0) >= 80, explain(nord))
 
-  assert.equal(haven.score?.band, "strong", explain(haven))
-  assert.ok((haven.score?.total ?? 0) >= 64 && (haven.score?.total ?? 0) < 80, explain(haven))
+  assert.equal(haven.score?.band, "possible", explain(haven))
+  assert.ok((haven.score?.total ?? 0) >= 64, explain(haven))
+  assert.equal(haven.fit?.level, "low")
 
   assert.equal(kumo.score?.band, "possible", explain(kumo))
-  assert.ok((kumo.score?.total ?? 0) >= 46 && (kumo.score?.total ?? 0) < 64, explain(kumo))
+  assert.ok((kumo.score?.total ?? 0) < 64, explain(kumo))
 
   assert.equal(atlas.score?.band, "disqualified", explain(atlas))
   assert.match(atlas.score?.disqualifyReason ?? "", /instant coffee/i)

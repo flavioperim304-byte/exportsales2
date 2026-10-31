@@ -155,6 +155,9 @@ type Buyer = {
   needed: string
   activity: string
   activityLive: boolean
+  fitLevel: string
+  fitIndex: number
+  fitNote: string
   suppliers: string[]
   risks: string[]
   trade?: TradeSnapshot
@@ -190,6 +193,9 @@ function buyerRows(runs: Run[]): Buyer[] {
         fit: row.activityLive ? row.bestFit : row.bestFit === "neither" ? row.bestFit : `${row.bestFit} · sem atividade`,
         activity: row.activity,
         activityLive: row.activityLive,
+        fitLevel: row.fitLevel,
+        fitIndex: row.fitIndex,
+        fitNote: row.fitNote,
         email: lead?.extraction?.email || "",
         phone: lead?.extraction?.phone || lead?.extraction?.whatsapp || "",
         website: lead?.extraction?.website || lead?.url || "",
@@ -233,6 +239,14 @@ function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
           <p className="mt-3 text-sm leading-relaxed">
             {buyer.note || "Esta empresa não tem nota de análise gravada."}
           </p>
+          {buyer.fitNote ? (
+            <div className="mt-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Probabilidade de fit · {buyer.fitLevel} · {buyer.fitIndex}/100
+              </p>
+              <p className="mt-1 text-sm leading-relaxed">{buyer.fitNote}</p>
+            </div>
+          ) : null}
           {buyer.activity ? (
             <div className="mt-3">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Atividade pública</p>

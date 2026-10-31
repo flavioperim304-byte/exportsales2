@@ -1,4 +1,5 @@
 import { emptyActivity, searchActivity } from "./activity"
+import { computeFitProbability } from "./fit-probability"
 import { brazilExports, countriesForTrade } from "./comexstat"
 import { advanceExa, searchLeads } from "./exa"
 import { extractPage, failedExtraction, pollExtractJob, startExtractJob } from "./firecrawl"
@@ -182,8 +183,9 @@ function fitRank(lead: Lead): number {
 
 function fileChecklist(run: Run) {
   for (const lead of run.leads) {
-    lead.score = scoreLead(run.brief, lead)
-    lead.alsoScore = run.also ? scoreLead(run.also, lead) : undefined
+    lead.fit = computeFitProbability(run.brief, lead, run.competitors)
+    lead.score = scoreLead(run.brief, lead, run.competitors)
+    lead.alsoScore = run.also ? scoreLead(run.also, lead, run.competitors) : undefined
   }
   run.leads.sort((left, right) => fitRank(right) - fitRank(left) || compareLeads(left, right))
 }
@@ -603,8 +605,9 @@ async function attachMissingActivity(id: string): Promise<"wait" | "ready"> {
       const lead = run.leads.find((item) => item.id === pending.id)
       if (!lead) return
       lead.activity = snapshotActivity
-      lead.score = scoreLead(run.brief, lead)
-      if (run.also) lead.alsoScore = scoreLead(run.also, lead)
+      lead.fit = computeFitProbability(run.brief, lead, run.competitors)
+      lead.score = scoreLead(run.brief, lead, run.competitors)
+      if (run.also) lead.alsoScore = scoreLead(run.also, lead, run.competitors)
       const recent = snapshotActivity.signals.length
       log(
         run,

@@ -121,6 +121,35 @@ export type Extraction = {
   phone?: string
   whatsapp?: string
   website?: string
+  /** Last inbound purchase or shipment, only when the page states it. */
+  lastPurchase?: string
+  /** Stock or restock language, only when the page states it. */
+  stock?: string
+  /** How current brands are performing, only when the page states it. */
+  brandPerformance?: string
+  /** Published sales or volume, only when the page states a figure or trend. */
+  salesNote?: string
+  /** Competitor moves named on the page. */
+  competitorMoves?: string[]
+}
+
+export type BuyingKind = "last_purchase" | "stock" | "brand_performance" | "sales" | "competitor_move"
+
+export type BuyingFact = {
+  kind: BuyingKind
+  found: boolean
+  recency: "recent" | "stale" | "unknown"
+  quote: string
+  url?: string
+}
+
+export type FitProbability = {
+  level: "high" | "medium" | "low"
+  /** Evidence index 0–100. Not a predicted order rate. */
+  index: number
+  note: string
+  missing: BuyingKind[]
+  facts: BuyingFact[]
 }
 
 export type FitJudgment = {
@@ -162,6 +191,8 @@ export type Lead = {
   openai?: FitJudgment
   /** News, launches, new brands, and social posts found after the company search. */
   activity?: ActivitySnapshot
+  /** Desk-calculated fit probability from published buying facts. */
+  fit?: FitProbability
 }
 
 export type MarketContext = {

@@ -12,6 +12,7 @@ import { PromptPreview } from "@/components/prompt-preview"
 import { qualificationRows } from "@/lib/qualify"
 import { BAND_LABEL, STATUS_LABEL, formatWhen, isHttpUrl, leadPlace, mailtoHref, telHref } from "@/lib/format"
 import { activityKindLabel, hasRecentActivity } from "@/lib/activity"
+import { buyingKindLabel } from "@/lib/fit-probability"
 import type { Band, Evidence, Lead, Run, StageState } from "@/lib/types"
 import type { IcpLevel } from "@/lib/qualify"
 
@@ -380,6 +381,7 @@ function Dossier({ lead }: { lead: Lead }) {
         {score ? <ScoreMark score={score.total} band={score.band} /> : null}
       </div>
 
+      <FitPanel lead={lead} />
       <ActivityPanel lead={lead} />
 
       {score?.disqualified ? (
@@ -487,10 +489,10 @@ function QualificationTable({ run }: { run: Run }) {
       <h2 className="font-serif text-2xl">{fromParallel || fromOpenAI ? "Best fit" : "Evidence checklist"}</h2>
       <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
         {fromParallel
-          ? "Parallel refined these levels and set the final best fit. High means product and channel fit. It is not a confirmed order."
+          ? "O Parallel refinou estes níveis e definiu o best fit final. High é fit de produto e canal. Só sobe com última compra, estoque, marcas, vendas ou ação de concorrente publicados — não é um pedido confirmado."
           : fromOpenAI
-            ? "OpenAI scored this list. Parallel has not refined it yet. High means product and channel fit, not a confirmed order."
-            : "Neither OpenAI nor Parallel has scored this list. The levels below are a local checklist. They are not the best-fit call."}
+            ? "A OpenAI pontuou esta lista. O Parallel ainda não refinou. High é fit de produto e canal, e só se mantém quando há fatos de compra publicados."
+            : "Nem a OpenAI nem o Parallel pontuaram esta lista. Os níveis abaixo são o checklist local. Sem última compra, estoque ou vendas publicados a probabilidade de fit fica baixa."}
       </p>
       <ul className="mt-4 flex flex-col gap-3 md:hidden">
         {rows.map((row) => (
@@ -516,6 +518,10 @@ function QualificationTable({ run }: { run: Run }) {
                 </dd>
               </div>
             </dl>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Probabilidade de fit · {row.fitLevel} · {row.fitIndex}/100
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{row.fitNote}</p>
             <p className="mt-3 text-sm text-muted-foreground">{row.activity}</p>
             <p className="mt-3 text-sm text-muted-foreground">{row.rationale}</p>
             <p className="mt-1 text-sm text-muted-foreground">{row.qualificationNeeded}</p>
@@ -523,7 +529,7 @@ function QualificationTable({ run }: { run: Run }) {
         ))}
       </ul>
       <div className="mt-4 hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[880px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[980px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-border text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               <th className="py-2 pr-3 font-medium">Company</th>
@@ -535,6 +541,7 @@ function QualificationTable({ run }: { run: Run }) {
                 </th>
               ))}
               <th className="py-2 pr-3 font-medium">Best fit</th>
+              <th className="py-2 pr-3 font-medium">Fit</th>
               <th className="py-2 pr-3 font-medium">Atividade</th>
               <th className="py-2 font-medium">Still to confirm</th>
             </tr>
@@ -555,6 +562,9 @@ function QualificationTable({ run }: { run: Run }) {
                 <td className="py-3 pr-3">
                   {row.bestFit}
                   {row.activityLive ? "" : " · sem atividade recente"}
+                </td>
+                <td className="py-3 pr-3 text-muted-foreground">
+                  {row.fitLevel} · {row.fitIndex}/100
                 </td>
                 <td className="py-3 pr-3 text-muted-foreground">{row.activity}</td>
                 <td className="py-3 text-muted-foreground">
@@ -602,6 +612,31 @@ function Fact({
           value
         )}
       </dd>
+    </div>
+  )
+}
+
+function FitPanel({ lead }: { lead: Lead }) {
+  const fit = lead.fit
+  if (!fit) return null
+  return (
+    <div className="mt-4 rounded-lg border border-border px-3 py-3">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+        Probabilidade de fit · índice {fit.index}/100
+      </p>
+      <p className="mt-2 text-sm font-medium uppercase">{fit.level}</p>
+      <p className="mt-1 text-sm leading-relaxed">{fit.note}</p>
+      <ul className="mt-3 grid gap-2 text-sm">
+        {fit.facts.map((fact) => (
+          <li key={fact.kind}>
+            <span className="font-medium">{buyingKindLabel(fact.kind)}</span>
+            <span className="text-muted-foreground">
+              {fact.found ? ` · ${fact.recency}` : " · não publicado"}
+            </span>
+            {fact.quote ? <p className="mt-1 text-muted-foreground">{fact.quote}</p> : null}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

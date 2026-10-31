@@ -1,4 +1,5 @@
 import { activityLine } from "./activity"
+import { buyingEvidenceLine, computeFitProbability, fitProbabilityLine } from "./fit-probability"
 import type { Brief, Lead } from "./types"
 import { clip, splitList } from "./text"
 
@@ -11,8 +12,13 @@ export function targetCountries(brief: Brief): string[] {
 function marketAsk(): string {
   return [
     "purchase_probability is high, medium, or low for the market in this search: the chance a qualified buyer there would take the brand on. Keep it separate from icp. Do not invent a percentage.",
+    "High purchase_probability needs at least two published commercial facts among last purchase, stock, brand performance, sales, and a competitor move, plus recent public activity. If those fields are unpublished, the call is medium or low. Do not invent a last purchase, a stock level, a sales figure, or a response rate.",
     "entry_strategy is a short plan for this market, using practices that have worked when professional brands enter a new country: appoint one importer before many retailers, train that channel, open with a non-exclusive trial, and price inside the local professional tier. Name a practice only when a source supports it. Do not invent a statistic.",
   ].join(" ")
+}
+
+function buyingAsk(): string {
+  return "On each company, look for last purchase or shipment, stock or restock, how current brands are performing, published sales or volume, and a competitor move. Quote the source. Leave a field empty when it is not published. A company that only has a brochure is not a high fit."
 }
 
 function extra(brief: Brief): string {
@@ -136,6 +142,7 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
       "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
       "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
       "buyerSignals must be short phrases taken from the page about how this company buys or sells.",
+      "Also extract lastPurchase, stock, brandPerformance, salesNote, and competitorMoves when the page states them. Leave each empty when unpublished.",
     ].join("\n")
   }
   const type = buyerType?.trim()
@@ -155,6 +162,7 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
     "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
     "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
     "buyerSignals must be short phrases about the buyer type named above, including importing, wholesale coverage, or trading.",
+    "Also extract lastPurchase, stock, brandPerformance, salesNote, and competitorMoves when the page states them. Leave each empty when unpublished.",
     extra(brief),
   ]
     .filter(Boolean)
@@ -196,7 +204,8 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       brief.excludedMarkets ? `Excluded countries: ${brief.excludedMarkets}.` : "",
       "A high score means the company distributes this brand, or it is a direct competitor distributor of a rival brand in the same country. Low means a retailer, a salon, or an unrelated company.",
       "Set best_fit to the brand name when they distribute it, direct competitor when they import a rival, or neither.",
-      "Use the public activity line on each card. Do not set icp high or best_fit to a brand when there is no recent news, product launch, new brand, or social activity. That company is unlikely to answer outreach.",
+      "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a brand when there is no recent news, product launch, new brand, or social activity, or when last purchase, stock, and sales are all unpublished. That company is unlikely to answer outreach.",
+      buyingAsk(),
       brief.instructions?.trim() ?? "",
       "qualification_needed is what a salesperson still has to confirm. icp is not the purchase probability.",
       marketAsk(),
@@ -212,7 +221,8 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       "Score against the prompt below. Do not add must-haves or exclusions that the prompt does not state.",
       brief.instructions?.trim() ?? "",
       "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
-      "Use the public activity line on each card. Do not set icp high or best_fit to a supplier when there is no recent news, product launch, new brand, or social activity. That company is unlikely to answer outreach.",
+      "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a supplier when there is no recent news, product launch, new brand, or social activity, or when last purchase, stock, and sales are all unpublished. That company is unlikely to answer outreach.",
+      buyingAsk(),
       "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
       marketAsk(),
     ]
@@ -231,7 +241,8 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       : "",
     "Score the company against the buyer type it was searched as, and against the other types in the brief. Do not lower the score only because it is a wholesaler or a trading company rather than a distributor.",
     "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
-    "Use the public activity line on each card. Do not set icp high or best_fit to a supplier when there is no recent news, product launch, new brand, or social activity. That company is unlikely to answer outreach.",
+    "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a supplier when there is no recent news, product launch, new brand, or social activity, or when last purchase, stock, and sales are all unpublished. That company is unlikely to answer outreach.",
+    buyingAsk(),
     "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
     marketAsk(),
     extra(brief),
@@ -255,6 +266,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
       competitorMarketRule(brief, countries),
       brief.instructions?.trim() ?? "",
       "Set icp high when the company is the brand’s distributor or a direct competitor distributor, medium when the role is likely but not proven, and low when it is unrelated. Set best_fit to the brand name, direct competitor, or neither.",
+      buyingAsk(),
       "qualification_needed is what still has to be confirmed. Put rival brand names in known suppliers when a source names them. In competitors, list direct competitor distributors in the searched countries that are not already in the candidate list. country is the searched country, not the rival brand’s headquarters.",
       marketAsk(),
     ]
@@ -272,7 +284,8 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
       "Refine the score against this prompt only. Do not add must-haves or exclusions that the prompt does not state.",
       brief.instructions?.trim() ?? "",
       "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
-      "Use the public activity line on each card. Do not keep icp high or best_fit on a supplier when there is no recent news, product launch, new brand, or social activity.",
+      "Use the public activity line and the fit-probability line on each card. Do not keep icp high or best_fit on a supplier when last purchase, stock, and sales are unpublished and there is no recent public activity.",
+      buyingAsk(),
       "Say who to approach first, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and the supplier fit to high, medium, or low. Set best_fit to the supplier to pursue or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
       marketAsk(),
       competitorMarketRule(brief, countries),
@@ -301,7 +314,8 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
     extra(brief),
     also?.instructions ? `Additional instructions: ${also.instructions.trim()}` : "",
     "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
-    "Use the public activity line on each card. Do not keep icp high or best_fit on a supplier when there is no recent news, product launch, new brand, or social activity.",
+    "Use the public activity line and the fit-probability line on each card. Do not keep icp high or best_fit on a supplier when last purchase, stock, and sales are unpublished and there is no recent public activity.",
+    buyingAsk(),
     "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
     marketAsk(),
     competitorMarketRule(brief, countries),
@@ -341,6 +355,8 @@ export function researchPrompt(brief: Brief, leads: Lead[], also?: Brief): strin
           ? `OpenAI preliminary: ${lead.openai.icp}, best fit ${lead.openai.bestFit}. ${clip(lead.openai.rationale, 180)}`
           : "OpenAI preliminary: unscored.",
         activityLine(lead),
+        buyingEvidenceLine(lead),
+        fitProbabilityLine(lead.fit ?? computeFitProbability(brief, lead)),
         clip(extraction?.summary || lead.exa.summary || lead.exa.text, 180),
       ]
         .filter(Boolean)

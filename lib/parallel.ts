@@ -30,7 +30,8 @@ const OUTPUT_SCHEMA = {
       purchase_probability: {
         type: "string",
         enum: ["high", "medium", "low"],
-        description: "Chance a qualified buyer in this search market would take the brand on. Not a percentage.",
+        description:
+          "Chance a qualified buyer in this search market would take the brand on. High only with at least two published facts among last purchase, stock, brand performance, sales, and a competitor move, plus recent public activity. Not a percentage. Do not invent those facts.",
       },
       purchase_probability_note: { type: "string" },
       entry_strategy: {

@@ -4,9 +4,11 @@ import {
   hasRecentActivity,
   recentSignals,
 } from "./activity"
+import { computeFitProbability } from "./fit-probability"
 import type {
   Band,
   Brief,
+  Competitor,
   DimensionScore,
   Evidence,
   Extraction,
@@ -381,7 +383,7 @@ function activityDimension(lead: Lead): DimensionScore {
   }
 }
 
-export function scoreLead(brief: Brief, lead: Lead): LeadScore {
+export function scoreLead(brief: Brief, lead: Lead, competitors: Competitor[] = []): LeadScore {
   const extraction = lead.extraction?.ok ? lead.extraction : undefined
   const full = corpusOf(lead)
   const productTokens = significant(brief.products)
@@ -715,6 +717,23 @@ export function scoreLead(brief: Brief, lead: Lead): LeadScore {
   }
 
   const activity = activityDimension(lead)
+  const fit = computeFitProbability(brief, lead, competitors)
+  const buying: DimensionScore = {
+    key: "buying",
+    label: "Buying facts",
+    points: fit.facts.some((fact) => fact.found) ? Math.round((fit.index / 100) * 15) : 0,
+    max: 15,
+    rationale: fit.note,
+    evidence: fit.facts
+      .filter((fact) => fact.found)
+      .slice(0, 3)
+      .map((fact) => ({
+        source: "rule" as const,
+        label: fact.kind,
+        quote: clip(fact.quote),
+        url: fact.url,
+      })),
+  }
   const dimensions = [
     product,
     role,
@@ -724,6 +743,7 @@ export function scoreLead(brief: Brief, lead: Lead): LeadScore {
     competitive,
     evidence,
     activity,
+    buying,
   ]
   const total = dimensions.reduce((sum, item) => sum + item.points, 0)
   let band = bandFor(total)
@@ -752,6 +772,8 @@ export function scoreLead(brief: Brief, lead: Lead): LeadScore {
   if (disqualified) band = "disqualified"
   else if (lead.activity && !hasRecentActivity(lead) && (band === "best_fit" || band === "strong")) {
     band = "possible"
+  } else if (fit.level === "low" && (band === "best_fit" || band === "strong")) {
+    band = "possible"
   }
   const place =
     splitList(brief.markets).find((market) => placeMatch(market, full)) ||
@@ -771,7 +793,9 @@ export function scoreLead(brief: Brief, lead: Lead): LeadScore {
       ? `Leave this account off the outreach list. ${disqualifyReason}`
       : lead.activity && !hasRecentActivity(lead)
         ? `Do not treat this as a confirmed best fit. No news, launch, new brand, or social activity was found in the last 18 months. Ask one question before a full offer.`
-        : nextAction(band, matched.slice(0, 3).join(", "), place, roleLabel),
+        : fit.level === "low"
+          ? `Do not treat this as a confirmed best fit. Last purchase, stock, and sales were not published. Companies without those facts almost never answer outreach.`
+          : nextAction(band, matched.slice(0, 3).join(", "), place, roleLabel),
     disqualified,
     disqualifyReason,
     dimensions,

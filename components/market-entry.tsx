@@ -10,7 +10,10 @@ export function MarketEntry({ run }: { run: Run }) {
     <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
       <div>
         <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-          Purchase probability · {fromParallel ? "Parallel" : "OpenAI"}
+          Probabilidade de compra do mercado · {fromParallel ? "Parallel" : "OpenAI"}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          High só com última compra, estoque, marcas, vendas ou ação de concorrente publicados, mais atividade recente.
         </p>
         <p className="mt-2 text-sm leading-relaxed">
           {probability ? <span className="font-medium uppercase">{probability}. </span> : null}

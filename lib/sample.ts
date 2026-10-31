@@ -1,7 +1,8 @@
 import { EXAMPLE_BRIEF } from "./example"
+import { computeFitProbability } from "./fit-probability"
 import { SAMPLE_RUN_ID } from "./ids"
 import { compareLeads, scoreLead } from "./score"
-import type { Lead, Run, StageState } from "./types"
+import type { Competitor, Lead, Run, StageState } from "./types"
 
 const WHEN = "2026-10-27T15:00:00.000Z"
 
@@ -53,6 +54,11 @@ function leads(): Lead[] {
         "We import green arabica, including Brazilian natural microlots.",
         "Container program or smaller microlot allocations from the same harvest.",
       ],
+      lastPurchase: "Received a Brazilian natural shipment in August 2026.",
+      stock: "Microlot inventory is in stock in Hamburg for the autumn book.",
+      brandPerformance: "Brazilian naturals are listed as a growing part of the specialty book.",
+      salesNote: "Container program sales grew in 2026 versus the previous harvest.",
+      competitorMoves: ["A rival Hamburg importer signed an exclusive Ethiopian line."],
       summary:
         "Hamburg importer of green arabica. Imports Brazilian natural microlots and organic lots for roasters in Germany and the Netherlands.",
       excerpt:
@@ -291,10 +297,40 @@ function stages(): StageState[] {
   ]
 }
 
+function sampleCompetitors(): Competitor[] {
+  return [
+    {
+      name: "Fazenda Norte Export",
+      country: "Brazil",
+      whyRelevant:
+        "Mantiqueira microlots already sitting on two Hamburg importer lists in this sample.",
+      url: "",
+    },
+    {
+      name: "Andean Verde",
+      country: "Colombia",
+      whyRelevant:
+        "Competes for the 84+ natural slot when a buyer wants a non-Brazilian alternative.",
+      url: "",
+    },
+    {
+      name: "Cup Line Cooperatives",
+      country: "Brazil",
+      whyRelevant:
+        "Larger container programs at a lower cup score. A price comparison on the container desk.",
+      url: "",
+    },
+  ]
+}
+
 export function sampleRun(): Run {
   const brief = EXAMPLE_BRIEF
+  const competitors = sampleCompetitors()
   const ranked = leads()
-    .map((lead) => ({ ...lead, score: scoreLead(brief, lead) }))
+    .map((lead) => {
+      const fit = computeFitProbability(brief, lead, competitors)
+      return { ...lead, fit, score: scoreLead(brief, lead, competitors) }
+    })
     .sort(compareLeads)
 
   return {
@@ -306,29 +342,7 @@ export function sampleRun(): Run {
     brief,
     stages: stages(),
     contextState: "done",
-    competitors: [
-      {
-        name: "Fazenda Norte Export",
-        country: "Brazil",
-        whyRelevant:
-          "Mantiqueira microlots already sitting on two Hamburg importer lists in this sample.",
-        url: "",
-      },
-      {
-        name: "Andean Verde",
-        country: "Colombia",
-        whyRelevant:
-          "Competes for the 84+ natural slot when a buyer wants a non-Brazilian alternative.",
-        url: "",
-      },
-      {
-        name: "Cup Line Cooperatives",
-        country: "Brazil",
-        whyRelevant:
-          "Larger container programs at a lower cup score. A price comparison on the container desk.",
-        url: "",
-      },
-    ],
+    competitors,
     market: {
       outlook:
         "Germany remains a core European consumption market for coffee, and specialty importers in Hamburg and the Dutch ports still buy Brazilian naturals as part of the main book. Japan’s specialty roasters pay for traceable microlots, usually through a trading house, with fewer direct-import relationships. Container programs and 84+ microlots are often bought by different desks inside the same importer.",

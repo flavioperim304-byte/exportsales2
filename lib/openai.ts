@@ -1,4 +1,5 @@
 import { activityLine } from "./activity"
+import { buyingEvidenceLine, computeFitProbability, fitProbabilityLine } from "./fit-probability"
 import type { Brief, FitJudgment, Lead } from "./types"
 import { ApiError, requestJson } from "./http"
 import { openaiInstructions } from "./prompts"
@@ -142,7 +143,7 @@ function schema(suppliers: string[]) {
   }
 }
 
-function cards(leads: Lead[]): string {
+function cards(brief: Brief, leads: Lead[]): string {
   return leads
     .map((lead, index) => {
       const extraction = lead.extraction
@@ -158,6 +159,8 @@ function cards(leads: Lead[]): string {
         extraction?.whatsapp ? `whatsapp ${extraction.whatsapp}` : "",
         extraction?.buys?.slice(0, 4).join("; "),
         activityLine(lead),
+        buyingEvidenceLine(lead),
+        fitProbabilityLine(lead.fit ?? computeFitProbability(brief, lead)),
         clip(extraction?.summary || lead.exa.summary || lead.exa.text, 320),
       ]
         .filter(Boolean)
@@ -178,7 +181,7 @@ export async function scoreLeads(
   const body = {
     messages: [
       { role: "system", content: openaiInstructions(brief, also) },
-      { role: "user", content: `Candidates:\n${cards(leads)}` },
+      { role: "user", content: `Candidates:\n${cards(brief, leads)}` },
     ],
     response_format: {
       type: "json_schema",

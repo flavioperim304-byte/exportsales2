@@ -373,7 +373,7 @@ export function QualifyForm({
             ? "Esta rodada chama a Decisions API em modo fast. As demais buscas continuam no Task."
             : brief.searchKind === "competitors" && brief.exaEffort !== "deep"
               ? "Exa Ultra pode levar cerca de 15 minutos. Depois o Parallel Task confere os distribuidores."
-              : "Depois das páginas, o Exa busca notícias, lançamentos e redes sociais. Sem atividade recente o best fit não fica confirmado."}
+              : "Depois das páginas, o Exa busca notícias, lançamentos e fatos de compra: última compra, estoque, desempenho das marcas, vendas e ação de concorrente. Sem esses dados a probabilidade de fit fica baixa — folheto sozinho quase não responde."}
         </p>
       </div>
     </form>
