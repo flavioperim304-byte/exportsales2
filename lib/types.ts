@@ -369,6 +369,8 @@ export type TradeSnapshot = {
   countries: CountryTrade[]
   error?: string
   fetchedAt: string
+  /** ISO time after which a failed Comex Stat call may be tried again. */
+  retryAfter?: string
 }
 
 export type StageState = {

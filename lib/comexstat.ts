@@ -7,7 +7,7 @@ import {
   tradePeriod,
   type HsFilter,
 } from "./comexstat-map"
-import { requestJson } from "./http"
+import { ApiError, requestJson } from "./http"
 import type { CountryTrade, TradeSnapshot, TradeYear } from "./types"
 
 export {
@@ -25,9 +25,73 @@ export {
 
 const COMEXSTAT_GENERAL = "https://api-comexstat.mdic.gov.br/general?language=en"
 const SOURCE = "Comex Stat"
+const MAX_429_RETRIES = 4
+const WAIT_BUFFER_MS = 2000
+const DEFAULT_WAIT_MS = 10000
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+const memory = new Map<string, TradeSnapshot>()
+let coolUntil = 0
+let queue: Promise<void> = Promise.resolve()
+let waitFn = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+export function isRateLimitError(error: unknown): boolean {
+  const status = error instanceof ApiError ? error.status : 0
+  const message = error instanceof Error ? error.message : String(error)
+  return status === 429 || /\b429\b/.test(message) || /excedeu o limite/i.test(message)
+}
+
+export function retryWaitMs(error: unknown, attempt = 0): number | null {
+  if (!isRateLimitError(error)) return null
+  const fromHeader = error instanceof ApiError ? error.retryAfterMs : undefined
+  const message = error instanceof Error ? error.message : String(error)
+  const fromText = message.match(/em\s+(\d+)\s+segundos?/i) || message.match(/in\s+(\d+)\s+seconds?/i)
+  const asked = fromHeader ?? (fromText ? Number(fromText[1]) * 1000 : DEFAULT_WAIT_MS)
+  const base = Math.max(asked, DEFAULT_WAIT_MS) + WAIT_BUFFER_MS
+  return base + attempt * 5000
+}
+
+export function publicTradeError(error: unknown): string {
+  if (!isRateLimitError(error)) {
+    return error instanceof Error ? error.message : String(error)
+  }
+  const wait = retryWaitMs(error) ?? DEFAULT_WAIT_MS + WAIT_BUFFER_MS
+  const seconds = Math.max(10, Math.ceil(wait / 1000))
+  return `Comex Stat pediu para esperar ${seconds}s. A busca continua; o volume entra sozinho na próxima tentativa.`
+}
+
+export function tradeCooldownActive(trade: TradeSnapshot | undefined, now = Date.now()): boolean {
+  if (!trade?.error) return false
+  if (trade.retryAfter && Date.parse(trade.retryAfter) > now) return true
+  if (isRateLimitError(trade.error) && Date.parse(trade.fetchedAt) + DEFAULT_WAIT_MS > now) return true
+  return false
+}
+
+export function resetComexstatForTests(wait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms))) {
+  memory.clear()
+  coolUntil = 0
+  queue = Promise.resolve()
+  waitFn = wait
+}
+
+function cacheKey(hs: string, countries: string[], period: { from: string; to: string }): string {
+  const names = countries.map((name) => canonicalCountry(name)).sort().join(",")
+  return `${hs}|${period.from}|${period.to}|${names}`
+}
+
+async function withQueue<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = queue
+  let release = () => {}
+  queue = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await previous
+  try {
+    const pause = coolUntil - Date.now()
+    if (pause > 0) await waitFn(pause)
+    return await fn()
+  } finally {
+    release()
+  }
 }
 
 async function postGeneral(body: unknown, attempt = 0): Promise<unknown> {
@@ -38,9 +102,10 @@ async function postGeneral(body: unknown, attempt = 0): Promise<unknown> {
       timeoutMs: 60000,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    if (attempt < 3 && /\b429\b/.test(message)) {
-      await sleep(11000)
+    const wait = retryWaitMs(error, attempt)
+    if (wait !== null && attempt < MAX_429_RETRIES) {
+      coolUntil = Math.max(coolUntil, Date.now() + wait)
+      await waitFn(wait)
       return postGeneral(body, attempt + 1)
     }
     throw error
@@ -96,6 +161,14 @@ export async function brazilExports(hsCode: string, countryNames: string[], now 
       fetchedAt,
     }
   }
+  const key = cacheKey(parsed.digits, resolved.map((item) => item.name), period)
+  const cached = memory.get(key)
+  if (cached && !cached.error) {
+    return {
+      ...cached,
+      countries: [...cached.countries.filter((item) => !missing.some((row) => row.country === item.country)), ...missing],
+    }
+  }
   const filter: HsFilter = parsed.filter
   const body = {
     flow: "export",
@@ -109,8 +182,22 @@ export async function brazilExports(hsCode: string, countryNames: string[], now 
     metrics: ["metricFOB", "metricKG"],
   }
   try {
-    const payload = (await postGeneral(body)) as {
+    const payload = (await withQueue(async () => {
+      const hit = memory.get(key)
+      if (hit && !hit.error) return { data: { list: [] }, cached: hit }
+      return postGeneral(body)
+    })) as {
       data?: { list?: Record<string, string>[] }
+      cached?: TradeSnapshot
+    }
+    if (payload.cached) {
+      return {
+        ...payload.cached,
+        countries: [
+          ...payload.cached.countries.filter((item) => !missing.some((row) => row.country === item.country)),
+          ...missing,
+        ],
+      }
     }
     const list = Array.isArray(payload?.data?.list) ? payload.data.list : []
     const label =
@@ -147,7 +234,7 @@ export async function brazilExports(hsCode: string, countryNames: string[], now 
       )
       return { country: item.asked, years: filled }
     })
-    return {
+    const snapshot: TradeSnapshot = {
       hsCode: parsed.digits,
       hsFilter: parsed.filter,
       hsLabel: String(label),
@@ -157,8 +244,11 @@ export async function brazilExports(hsCode: string, countryNames: string[], now 
       countries: [...countriesOut, ...missing],
       fetchedAt,
     }
+    memory.set(key, snapshot)
+    return snapshot
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = publicTradeError(error)
+    const wait = retryWaitMs(error) ?? (isRateLimitError(error) ? DEFAULT_WAIT_MS + WAIT_BUFFER_MS : 0)
     return {
       hsCode: parsed.digits,
       hsFilter: parsed.filter,
@@ -176,6 +266,7 @@ export async function brazilExports(hsCode: string, countryNames: string[], now 
       ],
       error: message,
       fetchedAt,
+      ...(wait ? { retryAfter: new Date(Date.now() + wait).toISOString() } : {}),
     }
   }
 }

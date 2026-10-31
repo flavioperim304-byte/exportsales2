@@ -10,7 +10,7 @@ import {
   probeFromSearch,
 } from "./diligence"
 import { computeFitProbability } from "./fit-probability"
-import { brazilExports, countriesForTrade } from "./comexstat"
+import { brazilExports, countriesForTrade, tradeCooldownActive } from "./comexstat"
 import { advanceExa, searchLeads } from "./exa"
 import { extractPage, failedExtraction, pollExtractJob, startExtractJob } from "./firecrawl"
 import { publicError } from "./http"
@@ -167,26 +167,39 @@ function tradeIsCurrent(trade: TradeSnapshot | undefined, countries: string[]): 
   )
 }
 
+function tradeRetryDue(run: Run): boolean {
+  const hs = run.brief.hsCode?.trim()
+  if (!hs) return false
+  const countries = tradeCountries(run)
+  if (countries.length === 0) return false
+  if (tradeIsCurrent(run.trade, countries)) return false
+  return !tradeCooldownActive(run.trade)
+}
+
+const tradeBusy = new Set<string>()
+
 async function attachTrade(id: string) {
+  if (tradeBusy.has(id)) return
   const run = await getRun(id)
   if (!run) return
-  const hs = run.brief.hsCode?.trim()
-  if (!hs) return
-  const countries = tradeCountries(run)
-  if (countries.length === 0) return
-  if (tradeIsCurrent(run.trade, countries)) return
-  const snapshot = await brazilExports(hs, countries)
-  await updateRun(id, (current) => {
-    current.trade = snapshot
-    const ok = snapshot.countries.filter((item) => !item.error).length
-    log(
-      current,
-      "system",
-      snapshot.error
-        ? `Comex Stat: ${snapshot.error}`
-        : `Comex Stat export volume attached for HS ${snapshot.hsCode} in ${ok} ${ok === 1 ? "country" : "countries"}.`
-    )
-  })
+  if (!tradeRetryDue(run)) return
+  tradeBusy.add(id)
+  try {
+    const snapshot = await brazilExports(run.brief.hsCode!.trim(), tradeCountries(run))
+    await updateRun(id, (current) => {
+      current.trade = snapshot
+      const ok = snapshot.countries.filter((item) => !item.error).length
+      log(
+        current,
+        "system",
+        snapshot.error
+          ? `Comex Stat: ${snapshot.error}`
+          : `Comex Stat export volume attached for HS ${snapshot.hsCode} in ${ok} ${ok === 1 ? "country" : "countries"}.`
+      )
+    })
+  } finally {
+    tradeBusy.delete(id)
+  }
 }
 
 function fitRank(lead: Lead): number {
@@ -308,7 +321,7 @@ async function doSearch(id: string): Promise<"busy" | "done"> {
       extract.startedAt = now()
       extract.detail = "Reading the first company page."
     })
-    await attachTrade(id)
+    void attachTrade(id)
   } catch (error) {
     const message = publicError(error, secrets())
     await updateRun(id, (run) => {
@@ -742,6 +755,7 @@ async function pump(id: string) {
       if (!run || run.mode === "sample") return
       if (run.status === "failed") return
       if (run.status === "complete") {
+        await attachTrade(id)
         await maybeAttachDeferred(id)
         return
       }
@@ -751,6 +765,7 @@ async function pump(id: string) {
         continue
       }
       if (run.status === "extracting") {
+        void attachTrade(id)
         await doExtract(id)
         continue
       }
@@ -866,7 +881,7 @@ async function doSearchTick(id: string) {
     extract.startedAt = now()
     extract.detail = "Reading the first company page."
   })
-  if (result.done && result.leads.length > 0 && !result.error) await attachTrade(id)
+  if (result.done && result.leads.length > 0 && !result.error) void attachTrade(id)
 }
 
 async function doExtractTick(id: string) {
@@ -940,6 +955,7 @@ async function stepOnce(id: string) {
   const run = await getRun(id)
   if (!run || run.mode === "sample" || run.status === "failed") return
   if (run.status === "complete") {
+    await attachTrade(id)
     await maybeAttachDeferred(id)
     return
   }
@@ -969,7 +985,8 @@ export async function ensurePump(id: string) {
   const active = run.status !== "complete" && run.status !== "failed"
   const deferred =
     run.status === "complete" && run.contextState === "deferred" && !run.market
-  if (!active && !deferred) return
+  const tradePending = tradeRetryDue(run)
+  if (!active && !deferred && !tradePending) return
   if (deferred) {
     const last = run.parallelCheckedAt ? Date.parse(run.parallelCheckedAt) : 0
     if (Date.now() - last < 20000) return

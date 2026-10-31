@@ -45,7 +45,7 @@ Live runs are stored in `data/runs.json`. Exa Agent and Parallel can each take s
 
 Each live run spends one Exa Agent search per country (a second search only if that country returned fewer than 10 companies), one Firecrawl Agent read per lead, one OpenAI score, and one Parallel task. Ten countries means about 100 company reads. The qualification form shows the prompts and the page count before you start.
 
-An HS code on the brief asks [Comex Stat](https://api-comexstat.mdic.gov.br/docs) for Brazil’s export value (US$ FOB) and net kg to each search country for the last three years. Hair-care briefs use 3305. The search still runs if Comex Stat is slow or empty.
+An HS code on the brief asks [Comex Stat](https://api-comexstat.mdic.gov.br/docs) for Brazil’s export value (US$ FOB) and net kg to each search country for the last three years. Hair-care briefs use 3305. The search still runs if Comex Stat is slow or empty. If the API returns 429, the desk waits the requested 10 seconds, retries, and fills the volume later without stopping the run.
 
 ## Deploy on Render
 

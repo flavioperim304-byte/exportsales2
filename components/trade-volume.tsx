@@ -1,3 +1,4 @@
+import { isRateLimitError } from "@/lib/comexstat"
 import { formatKg, formatUsd, tradeForCountry, yearLabel } from "@/lib/comexstat-map"
 import type { CountryTrade, TradeSnapshot } from "@/lib/types"
 
@@ -24,7 +25,11 @@ export function TradeVolume({
         Volume exportado nos últimos 3 anos
         {trade.hsLabel ? ` · ${trade.hsLabel}` : ""}.
       </p>
-      {trade.error ? <p className="mt-3 text-sm text-destructive">{trade.error}</p> : null}
+      {trade.error ? (
+        <p className={isRateLimitError(trade.error) ? "mt-3 text-sm text-muted-foreground" : "mt-3 text-sm text-destructive"}>
+          {trade.error}
+        </p>
+      ) : null}
       <ul className="mt-4 grid gap-3 sm:grid-cols-2">
         {rows.map((item) => (
           <CountryTradeCard key={item.country} item={item} periodTo={trade.periodTo} />

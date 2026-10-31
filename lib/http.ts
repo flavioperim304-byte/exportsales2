@@ -1,10 +1,12 @@
 export class ApiError extends Error {
   status: number
+  retryAfterMs?: number
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, retryAfterMs?: number) {
     super(message)
     this.name = "ApiError"
     this.status = status
+    this.retryAfterMs = retryAfterMs
   }
 }
 
@@ -60,7 +62,8 @@ export async function requestJson(
       })()
       throw new ApiError(
         `${host} returned ${response.status}: ${errorMessage(data, text.slice(0, 400) || response.statusText)}`,
-        response.status
+        response.status,
+        headerRetryAfterMs(response)
       )
     }
     return data
@@ -76,6 +79,16 @@ export async function requestJson(
   } finally {
     clearTimeout(timer)
   }
+}
+
+function headerRetryAfterMs(response: Response): number | undefined {
+  const raw = response.headers.get("retry-after")
+  if (!raw) return undefined
+  const seconds = Number(raw)
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000)
+  const when = Date.parse(raw)
+  if (!Number.isFinite(when)) return undefined
+  return Math.max(0, when - Date.now())
 }
 
 function safeHost(url: string): string {
