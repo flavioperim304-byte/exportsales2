@@ -76,12 +76,21 @@ export function Dashboard({
             {visible.length} empresas nas buscas de Kanechom e LQ Professional.
           </p>
         </div>
-        <Link
-          href="/qualify"
-          className="inline-flex h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm text-primary-foreground sm:h-10"
-        >
-          Nova busca
-        </Link>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <a
+            href="/api/codigo.zip"
+            download="export-desk.zip"
+            className="inline-flex h-11 items-center justify-center rounded-lg border border-border px-4 text-sm sm:h-10"
+          >
+            Baixar código (.zip)
+          </a>
+          <Link
+            href="/qualify"
+            className="inline-flex h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm text-primary-foreground sm:h-10"
+          >
+            Nova busca
+          </Link>
+        </div>
       </div>
 
       {sourcesReady < 4 ? (
