@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { companiesFromAgent } from "../lib/exa"
 import { profileFromAgent } from "../lib/firecrawl"
-import { entryFromOpenAI, judgmentsFromOpenAI } from "../lib/openai"
+import { draftFromOpenAI, entryFromOpenAI, judgmentsFromOpenAI } from "../lib/openai"
 
 test("Exa Agent search output becomes companies", () => {
   const companies = companiesFromAgent({
@@ -84,4 +84,37 @@ test("OpenAI score JSON becomes a preliminary best fit", () => {
   })
   assert.equal(entry.purchaseProbability, "medium")
   assert.match(entry.strategy, /one importer/)
+})
+
+test("OpenAI due diligence JSON keeps findings and never a score field we trust", () => {
+  const draft = draftFromOpenAI({
+    choices: [
+      {
+        message: {
+          content: JSON.stringify({
+            structure: "Importer in Bogotá.",
+            portfolio: "Skala on the grocery book.",
+            import_note: "Last shipment named on the site.",
+            recent_activity: "No fair listed.",
+            opportunity: "Open a mass SKU next to Skala.",
+            approach: "Write the grocery buyer. This is not a confirmed order.",
+            findings: [
+              {
+                kind: "fact",
+                polarity: "supports",
+                topic: "import",
+                text: "Imported a shipment in 2026.",
+                urls: ["https://impo.example"],
+                evidence_at: "2026-09-01T00:00:00.000Z",
+              },
+            ],
+            citations: [{ url: "https://impo.example", title: "About", published_at: "2026-09-01" }],
+          }),
+        },
+      },
+    ],
+  })
+  assert.equal(draft.findings[0].polarity, "supports")
+  assert.equal(draft.narratives.opportunity, "Open a mass SKU next to Skala.")
+  assert.equal("opportunityScore" in draft, false)
 })

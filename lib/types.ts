@@ -1,4 +1,4 @@
-export type StageId = "search" | "extract" | "context" | "classify"
+export type StageId = "search" | "extract" | "context" | "classify" | "diligence"
 
 export type RunStatus =
   | "queued"
@@ -171,6 +171,132 @@ export type LeadContext = {
   qualificationNeeded?: string
 }
 
+export type DiligenceBrandKind = "kanechom" | "lq" | "generic"
+
+export type DiligenceBlock =
+  | "channel"
+  | "portfolio"
+  | "import"
+  | "geography"
+  | "activity"
+  | "opening"
+
+export type DiligenceEvidenceState =
+  | "strong"
+  | "partial"
+  | "stale"
+  | "absent"
+  | "inadequate"
+  | "contradictory"
+  | "negative"
+
+export type DiligenceFindingKind = "fact" | "indication" | "interpretation" | "needs_confirmation"
+
+export type DiligencePolarity = "supports" | "against" | "absent" | "neutral"
+
+export type DiligenceConfidence = "high" | "medium" | "low"
+
+/** Commercial approach priority. pursue is not a confirmed purchase. */
+export type DiligencePriority = "pursue" | "investigate" | "watch" | "skip"
+
+export type DiligenceImportCapacity =
+  | "confirmed"
+  | "indicated"
+  | "not_found"
+  | "negative"
+  | "unknown"
+
+export type DiligenceGapKind = "missing" | "stale" | "inadequate"
+
+export type DiligenceQuestionId =
+  | "import_path"
+  | "exclusivity"
+  | "portfolio"
+  | "launch_capacity"
+  | "channel_fit"
+
+export type DiligenceFinding = {
+  kind: DiligenceFindingKind
+  polarity: DiligencePolarity
+  topic: DiligenceBlock | DiligenceQuestionId | string
+  text: string
+  urls: string[]
+  evidenceAt?: string
+}
+
+export type DiligenceProbe = {
+  questionId: DiligenceQuestionId
+  question: string
+  gap: DiligenceGapKind
+  query: string
+  ranAt: string
+  result: "found" | "not_found" | "failed"
+  evidenceAt?: string
+  urls: string[]
+  note: string
+}
+
+export type DiligenceBlockScore = {
+  key: DiligenceBlock
+  label: string
+  state: DiligenceEvidenceState
+  points: number
+  max: number
+  rationale: string
+}
+
+export type DiligenceSection = {
+  title: string
+  text: string
+  stale: boolean
+  evidenceAt?: string
+}
+
+export type DiligenceDiffChange = {
+  field: string
+  before: string
+  after: string
+}
+
+export type DiligenceDiff = {
+  previousInvestigatedAt: string
+  opportunity: { before: number; after: number }
+  confidence: { before: DiligenceConfidence; after: DiligenceConfidence }
+  importCapacity: { before: DiligenceImportCapacity; after: DiligenceImportCapacity }
+  changes: DiligenceDiffChange[]
+}
+
+export type DiligenceReport = {
+  brand: string
+  brandKind: DiligenceBrandKind
+  status: "running" | "done" | "failed"
+  investigatedAt: string
+  evidenceFrom?: string
+  evidenceTo?: string
+  staleSections: DiligenceBlock[]
+  opportunityScore: number
+  confidence: DiligenceConfidence
+  confidenceNote: string
+  /** Approach priority for a salesperson. Not purchase intent. */
+  priority: DiligencePriority
+  priorityNote: string
+  importCapacity: DiligenceImportCapacity
+  importNote: string
+  blocks: DiligenceBlockScore[]
+  structure: DiligenceSection
+  portfolio: DiligenceSection
+  import: DiligenceSection
+  recentActivity: DiligenceSection
+  opportunity: DiligenceSection
+  approach: DiligenceSection
+  findings: DiligenceFinding[]
+  probes: DiligenceProbe[]
+  citations: { url: string; title: string; publishedAt?: string }[]
+  complementary: { ran: boolean; reason: string }
+  diff?: DiligenceDiff
+  error?: string
+}
+
 export type Lead = {
   id: string
   name: string
@@ -193,6 +319,8 @@ export type Lead = {
   activity?: ActivitySnapshot
   /** Desk-calculated fit probability from published buying facts. */
   fit?: FitProbability
+  /** Commercial due diligence reports, newest last. One brand per report. */
+  diligence?: DiligenceReport[]
 }
 
 export type MarketContext = {

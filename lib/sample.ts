@@ -1,4 +1,5 @@
 import { EXAMPLE_BRIEF } from "./example"
+import { buildReport } from "./diligence"
 import { computeFitProbability } from "./fit-probability"
 import { SAMPLE_RUN_ID } from "./ids"
 import { compareLeads, scoreLead } from "./score"
@@ -294,6 +295,11 @@ function stages(): StageState[] {
       startedAt: "2026-10-27T15:04:00.000Z",
       finishedAt: "2026-10-27T15:06:00.000Z",
     },
+    {
+      id: "diligence",
+      status: "pending",
+      detail: "Commercial due diligence waits until you select companies and a brand.",
+    },
   ]
 }
 
@@ -329,7 +335,20 @@ export function sampleRun(): Run {
   const ranked = leads()
     .map((lead) => {
       const fit = computeFitProbability(brief, lead, competitors)
-      return { ...lead, fit, score: scoreLead(brief, lead, competitors) }
+      const scored = { ...lead, fit, score: scoreLead(brief, lead, competitors) }
+      if (scored.id !== "lead-nordlicht") return scored
+      return {
+        ...scored,
+        diligence: [
+          buildReport({
+            brand: brief.supplierName,
+            lead: scored,
+            brief,
+            now: new Date("2026-10-27T15:06:00.000Z"),
+            complementary: { ran: false, reason: "Sample dossier already answers the due-diligence questions." },
+          }),
+        ],
+      }
     })
     .sort(compareLeads)
 

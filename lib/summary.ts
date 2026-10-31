@@ -54,7 +54,22 @@ function boardLead(lead: Lead): Lead {
       summary: lead.exa?.summary || "",
     },
     extraction: lead.extraction ? boardExtraction(lead.extraction) : undefined,
+    diligence: latestDiligence(lead),
   }
+}
+
+function latestDiligence(lead: Lead): Lead["diligence"] {
+  const reports = lead.diligence ?? []
+  if (reports.length === 0) return undefined
+  const seen = new Set<string>()
+  const latest: typeof reports = []
+  for (const report of [...reports].reverse()) {
+    const key = report.brand.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    latest.push(report)
+  }
+  return latest.reverse()
 }
 
 function boardExtraction(extraction: Extraction): Extraction {

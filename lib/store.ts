@@ -151,3 +151,24 @@ export async function updateRun<T>(
   if (failed) throw failed
   return result
 }
+
+export async function deleteRun(id: string): Promise<void> {
+  const job = queue.then(async () => {
+    if (durable()) {
+      try {
+        await blobs().delete(`run:${id}`)
+      } catch {
+        // Older blob stores ignore a missing key.
+      }
+      return
+    }
+    const db = loadDatabase()
+    db.runs = db.runs.filter((item) => item.id !== id)
+    write(db)
+  })
+  queue = job.then(
+    () => undefined,
+    () => undefined
+  )
+  await job
+}

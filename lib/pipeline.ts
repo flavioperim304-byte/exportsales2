@@ -1,11 +1,21 @@
 import { emptyActivity, searchActivity } from "./activity"
+import {
+  brandKindOf,
+  buildReport,
+  classifyBlocks,
+  coverageGaps,
+  failedProbe,
+  hitsFromSearch,
+  latestReport,
+  probeFromSearch,
+} from "./diligence"
 import { computeFitProbability } from "./fit-probability"
 import { brazilExports, countriesForTrade } from "./comexstat"
 import { advanceExa, searchLeads } from "./exa"
 import { extractPage, failedExtraction, pollExtractJob, startExtractJob } from "./firecrawl"
 import { publicError } from "./http"
 import { getKeys } from "./keys"
-import { scoreLeads } from "./openai"
+import { draftDiligence, scoreLeads } from "./openai"
 import {
   createResearch,
   decideResearch,
@@ -15,8 +25,9 @@ import {
 } from "./parallel"
 import { localizeCompetitors } from "./competitors"
 import { compareLeads, scoreLead } from "./score"
+import { requestJson } from "./http"
 import { getRun, insertRun, updateRun } from "./store"
-import type { Brief, Lead, LogLine, Run, StageId, StageState, TradeSnapshot } from "./types"
+import type { Brief, DiligenceProbe, Lead, LogLine, Run, StageId, StageState, TradeSnapshot } from "./types"
 import { SAMPLE_RUN_ID } from "./ids"
 
 const running = new Set<string>()
@@ -66,6 +77,11 @@ export function blankStages(): StageState[] {
       id: "context",
       status: "pending",
       detail: "Waiting for Parallel to refine that score and research the market.",
+    },
+    {
+      id: "diligence",
+      status: "pending",
+      detail: "Commercial due diligence waits until you select companies and a brand.",
     },
   ]
 }
@@ -971,4 +987,189 @@ export async function startRun(brief: Brief, also?: Brief): Promise<Run> {
 
 export function leadById(run: Run, leadId: string): Lead | undefined {
   return run.leads.find((lead) => lead.id === leadId)
+}
+
+const diligenceBusy = new Set<string>()
+
+function ensureDiligenceStage(run: Run) {
+  if (run.stages.some((item) => item.id === "diligence")) return
+  run.stages.push({
+    id: "diligence",
+    status: "pending",
+    detail: "Commercial due diligence waits until you select companies and a brand.",
+  })
+}
+
+function markDiligenceStage(run: Run, detail: string, status: StageState["status"] = "running") {
+  ensureDiligenceStage(run)
+  const item = stage(run, "diligence")
+  item.status = status
+  item.detail = detail
+  item.startedAt = item.startedAt ?? now()
+  if (status === "done" || status === "failed") item.finishedAt = now()
+}
+
+async function searchProbeHits(query: string, key: string) {
+  const data = await requestJson("https://api.exa.ai/search", {
+    method: "POST",
+    timeoutMs: 25000,
+    headers: { Authorization: `Bearer ${key}`, "x-api-key": key },
+    body: JSON.stringify({
+      query,
+      type: "auto",
+      numResults: 5,
+      contents: {
+        text: { maxCharacters: 280 },
+        highlights: { maxHighlights: 1, maxCharacters: 160 },
+      },
+    }),
+  })
+  const results = (data as { results?: unknown } | null)?.results
+  return hitsFromSearch(Array.isArray(results) ? results : [])
+}
+
+async function collectProbes(
+  lead: Lead,
+  brief: Brief,
+  brand: string,
+  key: string | undefined
+): Promise<{ probes: DiligenceProbe[]; reason: string; ran: boolean }> {
+  const kind = brandKindOf(brand)
+  const states = classifyBlocks(kind, lead)
+  const gaps = coverageGaps(kind, lead, brief, states)
+  if (gaps.length === 0) {
+    return { probes: [], ran: false, reason: "O dossiê já responde às perguntas da due diligence." }
+  }
+  if (!key) {
+    return {
+      probes: gaps.map((gap) => failedProbe(gap, "Exa key missing. Complementary search was skipped.")),
+      ran: false,
+      reason: "Há lacunas, mas a busca complementar ficou sem chave Exa.",
+    }
+  }
+  const probes: DiligenceProbe[] = []
+  for (const gap of gaps) {
+    try {
+      const hits = await searchProbeHits(gap.query, key)
+      probes.push(probeFromSearch(gap, hits))
+    } catch (error) {
+      probes.push(failedProbe(gap, error instanceof Error ? error.message : "Complementary search failed."))
+    }
+  }
+  return {
+    probes,
+    ran: true,
+    reason: `Busca complementar em ${gaps.length} ${gaps.length === 1 ? "lacuna" : "lacunas"}.`,
+  }
+}
+
+async function fileDiligence(runId: string, leadId: string, brand: string) {
+  const job = `${runId}:${leadId}:${brand.toLowerCase()}`
+  if (diligenceBusy.has(job)) return
+  diligenceBusy.add(job)
+  try {
+    const snapshot = await getRun(runId)
+    if (!snapshot) return
+    const lead = snapshot.leads.find((item) => item.id === leadId)
+    if (!lead) return
+    const keys = getKeys()
+    const collected = await collectProbes(lead, snapshot.brief, brand, keys.exa)
+    let draft = {
+      findings: [] as Awaited<ReturnType<typeof draftDiligence>>["findings"],
+      narratives: {} as Awaited<ReturnType<typeof draftDiligence>>["narratives"],
+      citations: [] as Awaited<ReturnType<typeof draftDiligence>>["citations"],
+    }
+    if (keys.openai) {
+      try {
+        draft = await draftDiligence(snapshot.brief, brand, lead, collected.probes, keys.openai)
+      } catch {
+        draft = { findings: [], narratives: {}, citations: [] }
+      }
+    }
+    await updateRun(runId, (run) => {
+      const current = run.leads.find((item) => item.id === leadId)
+      if (!current) return
+      const previous = latestReport(current.diligence, brand)
+      const report = buildReport({
+        brand,
+        lead: current,
+        brief: run.brief,
+        findings: draft.findings,
+        probes: collected.probes,
+        narratives: draft.narratives,
+        citations: draft.citations,
+        complementary: { ran: collected.ran, reason: collected.reason },
+        previous,
+      })
+      current.diligence = [...(current.diligence ?? []).filter((item) => item.status !== "running" || item.brand !== brand), report]
+      const done = run.leads.flatMap((item) => item.diligence ?? []).filter((item) => item.status === "done").length
+      markDiligenceStage(run, `Due diligence gravada para ${current.name} · ${brand}. ${done} relatórios no total.`, "done")
+      log(run, "diligence", `Due diligence ${brand} · ${current.name} · opportunity ${report.opportunityScore} · confidence ${report.confidence}.`)
+    })
+  } catch (error) {
+    const message = publicError(error, secrets())
+    await updateRun(runId, (run) => {
+      const current = run.leads.find((item) => item.id === leadId)
+      if (current) {
+        current.diligence = (current.diligence ?? []).map((item) =>
+          item.status === "running" && item.brand === brand ? { ...item, status: "failed", error: message } : item
+        )
+      }
+      markDiligenceStage(run, message, "failed")
+      log(run, "diligence", message)
+    })
+  } finally {
+    diligenceBusy.delete(job)
+  }
+}
+
+export async function startDiligence(
+  runId: string,
+  leadIds: string[],
+  brands: string[],
+  _options: { deepen?: boolean } = {}
+): Promise<{ queued: number; error?: string }> {
+  const run = await getRun(runId)
+  if (!run || run.mode === "sample") {
+    return { queued: 0, error: "This qualification is not available for due diligence." }
+  }
+  const wanted = brands.map((item) => item.trim()).filter(Boolean)
+  if (wanted.length === 0) return { queued: 0, error: "Choose Kanechom, LQ Professional, or both." }
+  const targets = run.leads.filter((lead) => leadIds.includes(lead.id))
+  if (targets.length === 0) return { queued: 0, error: "Select at least one company." }
+  let queued = 0
+  await updateRun(runId, (current) => {
+    ensureDiligenceStage(current)
+    for (const lead of current.leads) {
+      if (!leadIds.includes(lead.id)) continue
+      for (const brand of wanted) {
+        const running = (lead.diligence ?? []).some(
+          (item) => item.brand === brand && item.status === "running"
+        )
+        if (running) continue
+        lead.diligence = [
+          ...(lead.diligence ?? []),
+          buildReport({
+            brand,
+            lead,
+            brief: current.brief,
+            status: "running",
+            complementary: { ran: false, reason: "Investigation started." },
+          }),
+        ]
+        queued += 1
+      }
+    }
+    markDiligenceStage(
+      current,
+      queued ? `Due diligence running for ${queued} ${queued === 1 ? "report" : "reports"}.` : "Nothing new to queue."
+    )
+    if (queued) log(current, "diligence", `Queued ${queued} commercial due diligence ${queued === 1 ? "report" : "reports"}.`)
+  })
+  for (const lead of targets) {
+    for (const brand of wanted) {
+      void fileDiligence(runId, lead.id, brand)
+    }
+  }
+  return { queued }
 }

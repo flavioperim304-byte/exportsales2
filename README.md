@@ -6,6 +6,7 @@ Export sales intelligence for a supplier you already represent. The desk qualifi
 2. **ICP and contacts — Firecrawl Agent.** Each company is read by `POST /v2/agent` for role, products, markets, and published email, website, phone, and WhatsApp. A blank field means it was not published.
 3. **Activity and best fit — Exa search + OpenAI.** Exa looks for news, product launches, new brands, and social posts from the last 18 months. The desk then calculates fit probability from published last purchase, stock, brand performance, sales, and competitor moves. Missing those facts keeps probability medium or low. OpenAI must follow the same rule. A brochure-only company is not a confirmed best fit.
 4. **Refine and context — Parallel.** The default is one Task API call (`pro-fast`, falling back to `pro`, about $0.14 a call). It checks the OpenAI score, writes the market and competitor note with citations, and sets the final best fit. Choosing Decisions on that run calls `POST /v1/decisions` in `fast` mode instead, and only for that run.
+5. **Commercial due diligence — on demand.** After the four stages finish, you pick companies and a brand (Kanechom and/or LQ). The desk scores six blocks with a fixed table, runs complementary Exa searches only for checklist gaps, and stores a dated report per brand. Pursue is approach priority, not a confirmed purchase.
 
 A local checklist still files page evidence beside those scores. It is shown only when neither OpenAI nor Parallel has scored the list. The worked example is in that state.
 

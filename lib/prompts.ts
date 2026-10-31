@@ -369,3 +369,20 @@ export function researchPrompt(brief: Brief, leads: Lead[], also?: Brief): strin
   const room = Math.max(0, 20000 - header.length)
   return `${header}${cards.slice(0, room)}`
 }
+
+export function diligenceInstructions(brief: Brief, brand: string): string {
+  const kind = brand.toLowerCase().includes("kanechom")
+    ? "Kanechom is mass-market retail hair care. Grocery, drugstore, and low-end wholesale are the channel. Skala or a similar mass brand is a positive portfolio signal. A salon-only account is a conflict."
+    : brand.toLowerCase().includes("lq")
+      ? "LQ Professional is salon hair care, including straightening. The buyer must reach salons and be able to train hairdressers. A grocery-only Skala book is a conflict."
+      : `${brand} is the supplier being placed. Judge channel and portfolio only against this brief: ${brief.products}.`
+  return [
+    "You write a commercial due diligence note for one company and one brand. Use only the dossier and complementary-search notes. Do not invent contacts, imports, volumes, exclusivities, or intent to buy.",
+    kind,
+    "Do not return an opportunity score or a confidence level. The desk calculates those from the facts.",
+    "Separate facts, indications, interpretations, and items that still need a human. If a search found nothing, that is absence, not proof of the opposite.",
+    "Not finding an import record does not mean the company does not import.",
+    "priority of pursue, if you mention it, would only mean a salesperson should approach — never a confirmed purchase.",
+    "Quote URLs already in the dossier. Leave a field empty when unpublished.",
+  ].join(" ")
+}

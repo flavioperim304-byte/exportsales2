@@ -13,7 +13,8 @@ import { qualificationRows } from "@/lib/qualify"
 import { BAND_LABEL, STATUS_LABEL, formatWhen, isHttpUrl, leadPlace, mailtoHref, telHref } from "@/lib/format"
 import { activityKindLabel, hasRecentActivity } from "@/lib/activity"
 import { buyingKindLabel } from "@/lib/fit-probability"
-import type { Band, Evidence, Lead, Run, StageState } from "@/lib/types"
+import { diligenceBrands, latestReport } from "@/lib/diligence"
+import type { Band, DiligenceReport, Evidence, Lead, Run, StageState } from "@/lib/types"
 import type { IcpLevel } from "@/lib/qualify"
 
 const STAGE_META = {
@@ -21,14 +22,20 @@ const STAGE_META = {
   extract: { n: "02", source: "Firecrawl Agent", title: "ICP and contacts" },
   classify: { n: "03", source: "Exa + OpenAI", title: "Activity and best fit" },
   context: { n: "04", source: "Parallel", title: "Refine and context" },
+  diligence: { n: "05", source: "Desk + OpenAI", title: "Commercial due diligence" },
 } as const
 
 export function RunDesk({ initial }: { initial: Run }) {
   const router = useRouter()
   const [run, setRun] = useState(initial)
   const [selectedId, setSelectedId] = useState(initial.leads[0]?.id ?? "")
+  const [picked, setPicked] = useState<string[]>([])
+  const [ddBrands, setDdBrands] = useState<string[]>(() =>
+    initial.also ? [initial.brief.supplierName, initial.also.supplierName] : [initial.brief.supplierName]
+  )
   const [refreshError, setRefreshError] = useState("")
   const [restarting, setRestarting] = useState(false)
+  const [diligenceBusy, setDiligenceBusy] = useState(false)
 
   useEffect(() => {
     if (initial.mode !== "live") return
@@ -191,8 +198,8 @@ export function RunDesk({ initial }: { initial: Run }) {
 
       {run.leads.some((lead) => lead.score) ? <QualificationTable run={run} /> : null}
 
-      <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {run.stages.map((item) => (
+      <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {visibleStages(run).map((item) => (
           <StageCard key={item.id} stage={item} />
         ))}
       </ol>
@@ -224,12 +231,57 @@ export function RunDesk({ initial }: { initial: Run }) {
           <h2 className="font-serif text-2xl">Leads</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {run.leads.length
-              ? "Ranked for this supplier. Disqualified accounts stay on the list so the reason is visible."
+              ? "Ranked for this supplier. Disqualified accounts stay on the list so the reason is visible. Mark companies for commercial due diligence."
               : "Companies appear here as soon as Exa returns them."}
           </p>
+          {run.leads.length > 0 ? (
+            <DiligenceBar
+              run={run}
+              picked={picked}
+              brands={ddBrands}
+              busy={diligenceBusy}
+              onBrands={setDdBrands}
+              onToggleAll={() =>
+                setPicked((current) =>
+                  current.length === run.leads.length ? [] : run.leads.map((item) => item.id)
+                )
+              }
+              onRun={async () => {
+                setDiligenceBusy(true)
+                try {
+                  const response = await fetch(`/api/runs/${run.id}/diligence`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ leadIds: picked, brands: ddBrands }),
+                  })
+                  const data = (await response.json()) as { run?: Run; error?: string }
+                  if (!response.ok) {
+                    setRefreshError(data.error || "Due diligence could not start.")
+                    return
+                  }
+                  if (data.run) setRun(data.run)
+                } catch {
+                  setRefreshError("Due diligence could not start.")
+                } finally {
+                  setDiligenceBusy(false)
+                }
+              }}
+            />
+          ) : null}
           <ul className="mt-3 flex flex-col gap-2">
             {run.leads.map((item, index) => (
-              <li key={item.id}>
+              <li key={item.id} className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  className="mt-4 h-4 w-4 shrink-0"
+                  checked={picked.includes(item.id)}
+                  onChange={() =>
+                    setPicked((current) =>
+                      current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id]
+                    )
+                  }
+                  aria-label={`Selecionar ${item.name} para due diligence`}
+                />
                 <button
                   type="button"
                   onClick={() => {
@@ -299,6 +351,188 @@ export function RunDesk({ initial }: { initial: Run }) {
         </Link>
       </p>
     </main>
+  )
+}
+
+function visibleStages(run: Run): StageState[] {
+  if (run.stages.some((item) => item.id === "diligence")) return run.stages
+  return [
+    ...run.stages,
+    {
+      id: "diligence",
+      status: "pending",
+      detail: "Commercial due diligence waits until you select companies and a brand.",
+    },
+  ]
+}
+
+function DiligenceBar({
+  run,
+  picked,
+  brands,
+  busy,
+  onBrands,
+  onToggleAll,
+  onRun,
+}: {
+  run: Run
+  picked: string[]
+  brands: string[]
+  busy: boolean
+  onBrands: (next: string[]) => void
+  onToggleAll: () => void
+  onRun: () => void
+}) {
+  const options = diligenceBrands(run.brief, run.also)
+  return (
+    <div className="mt-3 rounded-lg border border-border px-3 py-3">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Due diligence comercial</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Só as empresas marcadas. Cada marca gera um relatório próprio. Pursue é prioridade de abordagem, não intenção de compra.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-3 text-sm">
+        {options.map((name) => (
+          <label key={name} className="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={brands.includes(name)}
+              onChange={() =>
+                onBrands(
+                  brands.includes(name) ? brands.filter((item) => item !== name) : [...brands, name]
+                )
+              }
+            />
+            {name}
+          </label>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button type="button" variant="outline" className="h-9" onClick={onToggleAll}>
+          {picked.length === run.leads.length ? "Limpar seleção" : "Marcar todas"}
+        </Button>
+        <Button type="button" className="h-9" onClick={onRun} disabled={busy || picked.length === 0 || brands.length === 0}>
+          {busy ? "Na fila…" : `Rodar due diligence (${picked.length})`}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function DiligencePanel({ lead }: { lead: Lead }) {
+  const reports = lead.diligence ?? []
+  const brands = [...new Set(reports.map((item) => item.brand))]
+  const [brand, setBrand] = useState(brands[0] ?? "")
+  const current = brand ? latestReport(reports, brand) : reports.at(-1)
+  const history = reports.filter((item) => item.brand === (current?.brand ?? brand) && item.status === "done")
+  if (reports.length === 0) {
+    return (
+      <div className="mt-4 rounded-lg border border-dashed border-border px-3 py-3">
+        <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Due diligence comercial</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Ainda não há relatório. Marque esta empresa e uma marca acima.
+        </p>
+      </div>
+    )
+  }
+  return (
+    <div className="mt-4 rounded-lg border border-border px-3 py-3">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Due diligence comercial</p>
+      {brands.length > 1 ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {brands.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => setBrand(name)}
+              className={`rounded-full border px-3 py-1 text-sm ${
+                name === (current?.brand ?? brand) ? "border-primary" : "border-border"
+              }`}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {current ? <DiligenceReportView report={current} history={history.length} /> : null}
+    </div>
+  )
+}
+
+function DiligenceReportView({ report, history }: { report: DiligenceReport; history: number }) {
+  return (
+    <div className="mt-3">
+      <p className="text-sm font-medium">
+        Opportunity {report.opportunityScore}/100 · confiança {report.confidence} · {report.priority}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{report.priorityNote}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Investigado em {report.investigatedAt.slice(0, 10)}
+        {report.evidenceTo ? ` · evidências até ${report.evidenceTo.slice(0, 10)}` : ""}
+        {report.staleSections.length ? ` · seções velhas: ${report.staleSections.join(", ")}` : ""}
+      </p>
+      <p className="mt-2 text-sm">{report.importNote}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{report.confidenceNote}</p>
+      <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+        {report.blocks.map((block) => (
+          <li key={block.key}>
+            <span className="font-medium">{block.label}</span>
+            <span className="text-muted-foreground">
+              {" "}
+              · {block.state} · {block.points}/{block.max}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {[report.structure, report.portfolio, report.import, report.recentActivity, report.opportunity, report.approach].map(
+        (section) => (
+          <div key={section.title} className="mt-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              {section.title}
+              {section.stale ? " · desatualizado" : ""}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed">{section.text}</p>
+          </div>
+        )
+      )}
+      {report.probes.length ? (
+        <div className="mt-3">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Buscas complementares</p>
+          <ul className="mt-1 space-y-1 text-sm">
+            {report.probes.map((probe) => (
+              <li key={`${probe.questionId}:${probe.ranAt}`}>
+                {probe.questionId} · {probe.result} · {probe.question}
+                <span className="text-muted-foreground"> — {probe.note}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-muted-foreground">{report.complementary.reason}</p>
+      )}
+      {report.diff ? (
+        <div className="mt-3">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            O que mudou desde {report.diff.previousInvestigatedAt.slice(0, 10)}
+          </p>
+          <p className="mt-1 text-sm">
+            Opportunity {report.diff.opportunity.before} → {report.diff.opportunity.after}. Confiança{" "}
+            {report.diff.confidence.before} → {report.diff.confidence.after}. Importação{" "}
+            {report.diff.importCapacity.before} → {report.diff.importCapacity.after}.
+          </p>
+          {report.diff.changes.length ? (
+            <ul className="mt-1 list-disc pl-5 text-sm text-muted-foreground">
+              {report.diff.changes.map((change) => (
+                <li key={change.field}>
+                  {change.field}: {change.before} → {change.after}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : history <= 1 ? (
+        <p className="mt-3 text-sm text-muted-foreground">Sem relatório anterior desta marca.</p>
+      ) : null}
+    </div>
   )
 }
 
@@ -383,6 +617,7 @@ function Dossier({ lead }: { lead: Lead }) {
 
       <FitPanel lead={lead} />
       <ActivityPanel lead={lead} />
+      <DiligencePanel lead={lead} />
 
       {score?.disqualified ? (
         <p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">

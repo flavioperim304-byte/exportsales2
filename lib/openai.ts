@@ -1,8 +1,8 @@
 import { activityLine } from "./activity"
 import { buyingEvidenceLine, computeFitProbability, fitProbabilityLine } from "./fit-probability"
-import type { Brief, FitJudgment, Lead } from "./types"
+import type { Brief, DiligenceFinding, DiligenceProbe, FitJudgment, Lead } from "./types"
 import { ApiError, requestJson } from "./http"
-import { openaiInstructions } from "./prompts"
+import { diligenceInstructions, openaiInstructions } from "./prompts"
 import { asString, clip } from "./text"
 
 export type OpenAIJudgment = FitJudgment & { company: string }
@@ -206,4 +206,186 @@ export async function scoreLeads(
     }
   }
   throw lastError instanceof Error ? lastError : new Error("OpenAI rejected the score.")
+}
+
+export type DiligenceDraft = {
+  findings: DiligenceFinding[]
+  narratives: Partial<
+    Record<"structure" | "portfolio" | "import" | "recentActivity" | "opportunity" | "approach", string>
+  >
+  citations: { url: string; title: string; publishedAt?: string }[]
+}
+
+function findingOf(row: Record<string, unknown>): DiligenceFinding | null {
+  const kind = asString(row.kind)
+  const polarity = asString(row.polarity)
+  const text = asString(row.text)
+  if (!text) return null
+  if (!["fact", "indication", "interpretation", "needs_confirmation"].includes(kind)) return null
+  if (!["supports", "against", "absent", "neutral"].includes(polarity)) return null
+  const urls = Array.isArray(row.urls) ? row.urls.map((item) => asString(item)).filter(Boolean) : []
+  return {
+    kind: kind as DiligenceFinding["kind"],
+    polarity: polarity as DiligenceFinding["polarity"],
+    topic: asString(row.topic) || "channel",
+    text: clip(text, 400),
+    urls,
+    evidenceAt: asString(row.evidence_at) || undefined,
+  }
+}
+
+export function draftFromOpenAI(data: unknown): DiligenceDraft {
+  const empty: DiligenceDraft = { findings: [], narratives: {}, citations: [] }
+  const content = (() => {
+    if (!data || typeof data !== "object") return ""
+    const choice = (data as { choices?: { message?: { content?: unknown } }[] }).choices?.[0]
+    const raw = choice?.message?.content
+    return typeof raw === "string" ? raw : ""
+  })()
+  if (!content.trim()) return empty
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>
+    const findings = Array.isArray(parsed.findings)
+      ? parsed.findings
+          .map((item) => findingOf((item ?? {}) as Record<string, unknown>))
+          .filter((item): item is DiligenceFinding => Boolean(item))
+      : []
+    const citations: DiligenceDraft["citations"] = []
+    if (Array.isArray(parsed.citations)) {
+      for (const item of parsed.citations) {
+        const row = (item ?? {}) as Record<string, unknown>
+        const url = asString(row.url)
+        if (!url) continue
+        const publishedAt = asString(row.published_at)
+        citations.push({
+          url,
+          title: asString(row.title) || url,
+          ...(publishedAt ? { publishedAt } : {}),
+        })
+      }
+    }
+    return {
+      findings,
+      narratives: {
+        structure: asString(parsed.structure) || undefined,
+        portfolio: asString(parsed.portfolio) || undefined,
+        import: asString(parsed.import_note) || undefined,
+        recentActivity: asString(parsed.recent_activity) || undefined,
+        opportunity: asString(parsed.opportunity) || undefined,
+        approach: asString(parsed.approach) || undefined,
+      },
+      citations,
+    }
+  } catch {
+    return empty
+  }
+}
+
+const DILIGENCE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    structure: { type: "string" },
+    portfolio: { type: "string" },
+    import_note: { type: "string" },
+    recent_activity: { type: "string" },
+    opportunity: { type: "string" },
+    approach: { type: "string" },
+    findings: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          kind: { type: "string", enum: ["fact", "indication", "interpretation", "needs_confirmation"] },
+          polarity: { type: "string", enum: ["supports", "against", "absent", "neutral"] },
+          topic: { type: "string" },
+          text: { type: "string" },
+          urls: { type: "array", items: { type: "string" } },
+          evidence_at: { type: "string" },
+        },
+        required: ["kind", "polarity", "topic", "text", "urls", "evidence_at"],
+      },
+    },
+    citations: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          url: { type: "string" },
+          title: { type: "string" },
+          published_at: { type: "string" },
+        },
+        required: ["url", "title", "published_at"],
+      },
+    },
+  },
+  required: [
+    "structure",
+    "portfolio",
+    "import_note",
+    "recent_activity",
+    "opportunity",
+    "approach",
+    "findings",
+    "citations",
+  ],
+}
+
+export async function draftDiligence(
+  brief: Brief,
+  brand: string,
+  lead: Lead,
+  probes: DiligenceProbe[],
+  key: string
+): Promise<DiligenceDraft> {
+  const extraction = lead.extraction
+  const dossier = [
+    `Company: ${lead.name}`,
+    `Brand under review: ${brand}`,
+    lead.market ? `Search market: ${lead.market}` : "",
+    lead.url,
+    extraction?.role,
+    extraction?.summary,
+    extraction?.buys?.slice(0, 6).join("; "),
+    activityLine(lead),
+    buyingEvidenceLine(lead),
+    fitProbabilityLine(lead.fit ?? computeFitProbability(brief, lead)),
+    probes.length
+      ? `Complementary probes:\n${probes
+          .map((probe) => `${probe.questionId} · ${probe.result} · ${probe.question} · ${probe.note}`)
+          .join("\n")}`
+      : "No complementary search ran.",
+  ]
+    .filter(Boolean)
+    .join("\n")
+  const body = {
+    messages: [
+      { role: "system", content: diligenceInstructions(brief, brand) },
+      { role: "user", content: dossier },
+    ],
+    response_format: {
+      type: "json_schema",
+      json_schema: { name: "diligence_draft", strict: true, schema: DILIGENCE_SCHEMA },
+    },
+  }
+  let lastError: unknown
+  for (const model of MODELS) {
+    try {
+      const data = await requestJson("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        timeoutMs: 90000,
+        headers: { Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ ...body, model }),
+      })
+      return draftFromOpenAI(data)
+    } catch (error) {
+      lastError = error
+      if (!(error instanceof ApiError) || (error.status !== 400 && error.status !== 404)) {
+        throw error
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("OpenAI rejected the due diligence draft.")
 }

@@ -1,4 +1,5 @@
 import { formatKg, formatUsd, tradeForCountry, yearLabel } from "./comexstat-map"
+import { latestReport } from "./diligence"
 import type { Brief, Run } from "./types"
 import { qualificationRows } from "./qualify"
 
@@ -16,6 +17,12 @@ export function csvFilename(brief: Brief): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
   return `${slug || "results"}.csv`
+}
+
+function diligenceCells(lead: { diligence?: import("./types").DiligenceReport[] } | undefined, brand: string): string[] {
+  const report = latestReport(lead?.diligence, brand)
+  if (!report) return ["", "", "", ""]
+  return [String(report.opportunityScore), report.confidence, report.priority, report.investigatedAt]
 }
 
 function tradeCell(run: Pick<Run, "trade">, country: string): string {
@@ -45,6 +52,14 @@ export function resultsCsv(run: Pick<Run, "leads" | "brief" | "also" | "trade">)
     "Website",
     "Still to confirm",
     "Brazil exports",
+    "DD Kanechom opportunity",
+    "DD Kanechom confidence",
+    "DD Kanechom priority",
+    "DD Kanechom investigated",
+    "DD LQ opportunity",
+    "DD LQ confidence",
+    "DD LQ priority",
+    "DD LQ investigated",
   ]
   const lines = rows.map((row) => {
     const lead = leads.get(row.company)
@@ -63,6 +78,8 @@ export function resultsCsv(run: Pick<Run, "leads" | "brief" | "also" | "trade">)
       lead?.extraction?.website || lead?.url || "",
       row.qualificationNeeded,
       tradeCell(run, row.country),
+      ...diligenceCells(lead, "Kanechom"),
+      ...diligenceCells(lead, "LQ Professional"),
     ]
       .map(cell)
       .join(",")
