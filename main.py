@@ -56,6 +56,27 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/enviar", response_class=HTMLResponse)
+def upload_page() -> str:
+    return """<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Enviar CSV</title>
+  </head>
+  <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
+    <h1>Enviar CSV do dashboard</h1>
+    <p>Use o arquivo baixado em <strong>Download CSV</strong> na busca pronta.</p>
+    <form action="/api/v1/ingest-csv" method="post" enctype="multipart/form-data">
+      <p><input type="file" name="file" accept=".csv,text/csv" required /></p>
+      <p><button type="submit" style="padding:0.7rem 1.1rem;background:#111;color:#fff;border:0;border-radius:8px;">Enviar CSV</button></p>
+    </form>
+  </body>
+</html>
+"""
+
+
 @app.get("/baixar", response_class=HTMLResponse)
 def download_page() -> str:
     return """<!doctype html>
