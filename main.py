@@ -51,14 +51,45 @@ def prepare_for_index(documents: list[Document]) -> list[Document]:
     return documents
 
 
-@app.get("/")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def looks_like_csv(name: str, raw: bytes) -> bool:
+    lowered = name.lower()
+    if lowered.endswith(".csv") or lowered.endswith(".csv.txt"):
+        return True
+    head = raw.lstrip(b"\xef\xbb\xbf")[:200].decode("utf-8", errors="ignore")
+    return "company" in head.lower() and "," in head
 
 
-@app.get("/enviar", response_class=HTMLResponse)
-def upload_page() -> str:
-    return """<!doctype html>
+def read_dashboard_csv(raw: bytes) -> pd.DataFrame:
+    return pd.read_csv(BytesIO(raw), encoding="utf-8-sig")
+
+
+def ingest_bytes(name: str, raw: bytes) -> dict:
+    if not raw.strip():
+        raise ValueError("O arquivo está em branco. Baixe de novo em Download CSV no dashboard.")
+    if name and not looks_like_csv(name, raw):
+        raise ValueError("Esse não parece o CSV do dashboard. Use o botão Download CSV da busca pronta.")
+    try:
+        frame = read_dashboard_csv(raw)
+    except Exception as exc:
+        raise ValueError(f"Não foi possível ler o arquivo: {exc}") from exc
+    if frame.empty:
+        raise ValueError("O CSV não tem empresas. Abra uma busca que já terminou e clique em Download CSV.")
+    documents = prepare_for_index(rows_to_documents(frame))
+    return {
+        "ingested": len(documents),
+        "columns": [str(column) for column in frame.columns],
+        "ready_for_index": True,
+        "queued": len(pending_documents),
+        "preview": documents[0].text if documents else "",
+    }
+
+
+def upload_html(message: str = "", ok: bool = False) -> str:
+    note = ""
+    if message:
+        color = "#0a7" if ok else "#b00"
+        note = f'<p style="color:{color};white-space:pre-wrap;">{message}</p>'
+    return f"""<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
@@ -67,14 +98,41 @@ def upload_page() -> str:
   </head>
   <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
     <h1>Enviar CSV do dashboard</h1>
-    <p>Use o arquivo baixado em <strong>Download CSV</strong> na busca pronta.</p>
-    <form action="/api/v1/ingest-csv" method="post" enctype="multipart/form-data">
-      <p><input type="file" name="file" accept=".csv,text/csv" required /></p>
+    <p>1. No dashboard (URL antiga), abra a busca pronta e clique em <strong>Download CSV</strong>.</p>
+    <p>2. Aqui, escolha esse arquivo e envie. Não envie o zip.</p>
+    {note}
+    <form action="/enviar" method="post" enctype="multipart/form-data">
+      <p><input type="file" name="file" accept=".csv,text/csv,.txt" required /></p>
       <p><button type="submit" style="padding:0.7rem 1.1rem;background:#111;color:#fff;border:0;border-radius:8px;">Enviar CSV</button></p>
     </form>
   </body>
 </html>
 """
+
+
+@app.get("/")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/enviar", response_class=HTMLResponse)
+def upload_page() -> str:
+    return upload_html()
+
+
+@app.post("/enviar", response_class=HTMLResponse)
+async def upload_form(file: UploadFile = File(...)) -> str:
+    raw = await file.read()
+    try:
+        result = ingest_bytes(file.filename or "", raw)
+    except ValueError as exc:
+        return upload_html(str(exc), ok=False)
+    except Exception as exc:
+        return upload_html(f"Falha ao processar o arquivo: {exc}", ok=False)
+    return upload_html(
+        f"Certo. {result['ingested']} empresas lidas e prontas para indexar.",
+        ok=True,
+    )
 
 
 @app.get("/baixar", response_class=HTMLResponse)
@@ -107,28 +165,8 @@ def download_zip() -> FileResponse:
 
 @app.post("/api/v1/ingest-csv")
 async def ingest_csv(file: UploadFile = File(...)) -> dict:
-    name = (file.filename or "").lower()
-    if name and not name.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Envie um arquivo .csv gerado pelo dashboard.")
-
     raw = await file.read()
-    if not raw.strip():
-        raise HTTPException(status_code=400, detail="O CSV está vazio.")
-
     try:
-        frame = pd.read_csv(BytesIO(raw), encoding="utf-8-sig")
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Não foi possível ler o CSV: {exc}") from exc
-
-    if frame.empty:
-        raise HTTPException(status_code=400, detail="O CSV não tem linhas de dados.")
-
-    documents = prepare_for_index(rows_to_documents(frame))
-    preview = documents[0].text if documents else ""
-    return {
-        "ingested": len(documents),
-        "columns": [str(column) for column in frame.columns],
-        "ready_for_index": True,
-        "queued": len(pending_documents),
-        "preview": preview,
-    }
+        return ingest_bytes(file.filename or "", raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
