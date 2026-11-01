@@ -1,7 +1,9 @@
 from io import BytesIO
+from pathlib import Path
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse
 from llama_index.core import Document
 
 app = FastAPI()
@@ -52,6 +54,34 @@ def prepare_for_index(documents: list[Document]) -> list[Document]:
 @app.get("/")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/baixar", response_class=HTMLResponse)
+def download_page() -> str:
+    return """<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Baixar FastAPI RAG</title>
+  </head>
+  <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
+    <h1>Baixar o código</h1>
+    <p>Clique no botão. No Windows: botão direito no arquivo → Extrair tudo.</p>
+    <p><a href="/fastapi-rag.zip" download="fastapi-rag.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar fastapi-rag.zip</a></p>
+  </body>
+</html>
+"""
+
+
+@app.get("/fastapi-rag.zip")
+def download_zip() -> FileResponse:
+    path = Path(__file__).with_name("fastapi-rag.zip")
+    if not path.is_file():
+        path = Path("public/fastapi-rag.zip")
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="O zip ainda não está neste servidor.")
+    return FileResponse(path, media_type="application/zip", filename="fastapi-rag.zip")
 
 
 @app.post("/api/v1/ingest-csv")
