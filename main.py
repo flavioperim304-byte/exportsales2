@@ -149,28 +149,35 @@ def lead_blob(company: str, country: str, role: str, summary: str) -> str:
     return "\n".join(line for line in lines if line and not line.endswith(":"))
 
 
-MATCH_DISTANCE = 1.15
+def indexed_company(company: str) -> str:
+    """Return the stored company name when the folded name is already in Chroma."""
+    wanted = fold_name(company)
+    if not wanted:
+        return ""
+    raw = chroma_collection().get(include=["metadatas"])
+    for meta in raw.get("metadatas") or []:
+        name = str((meta or {}).get("company") or "")
+        if fold_name(name) == wanted:
+            return name
+    return ""
 
 
 def match_against_index(company: str, country: str, role: str = "", summary: str = "") -> dict:
     text = lead_blob(company, country, role, summary) or company
     hits = query_neighbors(text, n=5)
-    wanted = fold_name(company)
-    exact = bool(wanted) and any(
-        fold_name(str((hit.get("metadata") or {}).get("company") or "")) == wanted for hit in hits
-    )
+    exact_name = indexed_company(company)
+    exact = bool(exact_name)
     best = hits[0]["distance"] if hits else None
-    close = best is not None and float(best) <= MATCH_DISTANCE
-    neighbor = str((hits[0].get("metadata") or {}).get("company") or "") if hits else ""
+    neighbor = exact_name or (str((hits[0].get("metadata") or {}).get("company") or "") if hits else "")
     return {
-        "match": bool(exact or close),
+        "match": exact,
         "exact": exact,
         "distance": best,
         "neighbor": neighbor,
         "neighbors": hits[:3],
         "note": (
-            f"Combina com {neighbor} no índice."
-            if exact or close
+            f"Combina com {exact_name} no índice."
+            if exact
             else "Não parece uma empresa já confirmada no índice."
         ),
     }
@@ -304,9 +311,9 @@ def download_page() -> str:
   <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
     <h1>Baixar o código</h1>
     <p>Clique no botão. No Windows: botão direito no arquivo → Extrair tudo. Não abra com o Bloco de notas.</p>
-    <p><a href="/desk-rag.zip" download="desk-rag.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar desk-rag.zip</a></p>
-    <p>Esse zip é o dashboard (Node). Não é o main.py do FastAPI.</p>
-    <p><a href="/fastapi-rag.zip" download="fastapi-rag.zip">fastapi-rag.zip</a> (só se precisar do FastAPI de novo)</p>
+    <p><a href="/fastapi-rag.zip" download="fastapi-rag.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar fastapi-rag.zip</a></p>
+    <p>Esse zip é o FastAPI. No GitHub <strong>exportsales2</strong>, substitua só o <strong>main.py</strong> na raiz (ao lado de requirements.txt). Não coloque dentro de lib.</p>
+    <p><a href="/desk-rag.zip" download="desk-rag.zip">desk-rag.zip</a> (dashboard Node — não precisa agora)</p>
   </body>
 </html>
 """
