@@ -771,7 +771,10 @@ async function attachMissingActivity(id: string): Promise<"wait" | "ready"> {
   return "wait"
 }
 
-async function attachRag(id: string) {
+const ragRefreshAt = new Map<string, number>()
+const RAG_REFRESH_MS = 15000
+
+async function attachRag(id: string, refreshAll = false) {
   const snapshot = await getRun(id)
   if (!snapshot) return
   if (!ragConfigured()) {
@@ -782,7 +785,9 @@ async function attachRag(id: string) {
     }
     return
   }
-  const pending = snapshot.leads.filter((lead) => ragNeedsRetry(lead))
+  const pending = refreshAll
+    ? snapshot.leads
+    : snapshot.leads.filter((lead) => ragNeedsRetry(lead))
   if (pending.length === 0) return
   const classifyDone = stage(snapshot, "classify").status === "done"
   if (!classifyDone) {
@@ -1078,14 +1083,20 @@ export async function ensurePump(id: string) {
   const deferred =
     run.status === "complete" && run.contextState === "deferred" && !run.market
   const tradePending = tradeRetryDue(run)
+  const ragStale =
+    run.status === "complete" && Date.now() - (ragRefreshAt.get(id) ?? 0) > RAG_REFRESH_MS
   const ragPending =
     ragConfigured() &&
     run.leads.length > 0 &&
-    run.leads.some((lead) => ragNeedsRetry(lead))
+    (run.leads.some((lead) => ragNeedsRetry(lead)) || ragStale)
   if (!active && !deferred && !tradePending && !ragPending) return
   if (!active && ragPending && !deferred && !tradePending) {
     running.add(id)
-    void attachRag(id).finally(() => running.delete(id))
+    void attachRag(id, ragStale)
+      .finally(() => {
+        ragRefreshAt.set(id, Date.now())
+        running.delete(id)
+      })
     return
   }
   if (deferred) {

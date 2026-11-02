@@ -619,8 +619,9 @@ function Dossier({ lead }: { lead: Lead }) {
       <ActivityPanel lead={lead} />
       {lead.rag?.checked ? (
         <p className="mt-3 text-sm text-muted-foreground">
-          RAG · {lead.rag.match ? "combina com o índice" : "não combina com o índice"}
-          {lead.rag.neighbor ? ` · ${lead.rag.neighbor}` : ""}. {lead.rag.note}
+          {lead.rag.match
+            ? `RAG · combina com o índice${lead.rag.neighbor ? ` · ${lead.rag.neighbor}` : ""}. ${lead.rag.note}`
+            : `RAG · não combina com o índice. ${lead.rag.note}`}
         </p>
       ) : null}
       <DiligencePanel lead={lead} />
