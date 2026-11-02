@@ -55,7 +55,7 @@ This is a second Render Web Service (Python), not the Node dashboard. Do not del
 
 Keep the 1 GB disk at `/var/data` and `CHROMA_PATH=/var/data/chroma`. `/enviar` still takes the dashboard CSV. After this deploy, open `/perguntar` to query the index. You do not need to re-send the CSV if the 10 companies are already green.
 
-On the **Node** dashboard service, add `RAG_API_URL=https://exportsales2.onrender.com` and redeploy that service too.
+On the **Node** dashboard service, add `RAG_API_URL=https://exportsales2.onrender.com` and deploy the desk files that call `/api/v1/match` (`lib/rag.ts`, `lib/pipeline.ts`, `lib/fit-probability.ts`, `lib/types.ts`, `lib/csv.ts`, `components/run-desk.tsx`). The env var alone does not show RAG. After that deploy, opening a finished run fills RAG on companies that still lack it.
 
 ## Deploy on Render
 

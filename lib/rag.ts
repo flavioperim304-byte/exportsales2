@@ -67,8 +67,7 @@ export async function matchLead(lead: Lead): Promise<RagMatch> {
 export async function matchLeads(leads: Lead[]): Promise<Map<string, RagMatch>> {
   const out = new Map<string, RagMatch>()
   if (!ragConfigured()) return out
-  for (const lead of leads) {
-    out.set(lead.id, await matchLead(lead))
-  }
+  const rows = await Promise.all(leads.map(async (lead) => [lead.id, await matchLead(lead)] as const))
+  for (const [id, rag] of rows) out.set(id, rag)
   return out
 }

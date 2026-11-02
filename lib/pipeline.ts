@@ -772,17 +772,27 @@ async function attachMissingActivity(id: string): Promise<"wait" | "ready"> {
 }
 
 async function attachRag(id: string) {
-  if (!ragConfigured()) return
   const snapshot = await getRun(id)
   if (!snapshot) return
+  if (!ragConfigured()) {
+    if (snapshot.leads.some((lead) => !lead.rag?.checked)) {
+      await updateRun(id, (run) => {
+        log(run, "classify", "RAG skipped: RAG_API_URL is not set.")
+      })
+    }
+    return
+  }
   const pending = snapshot.leads.filter((lead) => !lead.rag?.checked)
   if (pending.length === 0) return
-  await updateRun(id, (run) => {
-    const classify = stage(run, "classify")
-    classify.status = "running"
-    classify.startedAt = classify.startedAt ?? now()
-    classify.detail = "RAG is comparing companies to the Chroma index."
-  })
+  const classifyDone = stage(snapshot, "classify").status === "done"
+  if (!classifyDone) {
+    await updateRun(id, (run) => {
+      const classify = stage(run, "classify")
+      classify.status = "running"
+      classify.startedAt = classify.startedAt ?? now()
+      classify.detail = "RAG is comparing companies to the Chroma index."
+    })
+  }
   const matches = await matchLeads(pending)
   await updateRun(id, (run) => {
     let hits = 0
@@ -1068,7 +1078,16 @@ export async function ensurePump(id: string) {
   const deferred =
     run.status === "complete" && run.contextState === "deferred" && !run.market
   const tradePending = tradeRetryDue(run)
-  if (!active && !deferred && !tradePending) return
+  const ragPending =
+    ragConfigured() &&
+    run.leads.length > 0 &&
+    run.leads.some((lead) => !lead.rag?.checked)
+  if (!active && !deferred && !tradePending && !ragPending) return
+  if (!active && ragPending && !deferred && !tradePending) {
+    running.add(id)
+    void attachRag(id).finally(() => running.delete(id))
+    return
+  }
   if (deferred) {
     const last = run.parallelCheckedAt ? Date.parse(run.parallelCheckedAt) : 0
     if (Date.now() - last < 20000) return
