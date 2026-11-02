@@ -11,7 +11,7 @@ import {
 } from "./diligence"
 import { computeFitProbability } from "./fit-probability"
 import { brazilExports, countriesForTrade, tradeCooldownActive } from "./comexstat"
-import { matchLeads, ragConfigured } from "./rag"
+import { matchLeads, ragConfigured, ragNeedsRetry } from "./rag"
 import { advanceExa, searchLeads } from "./exa"
 import {
   EXTRACT_POLL_MS,
@@ -775,14 +775,14 @@ async function attachRag(id: string) {
   const snapshot = await getRun(id)
   if (!snapshot) return
   if (!ragConfigured()) {
-    if (snapshot.leads.some((lead) => !lead.rag?.checked)) {
+    if (snapshot.leads.some((lead) => ragNeedsRetry(lead))) {
       await updateRun(id, (run) => {
         log(run, "classify", "RAG skipped: RAG_API_URL is not set.")
       })
     }
     return
   }
-  const pending = snapshot.leads.filter((lead) => !lead.rag?.checked)
+  const pending = snapshot.leads.filter((lead) => ragNeedsRetry(lead))
   if (pending.length === 0) return
   const classifyDone = stage(snapshot, "classify").status === "done"
   if (!classifyDone) {
@@ -1081,7 +1081,7 @@ export async function ensurePump(id: string) {
   const ragPending =
     ragConfigured() &&
     run.leads.length > 0 &&
-    run.leads.some((lead) => !lead.rag?.checked)
+    run.leads.some((lead) => ragNeedsRetry(lead))
   if (!active && !deferred && !tradePending && !ragPending) return
   if (!active && ragPending && !deferred && !tradePending) {
     running.add(id)

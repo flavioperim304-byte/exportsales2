@@ -1,6 +1,14 @@
 import type { Lead, RagMatch } from "./types"
 
-const timeoutMs = 12000
+const timeoutMs = 25000
+
+const RETRY_NOTE = /abort|fail|502|503|504|timeout|network|not configured|returned [45]/i
+
+export function ragNeedsRetry(lead: Lead): boolean {
+  const rag = lead.rag
+  if (!rag || !rag.checked) return true
+  return RETRY_NOTE.test(rag.note || "")
+}
 
 function ragUrl(): string {
   return (process.env.RAG_API_URL || "").trim().replace(/\/$/, "")
@@ -43,7 +51,7 @@ export async function matchLead(lead: Lead): Promise<RagMatch> {
     } | null
     if (!response.ok || !data) {
       return {
-        checked: true,
+        checked: false,
         match: false,
         note: data?.detail || data?.note || `RAG returned ${response.status}.`,
       }
@@ -58,7 +66,7 @@ export async function matchLead(lead: Lead): Promise<RagMatch> {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "RAG request failed."
-    return { checked: true, match: false, note: message }
+    return { checked: false, match: false, note: message }
   } finally {
     clearTimeout(timer)
   }
@@ -67,7 +75,8 @@ export async function matchLead(lead: Lead): Promise<RagMatch> {
 export async function matchLeads(leads: Lead[]): Promise<Map<string, RagMatch>> {
   const out = new Map<string, RagMatch>()
   if (!ragConfigured()) return out
-  const rows = await Promise.all(leads.map(async (lead) => [lead.id, await matchLead(lead)] as const))
-  for (const [id, rag] of rows) out.set(id, rag)
+  for (const lead of leads) {
+    out.set(lead.id, await matchLead(lead))
+  }
   return out
 }
