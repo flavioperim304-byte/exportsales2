@@ -145,3 +145,11 @@ test("last purchase and stock outweigh a brand mention without sales", () => {
   assert.ok(buyingFit.index > brandFit.index)
   assert.ok(buyingFit.level === "high" || buyingFit.level === "medium")
 })
+
+test("RAG mismatch caps a brochure-only fit", () => {
+  const lead = quietLead()
+  lead.rag = { checked: true, match: false, note: "No neighbor." }
+  const fit = computeFitProbability(KANECHOM_BRIEF, lead)
+  assert.ok(fit.index <= 48)
+  assert.match(fit.note, /RAG/)
+})

@@ -11,6 +11,7 @@ import {
 } from "./diligence"
 import { computeFitProbability } from "./fit-probability"
 import { brazilExports, countriesForTrade, tradeCooldownActive } from "./comexstat"
+import { matchLeads, ragConfigured } from "./rag"
 import { advanceExa, searchLeads } from "./exa"
 import {
   EXTRACT_POLL_MS,
@@ -770,12 +771,43 @@ async function attachMissingActivity(id: string): Promise<"wait" | "ready"> {
   return "wait"
 }
 
+async function attachRag(id: string) {
+  if (!ragConfigured()) return
+  const snapshot = await getRun(id)
+  if (!snapshot) return
+  const pending = snapshot.leads.filter((lead) => !lead.rag?.checked)
+  if (pending.length === 0) return
+  await updateRun(id, (run) => {
+    const classify = stage(run, "classify")
+    classify.status = "running"
+    classify.startedAt = classify.startedAt ?? now()
+    classify.detail = "RAG is comparing companies to the Chroma index."
+  })
+  const matches = await matchLeads(pending)
+  await updateRun(id, (run) => {
+    let hits = 0
+    for (const lead of run.leads) {
+      const rag = matches.get(lead.id)
+      if (!rag) continue
+      lead.rag = rag
+      lead.fit = computeFitProbability(run.brief, lead, run.competitors)
+      if (rag.match) hits += 1
+    }
+    log(
+      run,
+      "classify",
+      `RAG matched ${hits} of ${matches.size} companies against Chroma.`
+    )
+  })
+}
+
 async function doScore(id: string) {
   const keys = getKeys()
   const snapshot = await getRun(id)
   if (!snapshot) return
   const activity = await attachMissingActivity(id)
   if (activity === "wait") return
+  await attachRag(id)
   const current = (await getRun(id)) ?? snapshot
   if (!keys.openai) {
     await updateRun(id, (run) => {

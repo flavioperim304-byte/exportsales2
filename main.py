@@ -7,8 +7,9 @@ import re
 
 import chromadb
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
+from pydantic import BaseModel, Field
 from llama_index.core import Document, StorageContext
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
@@ -107,6 +108,86 @@ def prepare_for_index(documents: list[Document]) -> list[Document]:
     return documents
 
 
+def fold_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+
+def query_neighbors(text: str, n: int = 5) -> list[dict]:
+    collection = chroma_collection()
+    total = collection.count()
+    if total == 0:
+        raise ValueError("O índice está vazio. Envie um CSV em /enviar.")
+    take = max(1, min(n, total))
+    raw = collection.query(
+        query_texts=[text],
+        n_results=take,
+        include=["documents", "metadatas", "distances"],
+    )
+    documents = (raw.get("documents") or [[]])[0]
+    metadatas = (raw.get("metadatas") or [[]])[0]
+    distances = (raw.get("distances") or [[]])[0]
+    ids = (raw.get("ids") or [[]])[0]
+    hits: list[dict] = []
+    for index, document in enumerate(documents):
+        hits.append(
+            {
+                "id": ids[index] if index < len(ids) else "",
+                "text": document,
+                "metadata": metadatas[index] if index < len(metadatas) else {},
+                "distance": distances[index] if index < len(distances) else None,
+            }
+        )
+    return hits
+
+
+def lead_blob(company: str, country: str, role: str, summary: str) -> str:
+    lines = [f"Company: {company}".strip(), f"Country: {country}".strip()]
+    if role.strip():
+        lines.append(f"Role: {role.strip()}")
+    if summary.strip():
+        lines.append(summary.strip())
+    return "\n".join(line for line in lines if line and not line.endswith(":"))
+
+
+MATCH_DISTANCE = 1.15
+
+
+def match_against_index(company: str, country: str, role: str = "", summary: str = "") -> dict:
+    text = lead_blob(company, country, role, summary) or company
+    hits = query_neighbors(text, n=5)
+    wanted = fold_name(company)
+    exact = bool(wanted) and any(
+        fold_name(str((hit.get("metadata") or {}).get("company") or "")) == wanted for hit in hits
+    )
+    best = hits[0]["distance"] if hits else None
+    close = best is not None and float(best) <= MATCH_DISTANCE
+    neighbor = str((hits[0].get("metadata") or {}).get("company") or "") if hits else ""
+    return {
+        "match": bool(exact or close),
+        "exact": exact,
+        "distance": best,
+        "neighbor": neighbor,
+        "neighbors": hits[:3],
+        "note": (
+            f"Combina com {neighbor} no índice."
+            if exact or close
+            else "Não parece uma empresa já confirmada no índice."
+        ),
+    }
+
+
+class QueryBody(BaseModel):
+    q: str = Field(min_length=2)
+    n: int = 5
+
+
+class MatchBody(BaseModel):
+    company: str = ""
+    country: str = ""
+    role: str = ""
+    summary: str = ""
+
+
 def looks_like_csv(name: str, raw: bytes) -> bool:
     lowered = name.lower()
     if lowered.endswith(".csv") or lowered.endswith(".csv.txt"):
@@ -164,6 +245,7 @@ def upload_html(message: str = "", ok: bool = False) -> str:
       <p><input type="file" name="file" accept=".csv,text/csv,.txt" required /></p>
       <p><button type="submit" style="padding:0.7rem 1.1rem;background:#111;color:#fff;border:0;border-radius:8px;">Enviar CSV</button></p>
     </form>
+    <p><a href="/perguntar">Perguntar ao índice</a></p>
   </body>
 </html>
 """
@@ -235,3 +317,73 @@ async def ingest_csv(file: UploadFile = File(...)) -> dict:
         return ingest_bytes(file.filename or "", raw)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/query")
+def query_index(body: QueryBody) -> dict:
+    try:
+        hits = query_neighbors(body.q.strip(), n=body.n)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"q": body.q, "hits": hits, "chroma_count": chroma_collection().count()}
+
+
+@app.post("/api/v1/match")
+def match_lead(body: MatchBody) -> dict:
+    if not body.company.strip() and not body.summary.strip():
+        raise HTTPException(status_code=400, detail="Informe a empresa ou um resumo.")
+    try:
+        return match_against_index(body.company, body.country, body.role, body.summary)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def ask_html(message: str = "", ok: bool = False) -> str:
+    note = ""
+    if message:
+        color = "#0a7" if ok else "#b00"
+        note = f'<p style="color:{color};white-space:pre-wrap;">{message}</p>'
+    return f"""<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Perguntar ao índice</title>
+  </head>
+  <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
+    <h1>Perguntar ao RAG</h1>
+    <p>O índice compara com as empresas já enviadas no CSV. Exemplo: distribuidor de hair care na Colômbia.</p>
+    {note}
+    <form action="/perguntar" method="post">
+      <p><textarea name="q" rows="4" style="width:100%;" required placeholder="Quem é distribuidor de hair care na Colômbia?"></textarea></p>
+      <p><button type="submit" style="padding:0.7rem 1.1rem;background:#111;color:#fff;border:0;border-radius:8px;">Buscar</button></p>
+    </form>
+    <p><a href="/enviar">Enviar CSV</a> · <a href="/perguntar">Perguntar</a></p>
+  </body>
+</html>
+"""
+
+
+@app.get("/perguntar", response_class=HTMLResponse)
+def ask_page() -> str:
+    return ask_html()
+
+
+@app.post("/perguntar", response_class=HTMLResponse)
+async def ask_form(q: str = Form(...)) -> str:
+    try:
+        hits = query_neighbors(q.strip(), n=5)
+    except ValueError as exc:
+        return ask_html(str(exc), ok=False)
+    except Exception as exc:
+        return ask_html(f"Falha na busca: {exc}", ok=False)
+    if not hits:
+        return ask_html("Nenhuma empresa próxima no índice.", ok=False)
+    lines = []
+    for hit in hits:
+        company = (hit.get("metadata") or {}).get("company") or "empresa"
+        country = (hit.get("metadata") or {}).get("country") or ""
+        dist = hit.get("distance")
+        dist_txt = f" · distância {float(dist):.2f}" if dist is not None else ""
+        lines.append(f"{company} ({country}){dist_txt}")
+    return ask_html("Mais próximas:\n" + "\n".join(lines), ok=True)

@@ -160,9 +160,11 @@ export function computeFitProbability(
   ) {
     index = Math.min(index, 55)
   }
+  if (lead.rag?.checked && lead.rag.match) index += 8
+  if (lead.rag?.checked && !lead.rag.match) index = Math.min(index, 48)
   index = Math.max(0, Math.min(100, index))
   const level: FitProbability["level"] = index >= 70 ? "high" : index >= 45 ? "medium" : "low"
-  const note =
+  let note =
     found.length === 0
       ? "Não há última compra, estoque, desempenho de marca, vendas ou ação de concorrente publicados. A probabilidade de fit fica baixa até aparecer um desses fatos — empresas só com folheto quase não respondem."
       : level === "high"
@@ -170,6 +172,11 @@ export function computeFitProbability(
         : level === "medium"
           ? `Alguns fatos de compra foram publicados, mas última compra, estoque ou vendas ainda estão fracos. Índice de evidência ${index}/100.`
           : `Poucos fatos de compra publicados para um fit alto. Falta ${missing.map(buyingKindLabel).join(", ")}. Índice de evidência ${index}/100.`
+  if (lead.rag?.checked) {
+    note += lead.rag.match
+      ? ` RAG confirma um perfil parecido no índice${lead.rag.neighbor ? ` (${lead.rag.neighbor})` : ""}.`
+      : " RAG não encontrou um perfil parecido no índice; o fit fica limitado até haver evidência melhor."
+  }
   return { level, index, note, missing, facts }
 }
 

@@ -319,8 +319,19 @@ export type Lead = {
   activity?: ActivitySnapshot
   /** Desk-calculated fit probability from published buying facts. */
   fit?: FitProbability
+  /** Chroma RAG check against previously ingested dashboard CSVs. */
+  rag?: RagMatch
   /** Commercial due diligence reports, newest last. One brand per report. */
   diligence?: DiligenceReport[]
+}
+
+export type RagMatch = {
+  checked: boolean
+  match: boolean
+  exact?: boolean
+  distance?: number
+  neighbor?: string
+  note: string
 }
 
 export type MarketContext = {

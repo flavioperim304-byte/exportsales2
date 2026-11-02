@@ -47,6 +47,8 @@ Each live run spends one Exa Agent search per country (a second search only if t
 
 An HS code on the brief asks [Comex Stat](https://api-comexstat.mdic.gov.br/docs) for Brazil’s export value (US$ FOB) and net kg to each search country for the last three years. Hair-care briefs use 3305. The search still runs if Comex Stat is slow or empty. If the API returns 429, the desk waits the requested 10 seconds, retries, and fills the volume later without stopping the run.
 
+Set `RAG_API_URL` (for example `https://exportsales2.onrender.com`) so a live search compares each company to the Chroma index. Companies that do not match are kept on the list but their fit is capped. The desk still runs if that URL is missing.
+
 ## Deploy on Render
 
 This desk is a long-running Node process, not a static site. On Render create a **Web Service** (not Static Site).
