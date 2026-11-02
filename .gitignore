@@ -53,6 +53,9 @@ next-env.d.ts
 
 # packaged download and text dumps
 /public/export-desk.zip
+/public/fastapi-rag.zip
+/fastapi-rag.zip
+/fastapi-rag/
 /export-desk-fonte.txt
 
 # Chroma persistent index
