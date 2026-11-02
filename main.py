@@ -282,6 +282,16 @@ async def upload_form(file: UploadFile = File(...)) -> str:
     )
 
 
+def packaged_zip(name: str) -> Path:
+    path = Path(__file__).with_name(name)
+    if path.is_file():
+        return path
+    public = Path("public") / name
+    if public.is_file():
+        return public
+    raise HTTPException(status_code=404, detail="O zip ainda não está neste servidor.")
+
+
 @app.get("/baixar", response_class=HTMLResponse)
 def download_page() -> str:
     return """<!doctype html>
@@ -289,12 +299,14 @@ def download_page() -> str:
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Baixar FastAPI RAG</title>
+    <title>Baixar código</title>
   </head>
   <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
     <h1>Baixar o código</h1>
-    <p>Clique no botão. No Windows: botão direito no arquivo → Extrair tudo.</p>
-    <p><a href="/fastapi-rag.zip" download="fastapi-rag.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar fastapi-rag.zip</a></p>
+    <p>Clique no botão. No Windows: botão direito no arquivo → Extrair tudo. Não abra com o Bloco de notas.</p>
+    <p><a href="/desk-rag.zip" download="desk-rag.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar desk-rag.zip</a></p>
+    <p>Esse zip é o dashboard (Node). Não é o main.py do FastAPI.</p>
+    <p><a href="/fastapi-rag.zip" download="fastapi-rag.zip">fastapi-rag.zip</a> (só se precisar do FastAPI de novo)</p>
   </body>
 </html>
 """
@@ -302,12 +314,26 @@ def download_page() -> str:
 
 @app.get("/fastapi-rag.zip")
 def download_zip() -> FileResponse:
-    path = Path(__file__).with_name("fastapi-rag.zip")
-    if not path.is_file():
-        path = Path("public/fastapi-rag.zip")
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="O zip ainda não está neste servidor.")
-    return FileResponse(path, media_type="application/zip", filename="fastapi-rag.zip")
+    return FileResponse(packaged_zip("fastapi-rag.zip"), media_type="application/zip", filename="fastapi-rag.zip")
+
+
+@app.get("/desk-rag.zip")
+def download_desk_zip() -> FileResponse:
+    return FileResponse(packaged_zip("desk-rag.zip"), media_type="application/zip", filename="desk-rag.zip")
+
+
+@app.head("/desk-rag.zip")
+def head_desk_zip():
+    path = packaged_zip("desk-rag.zip")
+    return HTMLResponse(
+        content="",
+        status_code=200,
+        headers={
+            "Content-Type": "application/zip",
+            "Content-Disposition": 'attachment; filename="desk-rag.zip"',
+            "Content-Length": str(path.stat().st_size),
+        },
+    )
 
 
 @app.post("/api/v1/ingest-csv")
