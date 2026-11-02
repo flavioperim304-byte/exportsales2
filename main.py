@@ -1,15 +1,25 @@
 from io import BytesIO
+from os import getenv
 from pathlib import Path
+from typing import Any, Optional
+import hashlib
+import re
 
+import chromadb
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
-from llama_index.core import Document
+from llama_index.core import Document, StorageContext
+from llama_index.vector_stores.chroma import ChromaVectorStore
+
+CHROMA_PATH = Path(getenv("CHROMA_PATH", Path(__file__).resolve().parent / "chroma_data"))
+COLLECTION_NAME = "dashboard_leads"
 
 app = FastAPI()
 
-# Rows already turned into LlamaIndex documents, ready for VectorStoreIndex.
+# Also kept in memory for this process. Chroma on disk is the source of truth.
 pending_documents: list[Document] = []
+_chroma_client: Optional[Any] = None
 
 
 def row_to_text(row: pd.Series) -> str:
@@ -45,9 +55,55 @@ def rows_to_documents(frame: pd.DataFrame) -> list[Document]:
     return documents
 
 
+def chroma_path() -> Path:
+    CHROMA_PATH.mkdir(parents=True, exist_ok=True)
+    return CHROMA_PATH
+
+
+def chroma_client() -> Any:
+    global _chroma_client
+    if _chroma_client is None:
+        _chroma_client = chromadb.PersistentClient(path=str(chroma_path()))
+    return _chroma_client
+
+
+def chroma_collection():
+    return chroma_client().get_or_create_collection(name=COLLECTION_NAME)
+
+
+def document_id(doc: Document) -> str:
+    company = re.sub(r"[^a-z0-9]+", "-", str(doc.metadata.get("company") or "empresa").lower()).strip("-")
+    country = re.sub(r"[^a-z0-9]+", "-", str(doc.metadata.get("country") or "pais").lower()).strip("-")
+    digest = hashlib.sha1(doc.text.encode("utf-8")).hexdigest()[:12]
+    return f"{company or 'empresa'}-{country or 'pais'}-{digest}"
+
+
+def persist_documents(documents: list[Document]) -> int:
+    """Write LlamaIndex documents to a persistent Chroma collection and keep a VectorStoreIndex ready."""
+    if not documents:
+        return chroma_collection().count()
+    collection = chroma_collection()
+    ids = [document_id(doc) for doc in documents]
+    texts = [doc.text for doc in documents]
+    metas = []
+    for doc in documents:
+        metas.append(
+            {
+                "company": str(doc.metadata.get("company") or ""),
+                "country": str(doc.metadata.get("country") or ""),
+                "source_row": str(doc.metadata.get("source_row") or ""),
+                "source": str(doc.metadata.get("source") or "dashboard-csv"),
+            }
+        )
+    collection.upsert(ids=ids, documents=texts, metadatas=metas)
+    vector_store = ChromaVectorStore(chroma_collection=collection)
+    StorageContext.from_defaults(vector_store=vector_store)
+    return collection.count()
+
+
 def prepare_for_index(documents: list[Document]) -> list[Document]:
-    """Keep structured documents in memory for a later VectorStoreIndex.from_documents call."""
     pending_documents.extend(documents)
+    persist_documents(documents)
     return documents
 
 
@@ -75,11 +131,14 @@ def ingest_bytes(name: str, raw: bytes) -> dict:
     if frame.empty:
         raise ValueError("O CSV não tem empresas. Abra uma busca que já terminou e clique em Download CSV.")
     documents = prepare_for_index(rows_to_documents(frame))
+    stored = chroma_collection().count()
     return {
         "ingested": len(documents),
         "columns": [str(column) for column in frame.columns],
         "ready_for_index": True,
-        "queued": len(pending_documents),
+        "queued": stored,
+        "chroma_path": str(chroma_path()),
+        "chroma_count": stored,
         "preview": documents[0].text if documents else "",
     }
 
@@ -111,8 +170,14 @@ def upload_html(message: str = "", ok: bool = False) -> str:
 
 
 @app.get("/")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict:
+    try:
+        stored = chroma_collection().count()
+        path = str(chroma_path())
+    except Exception:
+        stored = 0
+        path = str(CHROMA_PATH)
+    return {"status": "ok", "chroma_path": path, "chroma_count": stored}
 
 
 @app.get("/enviar", response_class=HTMLResponse)
@@ -130,7 +195,7 @@ async def upload_form(file: UploadFile = File(...)) -> str:
     except Exception as exc:
         return upload_html(f"Falha ao processar o arquivo: {exc}", ok=False)
     return upload_html(
-        f"Certo. {result['ingested']} empresas lidas e prontas para indexar.",
+        f"Certo. {result['ingested']} empresas gravadas no Chroma ({result['chroma_count']} no índice).",
         ok=True,
     )
 
