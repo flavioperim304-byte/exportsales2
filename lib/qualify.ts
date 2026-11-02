@@ -1,5 +1,5 @@
 import { activityLine, hasRecentActivity } from "./activity"
-import { buyingFacts, computeFitProbability, fitProbabilityLine } from "./fit-probability"
+import { computeFitProbability, fitProbabilityLine, hasPublishedBuyFacts } from "./fit-probability"
 import type { Brief, FitJudgment, Lead, LeadScore } from "./types"
 
 export type IcpLevel = "high" | "medium" | "low"
@@ -73,9 +73,7 @@ function fromJudgment(
 }
 
 function hasPublishedBuyIntent(lead: Lead): boolean {
-  return buyingFacts(lead).some(
-    (fact) => fact.found && (fact.kind === "last_purchase" || fact.kind === "stock" || fact.kind === "sales")
-  )
+  return hasPublishedBuyFacts(lead)
 }
 
 function guardFit(lead: Lead, row: QualificationRow): QualificationRow {

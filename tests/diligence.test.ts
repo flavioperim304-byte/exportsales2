@@ -173,6 +173,7 @@ test("missing import evidence is not_found, not negative", () => {
 
 test("pursue is approach priority and never follows low confidence", () => {
   assert.equal(approachPriority(80, "high"), "pursue")
+  assert.equal(approachPriority(80, "medium"), "investigate")
   assert.equal(approachPriority(80, "low"), "investigate")
   assert.equal(approachPriority(50, "high"), "watch")
   const report = buildReport({
@@ -312,6 +313,131 @@ test("brand names map to the Kanechom and LQ scorebooks", () => {
   assert.equal(brandKindOf("Kanechom"), "kanechom")
   assert.equal(brandKindOf("LQ Professional"), "lq")
   assert.equal(brandKindOf("Serra Alta Exportadora"), "generic")
+})
+
+test("Parallel empty last-purchase labels do not confirm import or pursue", () => {
+  const premium = lead({
+    name: "Premium Cosmetics S.A.",
+    country: "Panama",
+    market: "Panama",
+    exa: {
+      title: "Premium Cosmetics S.A.",
+      url: "https://premium.example",
+      domain: "premium.example",
+      text: "",
+      highlights: [],
+      summary:
+        "Distribuidor panameño de cosméticos con especialidad en cuidado capilar y canal mayorista; su portafolio incluye la mascarilla Intensive Hair Mask Brazilian Nut Oil y las marcas Topganic y Lab Squeezed, y ofrece capacitación de producto y ventas a distribuidores.",
+    },
+    extraction: {
+      ok: false,
+      companyName: "Premium Cosmetics S.A.",
+      headquarters: "",
+      country: "",
+      role: "",
+      buys: [],
+      sells: [],
+      markets: [],
+      certifications: [],
+      buyerSignals: [],
+      lastPurchase: "",
+      stock: "",
+      salesNote: "",
+      summary: "",
+      excerpt: "",
+      error: "Timed out after 20s calling api.firecrawl.dev",
+    },
+    context: {
+      fitNarrative:
+        "Rank 8. Its official site describes importing products. Commercial evidence—last purchase/shipment: ; stock/restock: ; brand performance: ; sales/volume: ; competitor moves: .",
+      knownSuppliers: [],
+      risks: ["Training capability and recent commercial activity remain unconfirmed."],
+      citations: [],
+      icp: "medium",
+      supplierFits: [{ supplier: "LQ Professional", level: "medium" }],
+      bestFit: "neither",
+      qualificationNeeded: "Confirm salon reach.",
+    },
+    activity: {
+      fetchedAt: "2026-11-02T00:00:00.000Z",
+      signals: [
+        {
+          kind: "news",
+          title: "PREMIUM COSMETICS S.A.",
+          url: "https://news.example/premium",
+          publishedAt: "2026-09-14T00:00:00.000Z",
+          quote: "Directory listing.",
+        },
+      ],
+    },
+  })
+  const findings = [
+    {
+      kind: "fact" as const,
+      polarity: "absent" as const,
+      topic: "import_data",
+      text: "No import records for LQ Professional.",
+      urls: [],
+    },
+    {
+      kind: "needs_confirmation" as const,
+      polarity: "neutral" as const,
+      topic: "purchase_intent",
+      text: "No data on recent purchases or intent to buy.",
+      urls: [],
+    },
+  ]
+  const probes = [
+    {
+      questionId: "exclusivity" as const,
+      question: "Exclusivity?",
+      gap: "missing" as const,
+      query: "Premium exclusive",
+      ranAt: "2026-11-02T00:00:00.000Z",
+      result: "found" as const,
+      urls: ["https://premium.example"],
+      note: "Somos dueños y desarrolladores de las marcas Topganic y Lab Squeezed. Buscamos tiendas.",
+    },
+  ]
+  const report = buildReport({
+    brand: "LQ Professional",
+    lead: premium,
+    brief: LQ_BRIEF,
+    findings,
+    probes,
+  })
+  assert.notEqual(report.importCapacity, "confirmed")
+  assert.notEqual(report.blocks.find((item) => item.key === "import")?.state, "strong")
+  assert.notEqual(report.confidence, "high")
+  assert.notEqual(report.priority, "pursue")
+  assert.ok(report.opportunityScore < 80)
+  assert.match(report.importNote, /não permite concluir que a empresa não importa|Ainda não investigamos|Há sinal/)
+})
+
+test("a published we-import line still confirms import capacity", () => {
+  const importer = lead({
+    name: "Pro Hair Dist",
+    extraction: {
+      ok: true,
+      companyName: "Pro Hair Dist",
+      headquarters: "Santiago",
+      country: "Chile",
+      role: "professional importer",
+      buys: ["salon keratin"],
+      sells: ["straightening systems to salons"],
+      markets: ["Chile"],
+      certifications: [],
+      buyerSignals: ["We import keratin kits for salon accounts."],
+      lastPurchase: "Imported a keratin shipment in September 2026.",
+      stock: "Keratin kits are in stock.",
+      salesNote: "Sales volume grew in 2026.",
+      summary: "Professional salon wholesale and keratin straightening.",
+      excerpt: "We import for salons.",
+    },
+  })
+  const report = buildReport({ brand: "LQ Professional", lead: importer, brief: LQ_BRIEF })
+  assert.equal(report.importCapacity, "confirmed")
+  assert.equal(report.blocks.find((item) => item.key === "import")?.state, "strong")
 })
 
 test("the coffee sample still ranks and can carry a diligence report", () => {

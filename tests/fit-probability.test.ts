@@ -146,6 +146,22 @@ test("last purchase and stock outweigh a brand mention without sales", () => {
   assert.ok(buyingFit.level === "high" || buyingFit.level === "medium")
 })
 
+test("empty Parallel last-purchase labels are not buying facts", () => {
+  const lead = quietLead()
+  lead.context = {
+    fitNarrative:
+      "Upgrade ICP for channel fit. Commercial evidence—last purchase/shipment: ; stock/restock: ; brand performance: ; sales/volume: ; competitor moves: .",
+    knownSuppliers: ["Kérastase"],
+    risks: ["No purchase, inventory, brand-performance or sales evidence was found."],
+    citations: [],
+  }
+  const fit = computeFitProbability(KANECHOM_BRIEF, lead)
+  assert.ok(fit.facts.every((fact) => !fact.found || (fact.kind !== "last_purchase" && fact.kind !== "stock" && fact.kind !== "sales")))
+  assert.ok(fit.missing.includes("last_purchase"))
+  assert.ok(fit.missing.includes("stock"))
+  assert.ok(fit.missing.includes("sales"))
+})
+
 test("RAG mismatch caps a brochure-only fit", () => {
   const lead = quietLead()
   lead.rag = { checked: true, match: false, note: "No neighbor." }

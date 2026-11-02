@@ -52,7 +52,6 @@ function corpus(lead: Lead): string {
     lead.exa.summary,
     lead.exa.text,
     lead.exa.highlights.join(" "),
-    lead.context?.fitNarrative,
     (lead.context?.knownSuppliers ?? []).join(" "),
     (lead.activity?.signals ?? []).map((signal) => `${signal.title} ${signal.quote}`).join(" "),
   ]
@@ -68,10 +67,33 @@ function recencyOf(quote: string): BuyingFact["recency"] {
   return "unknown"
 }
 
+function looksUnpublished(quote: string): boolean {
+  const value = quote.trim()
+  if (!value) return true
+  if (
+    /^(n\/?a|none|unknown|unpublished|not (?:found|published|available)|no (?:data|information|evidence|records?)|sem (?:dado|evid)|n[aã]o (?:h[aá]|encontr))/i.test(
+      value
+    )
+  ) {
+    return true
+  }
+  if (/last purchase\/shipment:\s*;/i.test(value)) return true
+  if (/(?:stock\/restock|sales\/volume|brand performance):\s*;/i.test(value) && value.length < 120) {
+    return true
+  }
+  return false
+}
+
 function factFromField(kind: BuyingKind, value: string | undefined, url?: string): BuyingFact | null {
   const quote = value?.trim() ?? ""
-  if (!quote) return null
+  if (!quote || looksUnpublished(quote)) return null
   return { kind, found: true, recency: recencyOf(quote), quote: clip(quote, 220), url }
+}
+
+export function hasPublishedBuyFacts(lead: Lead): boolean {
+  return buyingFacts(lead).some(
+    (fact) => fact.found && (fact.kind === "last_purchase" || fact.kind === "stock" || fact.kind === "sales")
+  )
 }
 
 export function buyingFacts(lead: Lead): BuyingFact[] {
@@ -94,14 +116,17 @@ export function buyingFacts(lead: Lead): BuyingFact[] {
     const match = text.match(PATTERNS[kind])
     if (match) {
       const start = Math.max(0, (match.index ?? 0) - 40)
-      facts.push({
-        kind,
-        found: true,
-        recency: recencyOf(text.slice(start, start + 180)),
-        quote: clip(text.slice(start, start + 180), 220),
-        url: lead.url,
-      })
-      continue
+      const quote = clip(text.slice(start, start + 180), 220)
+      if (!looksUnpublished(quote)) {
+        facts.push({
+          kind,
+          found: true,
+          recency: recencyOf(quote),
+          quote,
+          url: lead.url,
+        })
+        continue
+      }
     }
     facts.push({ kind, found: false, recency: "unknown", quote: "" })
   }

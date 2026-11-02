@@ -464,6 +464,10 @@ function DiligenceReportView({ report, history }: { report: DiligenceReport; his
       <p className="text-sm font-medium">
         Opportunity {report.opportunityScore}/100 · confiança {report.confidence} · {report.priority}
       </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Opportunity não entra no Fit. Canal e portfólio de folheto não confirmam intenção de compra; pursue só com
+        confiança alta e fato publicado de importação, última compra, estoque ou vendas.
+      </p>
       <p className="mt-1 text-sm text-muted-foreground">{report.priorityNote}</p>
       <p className="mt-1 text-sm text-muted-foreground">
         Investigado em {report.investigatedAt.slice(0, 10)}

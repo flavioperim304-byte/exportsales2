@@ -1,5 +1,5 @@
 import { hasRecentActivity, recentSignals } from "./activity"
-import { buyingFacts } from "./fit-probability"
+import { buyingFacts, hasPublishedBuyFacts } from "./fit-probability"
 import type {
   Brief,
   DiligenceBlock,
@@ -123,13 +123,15 @@ export const SCORE_TABLE: Record<DiligenceBlock, Record<DiligenceEvidenceState, 
 const MASS =
   /\b(supermarket|grocery|mass[- ]market|varejo popular|low-end retail|skala|farmacia|drugstore|atacado popular)\b/i
 const SALON =
-  /\b(salon|sal[aã]o|cabeleireiro|hairdresser|professional (?:line|hair|salon)|alisamento|straightening|keratin treat)\b/i
+  /\b(salons?|salones|sal[oó]n(?:es)?|sal[aã]o|cabeleireiro|hairdresser|capilar|belleza profesional|professional (?:line|hair|salon|beauty)|alisamento|straightening|keratin treat)\b/i
 const WHOLESALE =
-  /\b(importer|importador|distributor|distribuidor|wholesaler|atacadista|trading)\b/i
+  /\b(importer|importador|distributor|distribuidor|distribuye|distribuci[oó]n|wholesaler|atacadista|mayorista|trading)\b/i
 const SALON_ONLY =
   /\b(salon|sal[aã]o|cabeleireiro)\b/i
 const IMPORT_YES =
-  /\b(importer of record|importamos|we import|direct import|importador direto|shipment|embarque|last purchase)\b/i
+  /\b(importer of record|importamos|we import|direct import|importador direto|importador directo|importador de registro|somos importadores)\b/i
+const IMPORT_HINT =
+  /\b(importer|importador|importamos)\b/i
 const IMPORT_NO =
   /\b(via|through) (an |the )?(importer|importador)|not the importer|buy the rest via|sem mesa de importa/i
 const EXCLUSIVE =
@@ -139,7 +141,7 @@ const OPEN_BOOK =
 const COMMERCIAL_K =
   /\b(restock|reposi[cç]|sku|retail campaign|campanha (varejo|retail)|new (mass|retail) (line|sku))\b/i
 const COMMERCIAL_LQ =
-  /\b(training|treino|feira|trade fair|expo|new professional (line|range)|demonstra[cç])\b/i
+  /\b(training|treino|capacita[cç][aãá]o|capacitaci[oó]n|entrenamiento|feira|trade fair|expo|new professional (line|range)|demonstra[cç])\b/i
 const ROUTINE_SOCIAL =
   /\b(follow us|instagram|facebook|linkedin|tiktok)\b/i
 
@@ -186,7 +188,7 @@ export function approachPriority(
 ): DiligencePriority {
   if (opportunityScore < 40) return "skip"
   if (opportunityScore < 55) return "watch"
-  if (opportunityScore >= 70 && (confidence === "high" || confidence === "medium")) return "pursue"
+  if (opportunityScore >= 70 && confidence === "high") return "pursue"
   if (opportunityScore >= 55) return "investigate"
   return "watch"
 }
@@ -241,7 +243,6 @@ function corpus(lead: Lead): string {
     (extraction?.competitorMoves ?? []).join(" "),
     lead.exa.summary,
     lead.exa.text,
-    lead.context?.fitNarrative,
     (lead.context?.knownSuppliers ?? []).join(" "),
     (lead.context?.risks ?? []).join(" "),
     (lead.activity?.signals ?? []).map((signal) => `${signal.title} ${signal.quote}`).join(" "),
@@ -276,15 +277,23 @@ export function isOlderThan(evidenceAt: string | undefined, months: number, now 
   return now.getTime() - stamp > months * 30 * 24 * 60 * 60 * 1000
 }
 
+function findingTouches(item: DiligenceFinding, block: DiligenceBlock): boolean {
+  const topic = item.topic.toLowerCase()
+  if (item.topic === block) return true
+  return block === "import" && (topic.includes("import") || topic === "import_path")
+}
+
 function polaritiesFor(
   block: DiligenceBlock,
   findings: DiligenceFinding[],
   probes: DiligenceProbe[]
 ): DiligencePolarity[] {
-  const related = findings.filter(
-    (item) => item.topic === block || (block === "import" && item.topic === "import_path")
-  )
-  const values = related.map((item) => item.polarity)
+  const related = findings.filter((item) => findingTouches(item, block))
+  const values: DiligencePolarity[] = []
+  for (const item of related) {
+    if (item.kind === "interpretation" || item.kind === "needs_confirmation") continue
+    values.push(item.polarity)
+  }
   const probeIds: Partial<Record<DiligenceBlock, DiligenceQuestionId>> = {
     import: "import_path",
     opening: "exclusivity",
@@ -294,10 +303,20 @@ function polaritiesFor(
   }
   const probe = probes.filter((item) => item.questionId === probeIds[block])
   for (const item of probe) {
-    if (item.result === "found") values.push("supports")
+    if (item.result === "found") {
+      if (block === "import" && !IMPORT_YES.test(item.note) && !IMPORT_HINT.test(item.note)) continue
+      values.push("supports")
+    }
     if (item.result === "not_found") values.push("absent")
   }
   return values
+}
+
+function foldText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
 }
 
 function applyPolarity(
@@ -376,24 +395,27 @@ export function classifyBlocks(
   } else if (brand === "lq") {
     if (skala && !proLine) portfolio = "negative"
     else if (proLine) portfolio = "strong"
-    else if (/hair|cabelo|profissional/i.test(text)) portfolio = "partial"
-    else if (text.trim() && !/hair|cabelo/i.test(text)) portfolio = "inadequate"
+    else if (/hair|cabelo|capilar|profissional|professional/i.test(text)) portfolio = "partial"
+    else if (text.trim() && !/hair|cabelo|capilar/i.test(text)) portfolio = "inadequate"
   } else if (hasBuying) {
     portfolio = "partial"
   }
 
   let imports: DiligenceEvidenceState = "absent"
-  if (IMPORT_NO.test(text) && !IMPORT_YES.test(text)) imports = "negative"
-  else if (IMPORT_YES.test(text) || facts.some((fact) => fact.kind === "last_purchase" && fact.found)) {
-    imports = "strong"
-  } else if (/\bimport/i.test(role) || /\bimport/i.test(text)) imports = "partial"
-  else if (ROUTINE_SOCIAL.test(text) && !/\bimport/i.test(text)) imports = "inadequate"
+  const publishedPurchase = facts.some((fact) => fact.kind === "last_purchase" && fact.found)
+  if (IMPORT_NO.test(text) && !IMPORT_YES.test(text) && !publishedPurchase) imports = "negative"
+  else if (IMPORT_YES.test(text) || publishedPurchase) imports = "strong"
+  else if (IMPORT_HINT.test(role) || IMPORT_HINT.test(text)) imports = "partial"
+  else if (ROUTINE_SOCIAL.test(text) && !IMPORT_HINT.test(text)) imports = "inadequate"
 
   let geography: DiligenceEvidenceState = "absent"
-  const market = (lead.market || lead.country || "").toLowerCase()
-  const place = `${lead.extraction?.country ?? ""} ${lead.extraction?.headquarters ?? ""} ${(lead.extraction?.markets ?? []).join(" ")}`.toLowerCase()
+  const market = foldText(lead.market || lead.country || "")
+  const place = foldText(
+    `${lead.extraction?.country ?? ""} ${lead.extraction?.headquarters ?? ""} ${(lead.extraction?.markets ?? []).join(" ")}`
+  )
+  const foldedText = foldText(text)
   if (market && place.includes(market)) geography = "strong"
-  else if (market && text.toLowerCase().includes(market)) geography = "partial"
+  else if (market && foldedText.includes(market)) geography = "partial"
   else if (place.trim() && market && !place.includes(market)) geography = "negative"
   else if (text.trim()) geography = "inadequate"
 
@@ -431,13 +453,21 @@ export function classifyBlocks(
 export function confidenceOf(
   states: Record<DiligenceBlock, DiligenceEvidenceState>,
   findings: DiligenceFinding[],
-  probes: DiligenceProbe[]
+  probes: DiligenceProbe[],
+  commercialFacts = false
 ): { level: DiligenceConfidence; note: string } {
   const strong = DILIGENCE_BLOCKS.filter((key) => states[key] === "strong").length
   const facts = findings.filter((item) => item.kind === "fact" && item.urls.length > 0).length
   const foundProbes = probes.filter((item) => item.result === "found").length
+  const importStrong = states.import === "strong"
   if (strong >= 2 && (facts > 0 || foundProbes > 0 || strong >= 3)) {
-    return { level: "high", note: "Dois ou mais blocos com fato recente e fonte." }
+    if (commercialFacts || importStrong) {
+      return { level: "high", note: "Dois ou mais blocos com fato recente e fonte." }
+    }
+    return {
+      level: "medium",
+      note: "Canal ou portfólio publicaram, mas última compra, estoque, vendas e importação em nome próprio não. A confiança não sobe para alta só com folheto ou busca complementar.",
+    }
   }
   const partial = DILIGENCE_BLOCKS.filter((key) =>
     states[key] === "partial" || states[key] === "strong" || states[key] === "stale"
@@ -664,7 +694,7 @@ export function buildReport(input: {
   const probes = input.probes ?? []
   const states = classifyBlocks(kind, input.lead, findings, probes, now)
   const scored = opportunityFromStates(states)
-  const confidence = confidenceOf(states, findings, probes)
+  const confidence = confidenceOf(states, findings, probes, hasPublishedBuyFacts(input.lead))
   const priority = approachPriority(scored.total, confidence.level)
   const capacity = importCapacityOf(states.import)
   const range = evidenceRange(input.lead, findings, probes)
