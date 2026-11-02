@@ -309,11 +309,11 @@ def download_page() -> str:
     <title>Baixar código</title>
   </head>
   <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
-    <h1>Baixar o código</h1>
-    <p>Clique no botão. No Windows: botão direito no arquivo → Extrair tudo. Não abra com o Bloco de notas.</p>
-    <p><a href="/fastapi-rag.zip" download="fastapi-rag.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar fastapi-rag.zip</a></p>
-    <p>Esse zip é o FastAPI. No GitHub <strong>exportsales2</strong>, substitua só o <strong>main.py</strong> na raiz (ao lado de requirements.txt). Não coloque dentro de lib.</p>
-    <p><a href="/desk-rag.zip" download="desk-rag.zip">desk-rag.zip</a> (dashboard Node — não precisa agora)</p>
+    <h1>Baixar o zip</h1>
+    <p>Este é um arquivo .zip, não um texto. No Windows: botão direito → Extrair tudo. Não abra com o Bloco de notas.</p>
+    <p><a href="/desk-rag.zip" download="desk-rag.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar desk-rag.zip</a></p>
+    <p>Esse zip é o dashboard Node (due diligence). No GitHub <strong>exportsales2</strong>, copie <strong>lib/</strong> e <strong>components/</strong> no mesmo lugar. Não extraia na raiz fora dessas pastas.</p>
+    <p><a href="/fastapi-rag.zip" download="fastapi-rag.zip">fastapi-rag.zip</a> (Python — só se for atualizar main.py)</p>
   </body>
 </html>
 """
@@ -326,7 +326,12 @@ def download_zip() -> FileResponse:
 
 @app.get("/desk-rag.zip")
 def download_desk_zip() -> FileResponse:
-    return FileResponse(packaged_zip("desk-rag.zip"), media_type="application/zip", filename="desk-rag.zip")
+    return FileResponse(
+        packaged_zip("desk-rag.zip"),
+        media_type="application/octet-stream",
+        filename="desk-rag.zip",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
 
 
 @app.head("/desk-rag.zip")
