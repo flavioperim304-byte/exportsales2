@@ -146,7 +146,7 @@ test("OpenAI high is pulled down when the company is publicly quiet", () => {
 })
 
 test("the score prompt forbids a high best fit without recent activity", () => {
-  assert.match(openaiInstructions(KANECHOM_BRIEF), /no recent news, product launch/)
+  assert.match(openaiInstructions(KANECHOM_BRIEF), /Hiring, social posts, and ICP fit are not purchase intent/)
 })
 
 test("checklist still files a thin excerpt without invented activity", () => {

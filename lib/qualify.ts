@@ -1,5 +1,5 @@
 import { activityLine, hasRecentActivity } from "./activity"
-import { computeFitProbability, fitProbabilityLine } from "./fit-probability"
+import { buyingFacts, computeFitProbability, fitProbabilityLine } from "./fit-probability"
 import type { Brief, FitJudgment, Lead, LeadScore } from "./types"
 
 export type IcpLevel = "high" | "medium" | "low"
@@ -72,6 +72,12 @@ function fromJudgment(
   }
 }
 
+function hasPublishedBuyIntent(lead: Lead): boolean {
+  return buyingFacts(lead).some(
+    (fact) => fact.found && (fact.kind === "last_purchase" || fact.kind === "stock" || fact.kind === "sales")
+  )
+}
+
 function guardFit(lead: Lead, row: QualificationRow): QualificationRow {
   let next = row
   const notes: string[] = []
@@ -94,6 +100,12 @@ function guardFit(lead: Lead, row: QualificationRow): QualificationRow {
     notes.push(
       "Last purchase, stock, and sales were not published.",
       "Fit probability stays medium until one of those facts is found."
+    )
+  }
+  if (!hasPublishedBuyIntent(lead) && next.bestFit && next.bestFit !== "neither") {
+    next = { ...next, bestFit: "neither" }
+    notes.push(
+      "Best fit foi retirado: não há última compra, estoque ou vendas publicados. ICP de canal não é intenção de compra. Vaga de vendas ou compras, sozinha, não basta."
     )
   }
   if (notes.length) {

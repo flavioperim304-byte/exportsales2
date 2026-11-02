@@ -18,7 +18,7 @@ function marketAsk(): string {
 }
 
 function buyingAsk(): string {
-  return "On each company, look for last purchase or shipment, stock or restock, how current brands are performing, published sales or volume, and a competitor move. Quote the source. Leave a field empty when it is not published. A company that only has a brochure is not a high fit."
+  return "On each company, look for last purchase or shipment, stock or restock, how current brands are performing, published sales or volume, and a competitor move. Quote the source. Leave a field empty when it is not published. A company that only has a brochure is not a high fit. A job ad for sales or purchasing is a supporting signal, not purchase intent. Do not set best_fit from ICP, a brochure, social posts, or hiring alone. If last purchase, stock, and sales are unpublished, best_fit is neither."
 }
 
 function extra(brief: Brief): string {
@@ -204,7 +204,7 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       brief.excludedMarkets ? `Excluded countries: ${brief.excludedMarkets}.` : "",
       "A high score means the company distributes this brand, or it is a direct competitor distributor of a rival brand in the same country. Low means a retailer, a salon, or an unrelated company.",
       "Set best_fit to the brand name when they distribute it, direct competitor when they import a rival, or neither.",
-      "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a brand when there is no recent news, product launch, new brand, or social activity, or when last purchase, stock, and sales are all unpublished. That company is unlikely to answer outreach.",
+      "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a brand when last purchase, stock, and sales are unpublished. Hiring, social posts, and ICP fit are not purchase intent.",
       buyingAsk(),
       brief.instructions?.trim() ?? "",
       "qualification_needed is what a salesperson still has to confirm. icp is not the purchase probability.",
@@ -221,7 +221,7 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       "Score against the prompt below. Do not add must-haves or exclusions that the prompt does not state.",
       brief.instructions?.trim() ?? "",
       "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
-      "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a supplier when there is no recent news, product launch, new brand, or social activity, or when last purchase, stock, and sales are all unpublished. That company is unlikely to answer outreach.",
+      "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a supplier when last purchase, stock, and sales are unpublished. Hiring, social posts, and ICP fit are not purchase intent.",
       buyingAsk(),
       "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
       marketAsk(),
@@ -241,7 +241,7 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       : "",
     "Score the company against the buyer type it was searched as, and against the other types in the brief. Do not lower the score only because it is a wholesaler or a trading company rather than a distributor.",
     "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
-    "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a supplier when there is no recent news, product launch, new brand, or social activity, or when last purchase, stock, and sales are all unpublished. That company is unlikely to answer outreach.",
+    "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a supplier when last purchase, stock, and sales are unpublished. Hiring, social posts, and ICP fit are not purchase intent.",
     buyingAsk(),
     "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
     marketAsk(),
@@ -284,7 +284,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
       "Refine the score against this prompt only. Do not add must-haves or exclusions that the prompt does not state.",
       brief.instructions?.trim() ?? "",
       "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
-      "Use the public activity line and the fit-probability line on each card. Do not keep icp high or best_fit on a supplier when last purchase, stock, and sales are unpublished and there is no recent public activity.",
+      "Use the public activity line and the fit-probability line on each card. Do not keep icp high or best_fit on a supplier when last purchase, stock, and sales are unpublished. Hiring, social posts, and ICP fit are not purchase intent.",
       buyingAsk(),
       "Say who to approach first, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and the supplier fit to high, medium, or low. Set best_fit to the supplier to pursue or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
       marketAsk(),
@@ -314,7 +314,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
     extra(brief),
     also?.instructions ? `Additional instructions: ${also.instructions.trim()}` : "",
     "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
-    "Use the public activity line and the fit-probability line on each card. Do not keep icp high or best_fit on a supplier when last purchase, stock, and sales are unpublished and there is no recent public activity.",
+    "Use the public activity line and the fit-probability line on each card. Do not keep icp high or best_fit on a supplier when last purchase, stock, and sales are unpublished. Hiring, social posts, and ICP fit are not purchase intent.",
     buyingAsk(),
     "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
     marketAsk(),

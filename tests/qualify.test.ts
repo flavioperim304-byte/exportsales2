@@ -56,7 +56,7 @@ test("a dual qualification names the stronger supplier and keeps low fits out", 
     KANECHOM_BRIEF,
     LQ_BRIEF
   )
-  assert.equal(rows[0].bestFit, "Kanechom")
+  assert.equal(rows[0].bestFit, "neither")
   assert.equal(rows[0].level, "medium")
   assert.equal(rows[0].fits[1].level, "low")
   assert.equal(rows[1].bestFit, "neither")
@@ -81,9 +81,10 @@ test("Parallel's levels replace the local checklist once they are attached", () 
   const [row] = qualificationRows([item], KANECHOM_BRIEF, LQ_BRIEF)
   assert.equal(row.fromParallel, true)
   assert.equal(row.level, "medium")
-  assert.equal(row.bestFit, "Kanechom")
+  assert.equal(row.bestFit, "neither")
   assert.equal(row.fits[1].level, "low")
   assert.match(row.qualificationNeeded, /Skala/)
+  assert.match(row.qualificationNeeded, /intenção de compra/)
 })
 
 test("OpenAI's preliminary score is used until Parallel replaces it", () => {
@@ -100,7 +101,7 @@ test("OpenAI's preliminary score is used until Parallel replaces it", () => {
   }
   const [row] = qualificationRows([item], KANECHOM_BRIEF, LQ_BRIEF)
   assert.equal(row.source, "openai")
-  assert.equal(row.bestFit, "Kanechom")
+  assert.equal(row.bestFit, "neither")
   item.context = {
     fitNarrative: "Parallel kept Kanechom and lowered the call.",
     knownSuppliers: [],
@@ -138,6 +139,42 @@ test("a company from another country is not a Dominican Republic lead", () => {
   assert.equal(fitsRequestedMarket("South Africa", "Germany", "nordlicht.example"), false)
 })
 
+test("Parallel best fit stays when last purchase is published", () => {
+  const item = lead("Dissol", score(82, "best_fit"), score(40, "weak"))
+  item.extraction = {
+    ok: true,
+    companyName: "Dissol",
+    headquarters: "Quito",
+    country: "Ecuador",
+    role: "distributor",
+    buys: ["hair care"],
+    sells: [],
+    markets: ["Ecuador"],
+    certifications: [],
+    buyerSignals: [],
+    lastPurchase: "Imported a Brazilian shampoo line in 2026.",
+    stock: "In-stock professional kits this month.",
+    salesNote: "Sales grew in 2026.",
+    summary: "Importer.",
+    excerpt: "Importer.",
+  }
+  item.context = {
+    fitNarrative: "Mass retail importer.",
+    knownSuppliers: ["Skala"],
+    risks: [],
+    citations: [],
+    icp: "medium",
+    supplierFits: [
+      { supplier: "Kanechom", level: "medium" },
+      { supplier: "LQ Professional", level: "low" },
+    ],
+    bestFit: "Kanechom",
+    qualificationNeeded: "Confirm an open slot next to Skala.",
+  }
+  const [row] = qualificationRows([item], KANECHOM_BRIEF, LQ_BRIEF)
+  assert.equal(row.bestFit, "Kanechom")
+})
+
 test("Parallel is asked to separate fit from the ability to buy", () => {
   const prompt = parallelInstructions(KANECHOM_BRIEF, LQ_BRIEF)
   assert.match(prompt, /not confirmed purchasing intent/)
@@ -147,6 +184,7 @@ test("Parallel is asked to separate fit from the ability to buy", () => {
   assert.match(prompt, /best_fit/)
   assert.match(prompt, /OpenAI already assigned/)
   assert.match(prompt, /employee count/)
+  assert.match(prompt, /Hiring, social posts, and ICP fit are not purchase intent/)
   assert.equal(icpLevel(score(70, "strong")), "high")
   assert.equal(icpLevel(score(50, "possible")), "medium")
   assert.equal(icpLevel(score(10, "weak", true)), "low")

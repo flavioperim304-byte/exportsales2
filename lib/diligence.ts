@@ -487,7 +487,7 @@ export function coverageGaps(
         brand === "lq"
           ? `Há treino, feira ou nova linha profissional publicada para ${name}?`
           : `Há reposição, novo SKU ou campanha de varejo publicada para ${name}?`,
-      query: `"${name}" ${market} (fair OR feira OR training OR lançamento OR "new line" OR restock OR campaign)`,
+      query: `"${name}" ${market} (fair OR feira OR training OR lançamento OR "new line" OR restock OR campaign OR hiring OR vaga OR compras OR "sales executive")`,
     },
     {
       block: "channel",
@@ -509,6 +509,13 @@ export function coverageGaps(
     if (!gap) continue
     gaps.push({ ...item, gap })
   }
+  gaps.push({
+    block: "activity",
+    questionId: "hiring_signal",
+    question: `Há contratação publicada em vendas ou compras para ${name} em ${market}?`,
+    query: `"${name}" ${market} (hiring OR "we're hiring" OR vaga OR "ejecutivo de ventas" OR "purchasing manager" OR compras OR "key account")`,
+    gap: "missing",
+  })
   return gaps
 }
 

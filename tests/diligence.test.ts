@@ -207,6 +207,7 @@ test("complementary gaps become probes and not_found is recorded", () => {
   const states = classifyBlocks("kanechom", quiet)
   const gaps = coverageGaps("kanechom", quiet, KANECHOM_BRIEF, states)
   assert.ok(gaps.some((item) => item.questionId === "import_path"))
+  assert.ok(gaps.some((item) => item.questionId === "hiring_signal"))
   const probe = probeFromSearch(gaps[0], [])
   assert.equal(probe.result, "not_found")
   assert.match(probe.note, /não é evidência negativa/)

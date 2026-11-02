@@ -214,6 +214,7 @@ export type DiligenceQuestionId =
   | "portfolio"
   | "launch_capacity"
   | "channel_fit"
+  | "hiring_signal"
 
 export type DiligenceFinding = {
   kind: DiligenceFindingKind
