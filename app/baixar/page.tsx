@@ -2,75 +2,51 @@ export default function BaixarPage() {
   return (
     <main className="mx-auto w-full max-w-xl px-4 py-12">
       <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Deploy</p>
-      <h1 className="mt-2 font-serif text-3xl">Baixe os arquivos. Não cole.</h1>
+      <h1 className="mt-2 font-serif text-3xl">Uma chave. Eu mando o GitHub.</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        Os commits <code>Update tsconfig.json</code> e <code>Update page.tsx</code> no GitHub não
-        mudaram nenhuma linha. O Render repetiu o erro antigo: o <code>tsconfig</code> ainda
-        compila os <code>.ts</code> da raiz, e o <code>/leads</code> ainda quebra o{" "}
-        <code>next build</code>. Não cole código. Não suba lote. Baixe cada arquivo e arraste no
-        link certo.
+        O upload pelo site do GitHub já falhou várias vezes (pasta aberta, commits com 0 linhas).
+        Não vamos repetir. Você cola <strong>uma chave pública</strong> nas configurações do repo.
+        Eu faço o <code>git push</code> da árvore certa. O Render pega esse commit.
       </p>
 
-      <h2 className="mt-8 font-serif text-xl">1. tsconfig.json</h2>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        Vai na <strong>raiz</strong> do repositório (ao lado de <code>package.json</code>).
-      </p>
-      <div className="mt-3 flex flex-col gap-2">
-        <a
-          href="/api/hotfix/tsconfig"
-          download="tsconfig.json"
-          className="inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground"
-        >
-          Baixar tsconfig.json
-        </a>
-        <a
-          href="https://github.com/flavioperim304-byte/exportsales2/upload/main"
-          className="inline-flex rounded-lg border border-border px-5 py-3 text-sm"
-        >
-          Abrir upload da raiz no GitHub
-        </a>
-      </div>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Arraste só esse arquivo. Commit. No GitHub, abra o arquivo: tem de aparecer{" "}
-        <code>app/**/*.ts</code>. Se ainda aparecer <code>**/*.ts</code>, o upload não substituiu.
-      </p>
-
-      <h2 className="mt-8 font-serif text-xl">2. page.tsx das leads</h2>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        Vai em <code>app/leads/</code>. Não solte na raiz.
-      </p>
-      <div className="mt-3 flex flex-col gap-2">
-        <a
-          href="/api/hotfix/page"
-          download="page.tsx"
-          className="inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground"
-        >
-          Baixar page.tsx
-        </a>
-        <a
-          href="https://github.com/flavioperim304-byte/exportsales2/upload/main/app/leads"
-          className="inline-flex rounded-lg border border-border px-5 py-3 text-sm"
-        >
-          Abrir upload de app/leads no GitHub
-        </a>
-      </div>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Arraste só esse arquivo. Commit. No GitHub, a primeira linha tem de ter a palavra{" "}
-        <code>Suspense</code>.
-      </p>
-
-      <h2 className="mt-8 font-serif text-xl">3. Render</h2>
-      <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
+      <ol className="mt-6 list-decimal space-y-3 pl-5 text-sm leading-relaxed text-muted-foreground">
         <li>
-          Serviço Node <strong>exportsales</strong> → Manual Deploy → Deploy latest commit. Não
-          apague o disco.
+          Abra{" "}
+          <a
+            href="https://github.com/flavioperim304-byte/exportsales2/settings/keys"
+            className="underline-offset-2 hover:underline"
+          >
+            github.com/flavioperim304-byte/exportsales2/settings/keys
+          </a>
+          . Tem de estar logado na conta dona do repo.
         </li>
         <li>
-          Python (exportsales2) já está ok. Não mexa. Não reenvie o CSV do Panamá.
+          Add deploy key. Title: <code>cursor-export-desk</code>. Marque{" "}
+          <strong>Allow write access</strong>. Sem write eu não consigo enviar.
+        </li>
+        <li>
+          Cole a chave abaixo (uma linha, começa com <code>ssh-ed25519</code>). Add key.
+        </li>
+        <li>
+          Volte aqui e escreva <strong>chave ok</strong>. Eu envio o desk inteiro e o Node no
+          Render pode implantar. Não apague o disco. Não mexa no Python.
         </li>
       </ol>
-      <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-        Pronto quando https://exportsales.onrender.com/trade abrir.
+
+      <pre className="mt-6 overflow-x-auto rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-relaxed break-all whitespace-pre-wrap">
+        {`ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEK57AUOSSJIA9fQxQkKk3iFzlamwHBwwSDznLpy82mM cursor-export-desk-render`}
+      </pre>
+      <a
+        href="/cursor-deploy.pub"
+        download="cursor-deploy.pub"
+        className="mt-3 inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground"
+      >
+        Baixar a chave pública
+      </a>
+
+      <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
+        Isso não abre o Desktop e não arrasta pasta. É um único clique nas settings. Se o GitHub
+        pedir senha da conta, é normal. Não crie outro repositório. Não suba lote-1 nem lote-2.
       </p>
     </main>
   )
