@@ -75,7 +75,7 @@ export type ActivitySnapshot = {
 
 export type CommerceKind = "customs" | "restock" | "trade_fair" | "open_book" | "hiring_buy"
 
-export type CommerceSignalSource = "exa" | "trade_record"
+export type CommerceSignalSource = "exa" | "trade_record" | "company_atlas"
 
 export type CommerceSignal = {
   kind: CommerceKind
@@ -83,7 +83,7 @@ export type CommerceSignal = {
   url: string
   publishedAt?: string
   quote: string
-  /** Exa is a web mention. Only trade_record is a filing. */
+  /** Exa is a web mention. trade_record is a dump card. company_atlas is a customs line, still not a Kanechom purchase. */
   source?: CommerceSignalSource
 }
 
@@ -414,6 +414,28 @@ export type ApiConfirm = {
   note: string
 }
 
+export type AtlasMatchStatus = "hit" | "miss" | "no_market" | "skipped" | "error"
+
+export type AtlasPartner = {
+  name: string
+  companyId?: string
+  direction: "supplier" | "customer"
+  value?: number
+}
+
+/** Customs line from The Company Atlas. Indication only — never a Kanechom/LQ purchase. */
+export type AtlasMatch = {
+  status: AtlasMatchStatus
+  companyId?: string
+  companyName?: string
+  hs?: string
+  lineCount?: number
+  years?: number[]
+  partners: AtlasPartner[]
+  note: string
+  limited?: boolean
+}
+
 export type RejectedSeed = {
   importer: string
   country: string
@@ -434,6 +456,8 @@ export type Lead = {
   seed?: LeadSeed
   /** Exa and Firecrawl confirmation. A trade dump never sets this to confirmed. */
   apiConfirm?: ApiConfirm
+  /** Company Atlas customs line, when the market is one of the 36. Never unlocks Fit. */
+  atlas?: AtlasMatch
   exa: ExaHit
   extraction?: Extraction
   context?: LeadContext
@@ -576,10 +600,12 @@ export type KeyFlags = {
   firecrawl: boolean
   openai: boolean
   parallel: boolean
+  atlas: boolean
   exaEnv: boolean
   firecrawlEnv: boolean
   openaiEnv: boolean
   parallelEnv: boolean
+  atlasEnv: boolean
 }
 
 export type RunSummary = {

@@ -58,6 +58,7 @@ export function QualifyForm({
             note?: string
             countries?: { country: string; candidates: number }[]
           }
+          atlas?: { note?: string; overlapping?: { country: string }[] }
         } | null) => {
           if (!data) {
             setDumpNote("Abra Aduana e cole austsham, jap, hk, uz, ger ou UAE. Sem arquivo, a busca dump não tem semente.")
@@ -73,9 +74,9 @@ export function QualifyForm({
             )
             return
           }
+          const atlasBit = data.atlas?.note ? ` ${data.atlas.note}` : ""
           setDumpNote(
-            data.summary?.note ||
-              `${candidates} candidatos no arquivo. ${countries.join(" · ") || ""}. Coloque esses países em Target markets. O dump não confirma compra — Exa e Firecrawl confirmam ou descartam.`
+            `${data.summary?.note || `${candidates} candidatos no arquivo. ${countries.join(" · ") || ""}. Coloque esses países em Target markets. O dump não confirma compra — Exa e Firecrawl confirmam ou descartam.`}${atlasBit}`
           )
         }
       )
@@ -158,8 +159,9 @@ export function QualifyForm({
           {compact ? null : <h1 className="font-serif text-3xl sm:text-4xl">Nova busca</h1>}
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Escolha o tipo de busca e qual API do Parallel entra nesta rodada. No fluxo dump, o
-            arquivo de Aduana só nomeia; Exa e Firecrawl confirmam ou descartam. Task é o padrão.
-            Decisions só roda se você selecionar o botão abaixo.
+            arquivo de Aduana só nomeia; Company Atlas (se conectado) cruza declaração HS nos 36
+            mercados; Exa e Firecrawl confirmam ou descartam o site. Task é o padrão. Decisions só
+            roda se você selecionar o botão abaixo.
           </p>
         </div>
         <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-2">
@@ -191,7 +193,7 @@ export function QualifyForm({
             <ChoiceButton
               selected={brief.searchKind === "dump"}
               title="Dump + API"
-              hint="Nomes do arquivo Aduana. Exa e Firecrawl confirmam. Depois, similares."
+              hint="Nomes do arquivo Aduana. Atlas (36 mercados) + Exa + Firecrawl. Depois, similares."
               onClick={() => set("searchKind", "dump")}
             />
             <ChoiceButton
@@ -430,7 +432,7 @@ export function QualifyForm({
           {usingDecisions
             ? "Esta rodada chama a Decisions API em modo fast. As demais buscas continuam no Task."
             : brief.searchKind === "dump"
-              ? "O dump só nomeia. Exa confirma ou descarta cada empresa. Firecrawl lê a página. Depois busca concorrentes similares. Logística e marcas globais ficam fora. Sem fato publicado na página, Fit continua baixo."
+              ? "O dump só nomeia. Company Atlas pode achar a declaração HS nos 36 mercados. Exa confirma o site. Firecrawl lê a página. Depois similares. Logística e marcas globais ficam fora. Sem fato publicado na página, Fit continua baixo."
             : brief.searchKind === "competitors" && brief.exaEffort !== "deep"
               ? "Exa Ultra pode levar cerca de 15 minutos. Depois o Parallel Task confere os distribuidores."
               : "Depois das páginas, o Exa busca notícias, lançamentos e fatos de compra: última compra, estoque, desempenho das marcas, vendas e ação de concorrente. Sem esses dados a probabilidade de fit fica baixa — folheto sozinho quase não responde."}

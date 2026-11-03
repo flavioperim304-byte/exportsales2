@@ -1,3 +1,13 @@
+import { createAtlasClient, ensureAtlasToken } from "./atlas-client"
+import {
+  applyAtlasToLead,
+  atlasLookupKey,
+  atlasRejectedReason,
+  emptyAtlasLookup,
+  enrichDumpWithAtlas,
+  extraAtlasNames,
+  type AtlasLookup,
+} from "./company-atlas"
 import {
   blankApiConfirm,
   blockedImporterName,
@@ -185,9 +195,10 @@ async function similarInCountry(
   country: string,
   confirmed: Lead[],
   seen: Set<string>,
-  websites: string[]
+  websites: string[],
+  atlasNames: string[] = []
 ): Promise<Lead[]> {
-  const names = confirmed.map((lead) => lead.name)
+  const names = [...new Set([...confirmed.map((lead) => lead.name), ...atlasNames])]
   const query = dumpSimilarQuery(names, country, brief)
   const jobId = await startAgentRun(key, query, websites, {
     effort: "medium",
@@ -237,6 +248,25 @@ async function similarInCountry(
   return extra
 }
 
+async function atlasForDump(filings: TradeFiling[], brief: Brief): Promise<AtlasLookup> {
+  try {
+    const token = await ensureAtlasToken()
+    if (!token) return enrichDumpWithAtlas(filings, brief, { connected: false })
+    const client = await createAtlasClient(token)
+    return await enrichDumpWithAtlas(filings, brief, { client, connected: true })
+  } catch (error) {
+    const fallback = emptyAtlasLookup(
+      error instanceof Error
+        ? `Company Atlas falhou: ${error.message}. Dump + API segue com Exa e Firecrawl.`
+        : "Company Atlas falhou. Dump + API segue com Exa e Firecrawl."
+    )
+    return enrichDumpWithAtlas(filings, brief, { connected: false }).then((lookup) => ({
+      ...lookup,
+      note: fallback.note,
+    }))
+  }
+}
+
 export async function searchDumpFlow(
   brief: Brief,
   key: string,
@@ -248,27 +278,38 @@ export async function searchDumpFlow(
   confirmed: number
   similar: number
   candidates: number
+  atlasNote: string
+  atlasCredits: number
 }> {
   const candidates = candidatesForBrief(filings, brief)
   const websites = [brief.website, also?.website].filter((site): site is string => Boolean(site))
   const seen = new Set<string>()
   const leads: Lead[] = []
   const rejected: RejectedSeed[] = []
+  const atlas = await atlasForDump(candidates, brief)
 
   for (const filing of candidates) {
+    const atlasMatch = atlas.matches.get(atlasLookupKey(filing.importer, filing.country))
     try {
       const result = await confirmOne(filing, brief, key, seen, websites)
       if (result.lead) {
+        applyAtlasToLead(result.lead, atlas)
         seen.add(result.lead.domain)
         leads.push(result.lead)
       } else if (result.rejected) {
-        rejected.push(result.rejected)
+        rejected.push({
+          ...result.rejected,
+          reason: atlasRejectedReason(atlasMatch, result.rejected.reason),
+        })
       }
     } catch (error) {
       rejected.push({
         importer: filing.importer,
         country: filing.country,
-        reason: error instanceof Error ? error.message : "Exa falhou nesta confirmação.",
+        reason: atlasRejectedReason(
+          atlasMatch,
+          error instanceof Error ? error.message : "Exa falhou nesta confirmação."
+        ),
       })
     }
   }
@@ -283,7 +324,15 @@ export async function searchDumpFlow(
   }
   for (const [country, group] of byCountry) {
     try {
-      const extra = await similarInCountry(brief, key, country, group, seen, websites)
+      const extra = await similarInCountry(
+        brief,
+        key,
+        country,
+        group,
+        seen,
+        websites,
+        extraAtlasNames(atlas, country)
+      )
       leads.push(...extra)
     } catch {
       // Similar search is extra. Confirmed dump names still go through Firecrawl.
@@ -292,6 +341,7 @@ export async function searchDumpFlow(
 
   for (const lead of leads) {
     applyFilingToLead(lead, filings, brief)
+    applyAtlasToLead(lead, atlas)
   }
 
   return {
@@ -300,5 +350,7 @@ export async function searchDumpFlow(
     confirmed: confirmed.length,
     similar: leads.length - confirmed.length,
     candidates: candidates.length,
+    atlasNote: atlas.note,
+    atlasCredits: atlas.creditsUsed,
   }
 }

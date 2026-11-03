@@ -123,6 +123,9 @@ function guardFit(lead: Lead, row: QualificationRow): QualificationRow {
       )
     }
   }
+  if (lead.atlas) {
+    notes.push(lead.atlas.note)
+  }
   if (lead.filing) {
     const brands = lead.filing.occupiedBrands.join(", ")
     notes.push(

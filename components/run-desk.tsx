@@ -233,7 +233,7 @@ export function RunDesk({ initial }: { initial: Run }) {
           <p className="mt-1 text-sm text-muted-foreground">
             {run.brief.searchKind === "dump"
               ? run.leads.length
-                ? "Só entram nomes que o Exa confirmou. Firecrawl confirma a página. O dump não confirma compra. Logística e marcas globais ficam fora."
+                ? "Só entram nomes que o Exa confirmou. Company Atlas pode ter cruzado a declaração HS. Firecrawl confirma a página. O dump não confirma compra. Logística e marcas globais ficam fora."
                 : "Os nomes do dump aparecem aqui só depois que o Exa confirmar."
               : run.leads.length
                 ? "Ranked for this supplier. Disqualified accounts stay on the list so the reason is visible. Mark companies for commercial due diligence."
@@ -627,6 +627,9 @@ function Dossier({ lead }: { lead: Lead }) {
           {lead.apiConfirm?.note ? (
             <p className="mt-1 max-w-xl text-sm text-muted-foreground">{lead.apiConfirm.note}</p>
           ) : null}
+          {lead.atlas?.note && lead.atlas.status !== "hit" ? (
+            <p className="mt-1 max-w-xl text-sm text-muted-foreground">{lead.atlas.note}</p>
+          ) : null}
           {isHttpUrl(lead.url) && !lead.url.includes(".example") ? (
             <a
               href={lead.url}
@@ -1019,7 +1022,17 @@ function ApiBadge({ lead }: { lead: Lead }) {
           : lead.apiConfirm?.exa === "rejected"
             ? "Exa descartou"
             : ""
-  const text = [seed, api].filter(Boolean).join(" · ")
+  const atlas =
+    lead.atlas?.status === "hit"
+      ? "Atlas HS"
+      : lead.atlas?.status === "miss"
+        ? "Atlas não achou"
+        : lead.atlas?.status === "no_market"
+          ? "fora do Atlas"
+          : lead.atlas?.status === "skipped"
+            ? "Atlas off"
+            : ""
+  const text = [seed, api, atlas].filter(Boolean).join(" · ")
   if (!text) return null
   return <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{text}</p>
 }

@@ -73,7 +73,7 @@ function secrets(): string[] {
 export function blankStages(kind?: Brief["searchKind"]): StageState[] {
   const searchDetail =
     kind === "dump"
-      ? "Dump names go to Exa. The APIs confirm or reject each importer, then search similar competitors."
+      ? "Dump names go to Exa. Company Atlas can confirm a customs line in overlapping markets. Firecrawl reads the page. The dump never confirms a purchase."
       : kind === "competitors"
         ? "Exa is mapping the brand’s distributors and direct competitor importers."
         : "Exa Agent is in search mode, asking for 10 companies in each target country."
@@ -112,7 +112,7 @@ export function createRun(brief: Brief, also?: Brief): Run {
   const names = also ? `${brief.supplierName} and ${also.supplierName}` : brief.supplierName
   const startNote =
     brief.searchKind === "dump"
-      ? `Qualification started for ${names}. Dump names seed the list. Exa and Firecrawl confirm or reject. Then Exa searches similar importers. Logistics and global brands stay out. The dump never confirms a purchase.`
+      ? `Qualification started for ${names}. Dump names seed the list. Company Atlas can match HS lines in 36 markets. Exa and Firecrawl confirm or reject the company website. Then Exa searches similar importers. Logistics and global brands stay out. The dump never confirms a purchase.`
       : `Qualification started for ${names}. Exa searches, Firecrawl collects contacts, OpenAI scores, and Parallel refines the best fit.`
   return {
     id: crypto.randomUUID(),
@@ -348,7 +348,7 @@ async function runDumpSearch(id: string, key: string) {
   if (!snapshot) return
   await updateRun(id, (run) => {
     const search = stage(run, "search")
-    search.detail = "Exa is confirming dump names. Firecrawl confirms the page later. The dump does not confirm a purchase."
+    search.detail = "Exa is confirming dump names. Company Atlas checks overlapping markets when connected. Firecrawl confirms the page later. The dump does not confirm a purchase."
     log(run, "search", search.detail)
   })
   const filings = await listFilings()
@@ -379,6 +379,9 @@ async function runDumpSearch(id: string, key: string) {
       current,
       `Exa confirmou ${found.confirmed} de ${found.candidates} nomes do dump. ${found.similar} concorrentes similares.${rejected ? ` ${rejected} descartados.` : ""} ${searchCounts(found.leads)}.`
     )
+    if (found.atlasNote) {
+      log(current, "search", found.atlasNote)
+    }
     if (rejected) {
       log(
         current,
@@ -498,7 +501,7 @@ function stampFirecrawl(lead: Lead) {
     note: apiConfirmNote({
       exa: lead.apiConfirm?.exa ?? "confirmed",
       firecrawl: confirm.status,
-      note: confirm.reason,
+      note: [confirm.reason, lead.atlas?.status === "hit" ? lead.atlas.note : ""].filter(Boolean).join(" "),
     }),
   }
 }
@@ -547,7 +550,12 @@ async function doExtract(id: string): Promise<"wait" | "next"> {
           lead.apiConfirm = {
             exa: lead.apiConfirm?.exa ?? "confirmed",
             firecrawl: "skipped",
-            note: "Firecrawl key missing. Só o Exa confirmou o nome. O dump não confirma compra.",
+            note: [
+              "Firecrawl key missing. Só o Exa confirmou o nome. O dump não confirma compra.",
+              lead.atlas?.status === "hit" ? lead.atlas.note : "",
+            ]
+              .filter(Boolean)
+              .join(" "),
           }
         }
       }

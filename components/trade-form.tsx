@@ -57,6 +57,12 @@ type Payload = {
     files: string[]
     note?: string
   }
+  atlas?: {
+    connected?: boolean
+    overlapping?: { country: string; iso: string; years: string; limited: boolean; candidates: number }[]
+    outside?: { country: string; candidates: number }[]
+    note?: string
+  }
   files?: { name: string; parsed: number; added: number }[]
   error?: string
 }
@@ -70,6 +76,7 @@ export function TradeForm() {
   const [error, setError] = useState("")
   const [note, setNote] = useState("")
   const [summary, setSummary] = useState<Payload["summary"]>()
+  const [atlas, setAtlas] = useState<Payload["atlas"]>()
 
   async function refresh() {
     const response = await fetch("/api/trade-records")
@@ -79,6 +86,7 @@ export function TradeForm() {
     setCount(data.count ?? 0)
     setSeedCount(data.seedCount ?? 0)
     setSummary(data.summary)
+    setAtlas(data.atlas)
   }
 
   useEffect(() => {
@@ -146,10 +154,12 @@ export function TradeForm() {
         <p className="text-sm text-muted-foreground">
           {count} importadores no arquivo
           {seedCount ? ` · ${seedCount} do dump Panamá HS 330510 (agosto, sem assinatura)` : ""}.
-          Há falsos. A busca dump manda os nomes para Exa e Firecrawl confirmarem. Logística e marcas
+          Há falsos. A busca dump manda os nomes para Exa e Firecrawl confirmarem. Company Atlas, nos
+          36 mercados do trial, pode achar a declaração HS — não confirma compra. Logística e marcas
           globais ficam de fora.
         </p>
         {summary && (summary.total ?? count) > 0 ? <DumpCut summary={summary} /> : null}
+        {atlas ? <AtlasCut atlas={atlas} /> : null}
         <div className="flex flex-col gap-2">
           <Label htmlFor="trade-file">Txt, CSV ou Excel</Label>
           <input
@@ -278,6 +288,40 @@ function DumpCut({ summary }: { summary: NonNullable<Payload["summary"]> }) {
       </p>
       {chips.length ? <p className="mt-1 text-muted-foreground">{chips.join(" · ")}</p> : null}
       {summary.note ? <p className="mt-2 text-muted-foreground">{summary.note}</p> : null}
+    </div>
+  )
+}
+
+function AtlasCut({ atlas }: { atlas: NonNullable<Payload["atlas"]> }) {
+  const overlap = atlas.overlapping ?? []
+  const outside = atlas.outside ?? []
+  return (
+    <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm">
+      <p className="font-medium">
+        Company Atlas · {overlap.length} país{overlap.length === 1 ? "" : "es"} do dump no trial de 36
+        {atlas.connected ? " · Google conectado" : " · ainda sem login"}
+      </p>
+      {overlap.length ? (
+        <p className="mt-1 text-muted-foreground">
+          {overlap
+            .map((row) => `${row.country}${row.limited ? " (limitado)" : ""} ${row.candidates}`)
+            .join(" · ")}
+        </p>
+      ) : null}
+      {outside.length ? (
+        <p className="mt-1 text-muted-foreground">
+          Fora do Atlas: {outside.map((row) => row.country).join(", ")}. Esses seguem só com Exa e
+          Firecrawl.
+        </p>
+      ) : null}
+      {atlas.note ? <p className="mt-2 text-muted-foreground">{atlas.note}</p> : null}
+      <p className="mt-2 text-muted-foreground">
+        MCP remoto: https://thecompanyatlas.com/mcp · 50 créditos/mês, 1 por chamada. Conecte em{" "}
+        <a href="/sources" className="underline-offset-2 hover:underline">
+          Fontes
+        </a>
+        . Linha Atlas não destrava Fit.
+      </p>
     </div>
   )
 }

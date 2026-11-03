@@ -164,4 +164,5 @@ test("Dump + API is a first-class search kind and keeps the four pipeline stages
   assert.equal(run.stages.length, 5)
   assert.match(run.stages[0].detail, /Dump names go to Exa/i)
   assert.match(run.logs[0].message, /dump never confirms/i)
+  assert.match(run.logs[0].message, /Company Atlas/i)
 })

@@ -139,7 +139,10 @@ export function hasCommerceSignals(lead: Lead): boolean {
 }
 
 export function isTradeFilingSignal(signal: { kind: CommerceKind; source?: string }): boolean {
-  return signal.kind === "customs" && signal.source === "trade_record"
+  return (
+    signal.kind === "customs" &&
+    (signal.source === "trade_record" || signal.source === "company_atlas")
+  )
 }
 
 /** Restock on a public page. A trade dump and an Exa “aduana” mention are indications, not a purchase. */

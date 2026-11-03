@@ -11,10 +11,12 @@ const EMPTY_FLAGS: KeyFlags = {
   firecrawl: false,
   openai: false,
   parallel: false,
+  atlas: false,
   exaEnv: false,
   firecrawlEnv: false,
   openaiEnv: false,
   parallelEnv: false,
+  atlasEnv: false,
 }
 
 export function SourcesForm() {
@@ -27,6 +29,7 @@ export function SourcesForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [saved, setSaved] = useState(false)
+  const [atlasNote, setAtlasNote] = useState("")
 
   async function refresh() {
     const response = await fetch("/api/keys")
@@ -36,6 +39,12 @@ export function SourcesForm() {
   }
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("atlas") === "connected") {
+      setAtlasNote("Company Atlas conectado com Google. Dump + API usa até 12 créditos por rodada.")
+    } else if (params.get("atlas") === "error") {
+      setAtlasNote(params.get("reason") || "O login Google da Company Atlas não completou.")
+    }
     let cancelled = false
     fetch("/api/keys")
       .then((response) => (response.ok ? response.json() : null))
@@ -150,6 +159,51 @@ export function SourcesForm() {
         onChange={setParallel}
         onClear={() => clearKey("parallel")}
       />
+      <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between gap-3">
+          <Label>Company Atlas</Label>
+          <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+            {flags.atlas || flags.atlasEnv ? "Connected" : "Optional"}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          MCP remoto em{" "}
+          <a
+            href="https://thecompanyatlas.com/mcp"
+            target="_blank"
+            rel="noreferrer"
+            className="underline-offset-2 hover:underline"
+          >
+            thecompanyatlas.com/mcp
+          </a>
+          . Trial gratuito em 36 países, 50 créditos/mês (1 por chamada). Login Google. No Cursor,
+          Settings → MCP → URL. Aqui o desk chama rank HS 3305 e o livro de parceiros no Dump + API.
+          Linha Atlas não confirma compra Kanechom/LQ e não substitui Exa/Firecrawl.
+        </p>
+        {flags.atlasEnv ? (
+          <p className="text-sm">Using COMPANY_ATLAS_TOKEN from the environment.</p>
+        ) : flags.atlas ? (
+          <button
+            type="button"
+            onClick={() => {
+              void fetch("/api/atlas/disconnect", { method: "POST" })
+                .then((response) => response.json())
+                .then((data: { flags?: KeyFlags }) => {
+                  if (data.flags) setFlags(data.flags)
+                  setAtlasNote("Company Atlas desconectado.")
+                })
+            }}
+            className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Disconnect Google
+          </button>
+        ) : (
+          <Button nativeButton={false} className="h-11 w-full px-4 sm:h-10 sm:w-fit" render={<a href="/api/atlas/connect" />}>
+            Connect with Google
+          </Button>
+        )}
+        {atlasNote ? <p className="text-sm text-muted-foreground">{atlasNote}</p> : null}
+      </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {saved ? <p className="text-sm">Keys saved. A new qualification will use them.</p> : null}
       {notes.map((note) => (

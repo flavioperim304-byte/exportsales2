@@ -14,7 +14,9 @@ export default function TradePage() {
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Manda os txt e os Excel da época juntos — austsham, jap, hk, uz, ger, UAE, Panamá,
           Bolívia. Se a ficha não tiver país, o nome do arquivo preenche (jap → Japan). O recorte
-          diz o lixo visível antes da API. Dump + API na Nova busca. Plataforma nova pode esperar.
+          diz o lixo visível antes da API. Company Atlas cobre 36 mercados no trial gratuito (MCP
+          remoto + Google). Dump + API na Nova busca cruza o overlap; o resto segue com Exa e
+          Firecrawl. Linha Atlas não confirma compra.
         </p>
       </div>
       <TradeForm />

@@ -2,7 +2,7 @@
 
 Export sales intelligence for a supplier you already represent. The desk qualifies buyers in four steps and keeps the evidence next to the score.
 
-1. **Search — Exa.** Buyer search still runs one Agent per country (10 companies). **Dump + API** is the other path: names from the Aduana file seed the list (logistics and global brands already out). Exa must confirm each company on the web or it is dropped as a possible false dump record. Confirmed names then get a similar-importer search in that country. The dump never confirms a purchase.
+1. **Search — Exa.** Buyer search still runs one Agent per country (10 companies). **Dump + API** is the other path: names from the Aduana file seed the list (logistics and global brands already out). [The Company Atlas](https://thecompanyatlas.com/mcp) (optional, Google OAuth, 50 credits/month across 36 markets) can match an HS 3305 customs line and fill the occupied-book partners in overlapping countries. Exa must still confirm each company on the web or it is dropped as a possible false dump record. Confirmed names then get a similar-importer search in that country. Atlas absence is not proof the dump is false. An Atlas line is not a Kanechom/LQ purchase. The dump never confirms a purchase.
 2. **ICP and contacts — Firecrawl Agent.** Each company is read by `POST /v2/agent` for role, products, markets, and published email, website, phone, and WhatsApp. A blank field means it was not published.
 3. **Activity, commerce, and best fit — Exa search + OpenAI.** Exa looks for news, product launches, new brands, and social posts from the last 18 months. A second pair of Exa Search queries looks for restock posts, trade-fair exhibitor lists, open-book language, and purchasing-hire ads. Restock on a public page can count as a buying fact. An Exa mention of “aduana” or a paid trade dump does not — those sources have false records and are not a bill of lading. A fair or a hiring post does not unlock best fit. Fit stays medium or low without published last purchase, stock, or sales.
 4. **Refine and context — Parallel.** The default is one Task API call (`pro-fast`, falling back to `pro`, about $0.14 a call). It checks the OpenAI score, writes the market and competitor note with citations, and sets the final best fit. Choosing Decisions on that run calls `POST /v1/decisions` in `fast` mode instead, and only for that run.
@@ -50,7 +50,12 @@ EXA_API_KEY=
 FIRECRAWL_API_KEY=
 OPENAI_API_KEY=
 PARALLEL_API_KEY=
+COMPANY_ATLAS_TOKEN=
 ```
+
+`COMPANY_ATLAS_TOKEN` is optional. The desk can also store a Google OAuth session after **Fontes → Connect with Google**. In Cursor, add a remote MCP server with URL `https://thecompanyatlas.com/mcp` and sign in with Google — that is the same trial, for chat, not the live Render run.
+
+A Dump + API run spends at most 12 Atlas credits: one HS 3305 rank per overlapping country (cap 4), a shipment search only when the rank missed dump names, then partner breakdown for matched registry ids. The free plan is 50 credits per calendar month, one credit per tool call, 10 shipment lines per call. Matching of party names to company ids is incomplete for 2026 lines. Limited markets (Panama, Kenya, Ethiopia, …) are thinner. Markets not in the 36 (UAE, Japan, Germany, Mexico, …) skip Atlas and stay on Exa + Firecrawl.
 
 Or open [Sources](http://127.0.0.1:3847/sources) from the top bar (**Sources 0/4** means nothing is connected yet). Those values are written to `data/secrets.json` (mode 0600, gitignored) and are sent only to those four APIs. An environment variable wins over a saved key. The key routes return connection flags, never the key values.
 

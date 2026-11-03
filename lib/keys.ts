@@ -7,6 +7,17 @@ type SecretFile = {
   firecrawl?: string
   openai?: string
   parallel?: string
+  atlasAccess?: string
+  atlasRefresh?: string
+  atlasClientId?: string
+  atlasExpiresAt?: string
+}
+
+export type AtlasSession = {
+  access?: string
+  refresh?: string
+  clientId?: string
+  expiresAt?: string
 }
 
 const file = path.join(process.cwd(), "data", "secrets.json")
@@ -25,6 +36,11 @@ function clean(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
+function writeFile(next: SecretFile) {
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify(next, null, 2), { mode: 0o600 })
+}
+
 function readVisibleFile(): SecretFile {
   try {
     const parsed: SecretFile = {}
@@ -38,6 +54,7 @@ function readVisibleFile(): SecretFile {
       if (key === "FIRECRAWL_API_KEY") parsed.firecrawl = value
       if (key === "OPENAI_API_KEY") parsed.openai = value
       if (key === "PARALLEL_API_KEY") parsed.parallel = value
+      if (key === "COMPANY_ATLAS_TOKEN") parsed.atlasAccess = value
     }
     return parsed
   } catch {
@@ -45,7 +62,53 @@ function readVisibleFile(): SecretFile {
   }
 }
 
-export function getKeys(): { exa?: string; firecrawl?: string; openai?: string; parallel?: string } {
+export function getAtlasSession(): AtlasSession {
+  const stored = readFile()
+  const visible = readVisibleFile()
+  return {
+    access:
+      clean(process.env.COMPANY_ATLAS_TOKEN) ||
+      clean(visible.atlasAccess) ||
+      clean(stored.atlasAccess) ||
+      undefined,
+    refresh: clean(stored.atlasRefresh) || undefined,
+    clientId: clean(stored.atlasClientId) || undefined,
+    expiresAt: clean(stored.atlasExpiresAt) || undefined,
+  }
+}
+
+export function saveAtlasSession(session: AtlasSession): KeyFlags {
+  const next = readFile()
+  const put = (field: keyof SecretFile, value: string | undefined) => {
+    if (value === undefined) return
+    if (value) next[field] = value
+    else delete next[field]
+  }
+  put("atlasAccess", session.access)
+  put("atlasRefresh", session.refresh)
+  put("atlasClientId", session.clientId)
+  put("atlasExpiresAt", session.expiresAt)
+  writeFile(next)
+  return keyFlags()
+}
+
+export function clearAtlasSession(): KeyFlags {
+  const next = readFile()
+  delete next.atlasAccess
+  delete next.atlasRefresh
+  delete next.atlasClientId
+  delete next.atlasExpiresAt
+  writeFile(next)
+  return keyFlags()
+}
+
+export function getKeys(): {
+  exa?: string
+  firecrawl?: string
+  openai?: string
+  parallel?: string
+  atlas?: string
+} {
   const stored = readFile()
   const visible = readVisibleFile()
   const exa = clean(process.env.EXA_API_KEY) || clean(visible.exa) || clean(stored.exa)
@@ -54,11 +117,13 @@ export function getKeys(): { exa?: string; firecrawl?: string; openai?: string; 
   const openai = clean(process.env.OPENAI_API_KEY) || clean(visible.openai) || clean(stored.openai)
   const parallel =
     clean(process.env.PARALLEL_API_KEY) || clean(visible.parallel) || clean(stored.parallel)
+  const atlas = getAtlasSession().access
   return {
     exa: exa || undefined,
     firecrawl: firecrawl || undefined,
     openai: openai || undefined,
     parallel: parallel || undefined,
+    atlas: atlas || undefined,
   }
 }
 
@@ -69,10 +134,12 @@ export function keyFlags(): KeyFlags {
     firecrawl: Boolean(keys.firecrawl),
     openai: Boolean(keys.openai),
     parallel: Boolean(keys.parallel),
+    atlas: Boolean(keys.atlas),
     exaEnv: Boolean(clean(process.env.EXA_API_KEY)),
     firecrawlEnv: Boolean(clean(process.env.FIRECRAWL_API_KEY)),
     openaiEnv: Boolean(clean(process.env.OPENAI_API_KEY)),
     parallelEnv: Boolean(clean(process.env.PARALLEL_API_KEY)),
+    atlasEnv: Boolean(clean(process.env.COMPANY_ATLAS_TOKEN)),
   }
 }
 
@@ -86,7 +153,7 @@ export function saveKeys(input: {
   const notes: string[] = []
   const next: SecretFile = { ...current }
   const apply = (
-    field: keyof SecretFile,
+    field: "exa" | "firecrawl" | "openai" | "parallel",
     envName: string,
     value: string | undefined
   ) => {
@@ -107,7 +174,6 @@ export function saveKeys(input: {
   apply("firecrawl", "FIRECRAWL_API_KEY", input.firecrawl)
   apply("openai", "OPENAI_API_KEY", input.openai)
   apply("parallel", "PARALLEL_API_KEY", input.parallel)
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(file, JSON.stringify(next, null, 2), { mode: 0o600 })
+  writeFile(next)
   return { flags: keyFlags(), notes }
 }

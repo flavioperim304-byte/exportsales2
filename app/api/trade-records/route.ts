@@ -1,4 +1,6 @@
 import { connection } from "next/server"
+import { atlasCoverage } from "@/lib/company-atlas"
+import { keyFlags } from "@/lib/keys"
 import { rematchFilingsOnRuns } from "@/lib/pipeline"
 import { cargoLabel, filingSummary, qualityLabel } from "@/lib/trade-records"
 import { addFilingFiles, addFilings, listFilings, seedFilingCount } from "@/lib/trade-store"
@@ -44,11 +46,13 @@ export async function GET() {
   await connection()
   const filings = await listFilings()
   const summary = filingSummary(filings)
+  const atlas = atlasCoverage(summary.countries, keyFlags().atlas)
   return Response.json({
     count: filings.length,
     seedCount: seedFilingCount(),
     source: "trade dump / CSV (indicação, há falsos)",
     summary,
+    atlas,
     filings: filings
       .slice()
       .sort((a, b) => b.hsShipments - a.hsShipments)
@@ -105,12 +109,14 @@ export async function POST(request: Request) {
       )
     }
     const rematched = await rematchFilingsOnRuns()
+    const summary = filingSummary(result.filings)
     return Response.json({
       added: result.added,
       total: result.total,
       parsed: result.parsed.length,
       rematched,
-      summary: filingSummary(result.filings),
+      summary,
+      atlas: atlasCoverage(summary.countries, keyFlags().atlas),
       files: "files" in result ? result.files : undefined,
       filings: result.parsed
         .slice()
