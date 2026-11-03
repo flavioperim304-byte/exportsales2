@@ -627,31 +627,90 @@ export type TradeFileResult = {
   error?: string
 }
 
-export function filingSummary(rows: TradeFiling[]): {
-  countries: { country: string; count: number; candidates: number }[]
+export type FilingSummary = {
+  total: number
   candidates: number
   excluded: number
+  dropRate: number
+  drops: Record<Exclude<FilingDropReason, "candidate">, number>
+  headingOnly: number
+  partnersRedacted: number
+  occupied: number
+  countries: { country: string; count: number; candidates: number }[]
   files: string[]
-} {
+  note: string
+}
+
+const EMPTY_DROPS: FilingSummary["drops"] = {
+  logistics_name: 0,
+  global_brand: 0,
+  sample: 0,
+  parcel: 0,
+  cargo_noise: 0,
+}
+
+export function dumpWorthNote(summary: Omit<FilingSummary, "note" | "countries" | "files">): string {
+  if (summary.total === 0) return "Sem nomes neste arquivo."
+  const bits = [
+    `${summary.total} nomes. ${summary.excluded} (${summary.dropRate}%) caem antes da API — marca global, logística, amostra, parcela ou ruído. ${summary.candidates} candidatos.`,
+  ]
+  if (summary.partnersRedacted) {
+    bits.push(
+      `Parceiros mascarados em ${summary.partnersRedacted}: no plano barato o livro ocupado não aparece, então o lixo visível fica baixo demais.`
+    )
+  }
+  if (summary.headingOnly) {
+    bits.push(`${summary.headingOnly} com descrição de nomenclatura HS, não do produto.`)
+  }
+  bits.push(
+    "Isso é lixo visível, não falso de verdade. Falso = Exa rejeita o nome ou a empresa nunca comprou. Quem já comprou de você conta como verdadeiro."
+  )
+  return bits.join(" ")
+}
+
+export function filingSummary(rows: TradeFiling[]): FilingSummary {
   const byCountry = new Map<string, { count: number; candidates: number }>()
   const files = new Set<string>()
+  const drops = { ...EMPTY_DROPS }
   let candidates = 0
+  let headingOnly = 0
+  let partnersRedacted = 0
+  let occupied = 0
   for (const row of rows) {
     if (row.sourceFile) files.add(row.sourceFile)
-    const hit = isSearchCandidate(row)
-    if (hit) candidates += 1
+    const reason = dropReason(row)
+    if (reason === "candidate") {
+      candidates += 1
+      if (row.headingOnly) headingOnly += 1
+      if (row.partnersRedacted) partnersRedacted += 1
+      if (row.quality === "occupied") occupied += 1
+    } else {
+      drops[reason] += 1
+    }
     const current = byCountry.get(row.country) ?? { count: 0, candidates: 0 }
     current.count += 1
-    if (hit) current.candidates += 1
+    if (reason === "candidate") current.candidates += 1
     byCountry.set(row.country, current)
   }
-  return {
-    countries: [...byCountry.entries()]
-      .map(([country, stats]) => ({ country, ...stats }))
-      .sort((a, b) => b.count - a.count),
+  const excluded = rows.length - candidates
+  const dropRate = rows.length === 0 ? 0 : Math.round((excluded / rows.length) * 100)
+  const stats = {
+    total: rows.length,
     candidates,
-    excluded: rows.length - candidates,
+    excluded,
+    dropRate,
+    drops,
+    headingOnly,
+    partnersRedacted,
+    occupied,
+  }
+  return {
+    ...stats,
+    countries: [...byCountry.entries()]
+      .map(([country, countryStats]) => ({ country, ...countryStats }))
+      .sort((a, b) => b.count - a.count),
     files: [...files].sort(),
+    note: dumpWorthNote(stats),
   }
 }
 
@@ -855,13 +914,26 @@ export function isGlobalBrandImporter(name: string): boolean {
   return GLOBAL_IMPORTER.test(name)
 }
 
+export type FilingDropReason =
+  | "candidate"
+  | "logistics_name"
+  | "global_brand"
+  | "sample"
+  | "parcel"
+  | "cargo_noise"
+
+export function dropReason(filing: TradeFiling): FilingDropReason {
+  if (isLogisticsName(filing.importer)) return "logistics_name"
+  if (isGlobalBrandImporter(filing.importer)) return "global_brand"
+  if (filing.cargo === "noise") return "cargo_noise"
+  if (filing.quality === "parcel") return "parcel"
+  if (filing.quality === "sample") return "sample"
+  return "candidate"
+}
+
 /** Names worth sending to Exa to confirm. Logistics and captive global brands stay out. */
 export function isSearchCandidate(filing: TradeFiling): boolean {
-  if (isLogisticsName(filing.importer)) return false
-  if (isGlobalBrandImporter(filing.importer)) return false
-  if (filing.quality === "parcel" || filing.quality === "sample") return false
-  if (filing.cargo === "noise") return false
-  return true
+  return dropReason(filing) === "candidate"
 }
 
 export function cargoLabel(cargo: TradeCargoKind): string {

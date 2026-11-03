@@ -51,7 +51,13 @@ export function QualifyForm({
       .then(
         (data: {
           count?: number
-          summary?: { candidates?: number; excluded?: number; countries?: { country: string; candidates: number }[] }
+          summary?: {
+            candidates?: number
+            excluded?: number
+            dropRate?: number
+            note?: string
+            countries?: { country: string; candidates: number }[]
+          }
         } | null) => {
           if (!data) {
             setDumpNote("Abra Aduana e cole austsham, jap, hk, uz, ger ou UAE. Sem arquivo, a busca dump não tem semente.")
@@ -68,7 +74,8 @@ export function QualifyForm({
             return
           }
           setDumpNote(
-            `${candidates} candidatos no arquivo. ${countries.join(" · ") || ""}. Coloque esses países em Target markets. O dump não confirma compra — Exa e Firecrawl confirmam ou descartam.`
+            data.summary?.note ||
+              `${candidates} candidatos no arquivo. ${countries.join(" · ") || ""}. Coloque esses países em Target markets. O dump não confirma compra — Exa e Firecrawl confirmam ou descartam.`
           )
         }
       )

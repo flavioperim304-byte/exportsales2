@@ -9,6 +9,8 @@ import { hasCommercialBuyFacts } from "../lib/commerce"
 import { qualificationRows } from "../lib/qualify"
 import {
   applyFilingToLead,
+  dumpWorthNote,
+  filingSummary,
   isGlobalBrandImporter,
   isHsHeadingText,
   isSearchCandidate,
@@ -86,6 +88,23 @@ test("logistics names and global brand subsidiaries are not search candidates", 
   assert.equal(dany ? isSearchCandidate(dany) : false, true)
 })
 
+test("the Panama dump drops half the cards as visible junk before API spend", () => {
+  const rows = parseTradeDump(dump)
+  const summary = filingSummary(rows)
+  assert.equal(summary.total, 30)
+  assert.equal(summary.candidates, 15)
+  assert.equal(summary.excluded, 15)
+  assert.equal(summary.dropRate, 50)
+  assert.equal(summary.drops.global_brand, 9)
+  assert.equal(summary.drops.sample, 2)
+  assert.equal(summary.drops.parcel, 2)
+  assert.equal(summary.drops.logistics_name, 1)
+  assert.equal(summary.drops.cargo_noise, 1)
+  assert.equal(summary.partnersRedacted, 0)
+  assert.match(summary.note, /50%/)
+  assert.match(dumpWorthNote(summary), /lixo visível/)
+})
+
 test("the Company Data list card is not a bill of lading and keeps *** unpublished", () => {
   const text = fs.readFileSync(path.join(process.cwd(), "lib/data/tradeindata-list.txt"), "utf8")
   const rows = parseTradeDump(text, "tradeindata", "UAE.txt")
@@ -144,6 +163,11 @@ test("Product Data on the cheap plan is a name card with partners locked", () =>
   assert.equal(minoil?.hs, "330590")
   assert.notEqual(minoil?.hsShipments, 209)
   assert.equal(isSearchCandidate(minoil!), true)
+  const summary = filingSummary(rows)
+  assert.equal(summary.dropRate, 0)
+  assert.equal(summary.partnersRedacted, 2)
+  assert.equal(summary.headingOnly, 1)
+  assert.match(summary.note, /livro ocupado não aparece/)
 })
 
 test("a TradeInData dump does not confirm purchase or unlock best fit", () => {

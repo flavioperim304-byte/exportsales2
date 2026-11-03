@@ -39,10 +39,23 @@ type Payload = {
   parsed?: number
   rematched?: number
   summary?: {
+    total?: number
     candidates: number
     excluded: number
+    dropRate?: number
+    drops?: {
+      logistics_name: number
+      global_brand: number
+      sample: number
+      parcel: number
+      cargo_noise: number
+    }
+    headingOnly?: number
+    partnersRedacted?: number
+    occupied?: number
     countries: { country: string; count: number; candidates: number }[]
     files: string[]
+    note?: string
   }
   files?: { name: string; parsed: number; added: number }[]
   error?: string
@@ -91,7 +104,7 @@ export function TradeForm() {
       setText("")
       const files = data.files?.map((item) => `${item.name}: ${item.parsed}`).join(" · ")
       setNote(
-        `Li ${data.parsed} empresas. ${data.added} novas no arquivo. Cruzei ${data.rematched} buscas já na mesa.${files ? ` ${files}.` : ""} ${data.summary ? `${data.summary.candidates} candidatos para a busca dump.` : ""}`
+        `Li ${data.parsed} empresas. ${data.added} novas no arquivo. Cruzei ${data.rematched} buscas já na mesa.${files ? ` ${files}.` : ""} ${data.summary?.note ?? ""}`
       )
       await refresh()
     } catch {
@@ -126,7 +139,7 @@ export function TradeForm() {
       }
       const names = data.files?.map((item) => `${item.name}: ${item.parsed}`).join(" · ")
       setNote(
-        `Li ${data.parsed} empresas em ${files.length} arquivos. ${data.added} novas. ${names || ""} ${data.summary ? `${data.summary.candidates} candidatos para a busca dump.` : ""}`
+        `Li ${data.parsed} empresas em ${files.length} arquivos. ${data.added} novas. ${names || ""} ${data.summary?.note ?? ""}`
       )
       await refresh()
     } catch {
@@ -142,12 +155,10 @@ export function TradeForm() {
         <p className="text-sm text-muted-foreground">
           {count} importadores no arquivo
           {seedCount ? ` · ${seedCount} do dump Panamá HS 330510 (agosto, sem assinatura)` : ""}.
-          {summary
-            ? ` ${summary.candidates} candidatos para Dump + API; ${summary.excluded} logística/marca global/ruído.`
-            : ""}{" "}
           Há falsos. A busca dump manda os nomes para Exa e Firecrawl confirmarem. Logística e marcas
           globais ficam de fora.
         </p>
+        {summary && (summary.total ?? count) > 0 ? <DumpCut summary={summary} /> : null}
         <div className="flex flex-col gap-2">
           <Label htmlFor="trade-file">CSV ou dump</Label>
           <input
@@ -253,6 +264,29 @@ export function TradeForm() {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+function DumpCut({ summary }: { summary: NonNullable<Payload["summary"]> }) {
+  const drops = summary.drops
+  const chips = [
+    drops?.global_brand ? `marca global ${drops.global_brand}` : "",
+    drops?.logistics_name ? `logística ${drops.logistics_name}` : "",
+    drops?.sample ? `amostra ${drops.sample}` : "",
+    drops?.parcel ? `parcela ${drops.parcel}` : "",
+    drops?.cargo_noise ? `ruído ${drops.cargo_noise}` : "",
+    summary.occupied ? `livro ocupado ${summary.occupied}` : "",
+    summary.headingOnly ? `texto de HS ${summary.headingOnly}` : "",
+    summary.partnersRedacted ? `parceiros *** ${summary.partnersRedacted}` : "",
+  ].filter(Boolean)
+  return (
+    <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm">
+      <p className="font-medium">
+        Recorte: {summary.dropRate ?? 0}% cai antes da API · {summary.candidates} candidatos
+      </p>
+      {chips.length ? <p className="mt-1 text-muted-foreground">{chips.join(" · ")}</p> : null}
+      {summary.note ? <p className="mt-2 text-muted-foreground">{summary.note}</p> : null}
     </div>
   )
 }

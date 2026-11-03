@@ -12,12 +12,10 @@ export default function TradePage() {
         </p>
         <h1 className="mt-2 font-serif text-3xl sm:text-4xl">Aduana</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          No plano barato o TradeInData mostra a ficha Product/Company Data, não o Bill of Lading.
-          Nome, país, last trade date, DESCRIPTION no HS filtrado, totais e barras dos meses vêm
-          abertos. TOP TRADE PARTNERS, origem, porto e contato ficam em ***. View details é o
-          gráfico mensal da empresa, ainda sem BL. Cole austsham, jap, hk, uz, ger, UAE ou o dump
-          do Panamá. Na Nova busca, Dump + API: Exa confirma o nome, Firecrawl lê a página, depois
-          similares.
+          Outras plataformas entram igual: cola o dump, o recorte diz se o lixo visível vale o
+          preço. No Panamá que já temos, metade cai antes da API (Unilever, Avon, amostra, zona
+          livre). O que sobra ainda pode ser falso — só Exa, Firecrawl ou quem já comprou de você
+          fecha isso. Cole austsham, jap, hk, uz, ger, UAE ou outro xlsx. Dump + API na Nova busca.
         </p>
       </div>
       <TradeForm />
