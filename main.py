@@ -309,18 +309,17 @@ def download_page() -> str:
     <title>Implantar no Render</title>
   </head>
   <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
-    <h1>Dois arquivos para o Render voltar</h1>
-    <p>Pare de subir lote-1 e lote-2. O overlay já está no GitHub; o último arrasto abriu a pasta lib e jogou os .ts na raiz. O Node quebra no next build. Este zip tem só tsconfig.json e app/leads/page.tsx. Windows: botão direito → Extrair tudo. Não abra com o Bloco de notas.</p>
-    <p>
-      <a href="/consertar-build.zip" download="consertar-build.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">consertar-build.zip — só 2 arquivos</a>
-    </p>
-    <ol>
-      <li>Abra https://github.com/flavioperim304-byte/exportsales2/upload/main</li>
-      <li>Extraia. Entre na pasta. Arraste tsconfig.json e a pasta app. Não abra app nem leads. Commit em main.</li>
-      <li>Render → exportsales (Node) → Manual Deploy → Deploy latest commit. Não apague o disco.</li>
-      <li>Se https://exportsales2.onrender.com mostrar status ok, não mexa no Python. Não reenvie o CSV do Panamá.</li>
-    </ol>
-    <p>Pronto quando https://exportsales.onrender.com/trade abrir. Os .ts soltos na raiz podem ficar: o tsconfig novo ignora eles.</p>
+    <h1>Baixe os arquivos. Não cole.</h1>
+    <p>Os commits Update tsconfig.json e Update page.tsx no GitHub não mudaram nenhuma linha. O Render repetiu o erro antigo. Não cole código. Não suba lote.</p>
+    <h2>1. tsconfig.json — raiz do repo</h2>
+    <p><a href="/hotfix/tsconfig.json" download="tsconfig.json" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar tsconfig.json</a></p>
+    <p>Depois abra <a href="https://github.com/flavioperim304-byte/exportsales2/upload/main">github.com/flavioperim304-byte/exportsales2/upload/main</a> e arraste só esse arquivo. Commit. No GitHub tem de aparecer app/**/*.ts (não **/*.ts).</p>
+    <h2>2. page.tsx — pasta app/leads</h2>
+    <p><a href="/hotfix/page.tsx" download="page.tsx" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar page.tsx</a></p>
+    <p>Depois abra <a href="https://github.com/flavioperim304-byte/exportsales2/upload/main/app/leads">github.com/.../upload/main/app/leads</a> e arraste só esse arquivo. Commit. A primeira linha tem de ter a palavra Suspense.</p>
+    <h2>3. Render</h2>
+    <p>Serviço Node exportsales → Manual Deploy → Deploy latest commit. Não apague o disco. Python já está ok: não mexa e não reenvie o CSV do Panamá.</p>
+    <p>Pronto quando https://exportsales.onrender.com/trade abrir.</p>
   </body>
 </html>
 """
@@ -377,6 +376,32 @@ def download_consertar_build() -> FileResponse:
         packaged_zip("consertar-build.zip"),
         media_type="application/octet-stream",
         filename="consertar-build.zip",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.get("/hotfix/tsconfig.json")
+def download_hotfix_tsconfig() -> FileResponse:
+    path = Path(__file__).with_name("tsconfig.json")
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="tsconfig.json não está neste servidor.")
+    return FileResponse(
+        path,
+        media_type="application/json",
+        filename="tsconfig.json",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.get("/hotfix/page.tsx")
+def download_hotfix_leads_page() -> FileResponse:
+    path = Path(__file__).resolve().parent / "app" / "leads" / "page.tsx"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="page.tsx não está neste servidor.")
+    return FileResponse(
+        path,
+        media_type="text/plain; charset=utf-8",
+        filename="page.tsx",
         headers={"X-Content-Type-Options": "nosniff"},
     )
 

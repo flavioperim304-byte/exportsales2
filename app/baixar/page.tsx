@@ -2,56 +2,75 @@ export default function BaixarPage() {
   return (
     <main className="mx-auto w-full max-w-xl px-4 py-12">
       <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Deploy</p>
-      <h1 className="mt-2 font-serif text-3xl">Dois arquivos para o Render voltar</h1>
+      <h1 className="mt-2 font-serif text-3xl">Baixe os arquivos. Não cole.</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        Pare de subir lote-1 e lote-2. O GitHub já tem o overlay, mas o último arrasto abriu a pasta{" "}
-        <code>lib</code> e jogou os <code>.ts</code> na raiz. Por isso o Node quebra no{" "}
-        <code>next build</code> e o live fica no deploy antigo (<code>/trade</code> 404). Este zip
-        tem só o <code>tsconfig.json</code> e a página <code>/leads</code>. Windows: botão direito →
-        Extrair tudo. Não abra com o Bloco de notas.
+        Os commits <code>Update tsconfig.json</code> e <code>Update page.tsx</code> no GitHub não
+        mudaram nenhuma linha. O Render repetiu o erro antigo: o <code>tsconfig</code> ainda
+        compila os <code>.ts</code> da raiz, e o <code>/leads</code> ainda quebra o{" "}
+        <code>next build</code>. Não cole código. Não suba lote. Baixe cada arquivo e arraste no
+        link certo.
       </p>
-      <div className="mt-6 flex flex-col gap-3">
+
+      <h2 className="mt-8 font-serif text-xl">1. tsconfig.json</h2>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        Vai na <strong>raiz</strong> do repositório (ao lado de <code>package.json</code>).
+      </p>
+      <div className="mt-3 flex flex-col gap-2">
         <a
-          href="/api/consertar-build.zip"
-          download="consertar-build.zip"
+          href="/api/hotfix/tsconfig"
+          download="tsconfig.json"
           className="inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground"
         >
-          consertar-build.zip — só 2 arquivos
+          Baixar tsconfig.json
+        </a>
+        <a
+          href="https://github.com/flavioperim304-byte/exportsales2/upload/main"
+          className="inline-flex rounded-lg border border-border px-5 py-3 text-sm"
+        >
+          Abrir upload da raiz no GitHub
         </a>
       </div>
-      <ol className="mt-6 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
+      <p className="mt-2 text-sm text-muted-foreground">
+        Arraste só esse arquivo. Commit. No GitHub, abra o arquivo: tem de aparecer{" "}
+        <code>app/**/*.ts</code>. Se ainda aparecer <code>**/*.ts</code>, o upload não substituiu.
+      </p>
+
+      <h2 className="mt-8 font-serif text-xl">2. page.tsx das leads</h2>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        Vai em <code>app/leads/</code>. Não solte na raiz.
+      </p>
+      <div className="mt-3 flex flex-col gap-2">
+        <a
+          href="/api/hotfix/page"
+          download="page.tsx"
+          className="inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground"
+        >
+          Baixar page.tsx
+        </a>
+        <a
+          href="https://github.com/flavioperim304-byte/exportsales2/upload/main/app/leads"
+          className="inline-flex rounded-lg border border-border px-5 py-3 text-sm"
+        >
+          Abrir upload de app/leads no GitHub
+        </a>
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Arraste só esse arquivo. Commit. No GitHub, a primeira linha tem de ter a palavra{" "}
+        <code>Suspense</code>.
+      </p>
+
+      <h2 className="mt-8 font-serif text-xl">3. Render</h2>
+      <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
         <li>
-          Abra{" "}
-          <a
-            href="https://github.com/flavioperim304-byte/exportsales2/upload/main"
-            className="underline-offset-2 hover:underline"
-          >
-            github.com/flavioperim304-byte/exportsales2/upload/main
-          </a>
-          .
+          Serviço Node <strong>exportsales</strong> → Manual Deploy → Deploy latest commit. Não
+          apague o disco.
         </li>
         <li>
-          Extraia o zip. Entre na pasta. Arraste os dois itens: o arquivo{" "}
-          <code>tsconfig.json</code> e a pasta <code>app</code>. Não abra <code>app</code> nem{" "}
-          <code>leads</code>. Não arraste a pasta consertar-build inteira.
-        </li>
-        <li>
-          Commit em <code>main</code>. Confira no GitHub se{" "}
-          <code>app/leads/page.tsx</code> ainda está dentro de <code>app/leads</code> (não na raiz).
-        </li>
-        <li>
-          Render → serviço Node <strong>exportsales</strong> → Manual Deploy → Deploy latest commit.
-          Não apague o disco.
-        </li>
-        <li>
-          Se https://exportsales2.onrender.com mostrar <code>status: ok</code>, não mexa no Python.
-          Não reenvie o CSV do Panamá.
+          Python (exportsales2) já está ok. Não mexa. Não reenvie o CSV do Panamá.
         </li>
       </ol>
-      <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
-        Pronto quando https://exportsales.onrender.com/trade abrir. Os arquivos soltos na raiz do
-        GitHub podem ficar: o tsconfig novo ignora eles. Não arraste de novo o conteúdo de{" "}
-        <code>lib</code>.
+      <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+        Pronto quando https://exportsales.onrender.com/trade abrir.
       </p>
     </main>
   )

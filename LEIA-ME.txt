@@ -1,30 +1,28 @@
-Export Desk — o Render Node quebrou no next build
-=================================================
+Export Desk — o Render repetiu o erro porque o GitHub não mudou
+===============================================================
 
-Pare de subir lote-1 e lote-2. O overlay já está no GitHub
-(flavioperim304-byte/exportsales2). O último arrasto abriu a pasta lib
-e jogou os .ts na raiz. Por isso o Node falha no build e o live fica
-no deploy antigo: /trade 404.
+Os commits "Update tsconfig.json" e "Update page.tsx" tiveram 0 linhas.
+O Render rodou o mesmo next build e falhou de novo:
 
-Este conserto são dois arquivos:
-  tsconfig.json          (ignora os .ts soltos na raiz)
-  app/leads/page.tsx     (Suspense, senão o /leads derruba o next build)
+1. tsconfig.json ainda inclui **/*.ts → os .ts soltos na raiz
+   (comexstat-map.ts) pedem ./data/comexstat-countries.json
+2. app/leads/page.tsx ainda chama connection() sem Suspense
 
-No Windows:
-1. Botão direito no consertar-build.zip → Extrair tudo
-2. Não abra com o Bloco de notas. Use o Explorer ou o 7-Zip.
-3. Entre na pasta extraída. Você vê tsconfig.json e a pasta app.
-4. Abra github.com/flavioperim304-byte/exportsales2/upload/main
-5. Arraste os DOIS itens: o arquivo tsconfig.json e a pasta app.
-   Não abra app. Não abra leads. Não arraste a pasta consertar-build.
-6. Commit em main.
-7. Render → serviço Node exportsales → Manual Deploy → Deploy latest commit.
-8. Não apague o disco. Não apague o repo.
+NÃO cole código. NÃO suba lote-1 nem lote-2.
 
-Se https://exportsales2.onrender.com mostrar {"status":"ok"}, o Python
-já voltou. Não faça Manual Deploy no exportsales2. Não reenvie o CSV
-do Panamá.
+Baixe os arquivos nesta página e arraste nos links certos:
+
+1. Baixar tsconfig.json
+   Upload: github.com/flavioperim304-byte/exportsales2/upload/main
+   Conferir: o arquivo no GitHub tem de ter app/**/*.ts (não **/*.ts)
+
+2. Baixar page.tsx
+   Upload: github.com/flavioperim304-byte/exportsales2/upload/main/app/leads
+   Conferir: a primeira linha tem a palavra Suspense
+
+3. Render → exportsales (Node) → Manual Deploy → Deploy latest commit
+   Não apague o disco.
+
+Python (exportsales2) está ok. Não mexa. Não reenvie o CSV do Panamá.
 
 Pronto quando https://exportsales.onrender.com/trade abrir.
-Os arquivos soltos na raiz do GitHub podem ficar.
-Não arraste de novo o conteúdo de dentro de lib.
