@@ -27,6 +27,8 @@ type FilingRow = {
   ports?: string[]
   originsRedacted?: boolean
   portsRedacted?: boolean
+  partnersRedacted?: boolean
+  headingOnly?: boolean
 }
 
 type Payload = {
@@ -201,12 +203,17 @@ export function TradeForm() {
                     {row.description ? (
                       <p className="mt-1 max-w-xs text-muted-foreground">{row.description}</p>
                     ) : null}
-                    {row.originsRedacted || row.portsRedacted ? (
+                    {row.originsRedacted || row.portsRedacted || row.partnersRedacted || row.headingOnly ? (
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {row.originsRedacted ? "origem *** na página" : ""}
-                        {row.originsRedacted && row.portsRedacted ? " · " : ""}
-                        {row.portsRedacted ? "portos ***" : ""}
-                        {row.tradingCountries?.length ? ` · visível: ${row.tradingCountries.join(", ")}` : ""}
+                        {[
+                          row.partnersRedacted ? "parceiros ***" : "",
+                          row.originsRedacted ? "origem ***" : "",
+                          row.portsRedacted ? "portos ***" : "",
+                          row.headingOnly ? "texto do HS, não do produto" : "",
+                          row.tradingCountries?.length ? `visível: ${row.tradingCountries.join(", ")}` : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
                     ) : null}
                   </td>

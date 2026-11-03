@@ -133,6 +133,10 @@ export type TradeFiling = {
   ports: string[]
   originsRedacted: boolean
   portsRedacted: boolean
+  /** TOP TRADE PARTNERS pie was *** on the cheap plan. */
+  partnersRedacted: boolean
+  /** Description is the HS legal heading, not a commercial product name. */
+  headingOnly: boolean
   cargo: TradeCargoKind
   occupiedBrands: string[]
   occupiedShare: number
@@ -162,6 +166,8 @@ export type TradeFilingMatch = {
   ports: string[]
   originsRedacted: boolean
   portsRedacted: boolean
+  partnersRedacted: boolean
+  headingOnly: boolean
   brazilHint: boolean
   logisticsShare: number
   note: string

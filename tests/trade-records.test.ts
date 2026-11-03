@@ -10,6 +10,7 @@ import { qualificationRows } from "../lib/qualify"
 import {
   applyFilingToLead,
   isGlobalBrandImporter,
+  isHsHeadingText,
   isSearchCandidate,
   parseTradeDump,
 } from "../lib/trade-records"
@@ -117,6 +118,32 @@ test("the Company Data list card is not a bill of lading and keeps *** unpublish
   assert.equal(dole?.cargo, "other")
   assert.match(dole?.description ?? "", /bananas/i)
   assert.ok(dole?.latestMonths.includes("202605"))
+})
+
+test("Product Data on the cheap plan is a name card with partners locked", () => {
+  const text = fs.readFileSync(path.join(process.cwd(), "lib/data/tradeindata-product.txt"), "utf8")
+  const rows = parseTradeDump(text, "tradeindata", "bolivia.txt")
+  assert.equal(rows.length, 2)
+  const glb = rows.find((row) => /glb/i.test(row.importer))
+  const minoil = rows.find((row) => /minoil/i.test(row.importer))
+  assert.ok(glb)
+  assert.ok(minoil)
+  assert.equal(glb?.country, "Bolivia")
+  assert.equal(glb?.hs, "330590")
+  assert.equal(glb?.hsShipments, 139)
+  assert.equal(glb?.totalShipments, 1386)
+  assert.ok(glb?.hsCodes.some((row) => row.code === "330510" && row.shipments === 328))
+  assert.equal(glb?.partnersRedacted, true)
+  assert.equal(glb?.partners.length, 0)
+  assert.equal(glb?.headingOnly, false)
+  assert.match(glb?.description ?? "", /henna/i)
+  assert.equal(isSearchCandidate(glb!), true)
+  assert.ok(glb?.latestMonths.includes("202608"))
+  assert.equal(minoil?.headingOnly, true)
+  assert.equal(isHsHeadingText(minoil?.description ?? ""), true)
+  assert.equal(minoil?.hs, "330590")
+  assert.notEqual(minoil?.hsShipments, 209)
+  assert.equal(isSearchCandidate(minoil!), true)
 })
 
 test("a TradeInData dump does not confirm purchase or unlock best fit", () => {

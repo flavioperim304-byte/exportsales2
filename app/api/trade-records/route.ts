@@ -34,6 +34,8 @@ function present(row: Awaited<ReturnType<typeof listFilings>>[number]) {
     ports: row.ports,
     originsRedacted: row.originsRedacted,
     portsRedacted: row.portsRedacted,
+    partnersRedacted: row.partnersRedacted,
+    headingOnly: row.headingOnly,
     note: `${row.hsShipments} HS ${row.hs}`,
   }
 }

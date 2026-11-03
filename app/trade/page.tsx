@@ -12,12 +12,12 @@ export default function TradePage() {
         </p>
         <h1 className="mt-2 font-serif text-3xl sm:text-4xl">Aduana</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          A página de Company Data do TradeInData não é Bill of Lading. O cartão mostra nome, país,
-          last trade date, um recorte de PRODUCTS, HSCODE(S) com totais, barras dos últimos meses e
-          TOTAL SHIPMENT da empresa inteira. TOP TRADING COUNTRIES e TOP 5 PORTS vêm quase sempre
-          mascarados (*** ) sem assinatura. Contatos ficam atrás de Subscribe. Cole austsham, jap,
-          hk, uz, ger, UAE ou o dump do Panamá — o desk só lê essa ficha. Na Nova busca, Dump + API:
-          Exa confirma ou descarta o nome, Firecrawl lê a página, depois busca similares.
+          No plano barato o TradeInData mostra a ficha Product/Company Data, não o Bill of Lading.
+          Nome, país, last trade date, DESCRIPTION no HS filtrado, totais e barras dos meses vêm
+          abertos. TOP TRADE PARTNERS, origem, porto e contato ficam em ***. View details é o
+          gráfico mensal da empresa, ainda sem BL. Cole austsham, jap, hk, uz, ger, UAE ou o dump
+          do Panamá. Na Nova busca, Dump + API: Exa confirma o nome, Firecrawl lê a página, depois
+          similares.
         </p>
       </div>
       <TradeForm />
