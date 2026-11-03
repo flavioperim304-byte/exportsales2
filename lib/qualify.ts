@@ -1,4 +1,5 @@
 import { activityLine, hasRecentActivity } from "./activity"
+import { commerceLine } from "./commerce"
 import { computeFitProbability, fitProbabilityLine, hasPublishedBuyFacts } from "./fit-probability"
 import type { Brief, FitJudgment, Lead, LeadScore } from "./types"
 
@@ -16,6 +17,7 @@ export type QualificationRow = {
   fromParallel: boolean
   activity: string
   activityLive: boolean
+  commerce: string
   fitLevel: IcpLevel
   fitIndex: number
   fitNote: string
@@ -66,6 +68,7 @@ function fromJudgment(
     fromParallel: source === "parallel",
     activity: activityLine(lead),
     activityLive: hasRecentActivity(lead),
+    commerce: commerceLine(lead),
     fitLevel: fit.level,
     fitIndex: fit.index,
     fitNote: fitProbabilityLine(fit),
@@ -103,7 +106,7 @@ function guardFit(lead: Lead, row: QualificationRow): QualificationRow {
   if (!hasPublishedBuyIntent(lead) && next.bestFit && next.bestFit !== "neither") {
     next = { ...next, bestFit: "neither" }
     notes.push(
-      "Best fit foi retirado: não há última compra, estoque ou vendas publicados. ICP de canal não é intenção de compra. Vaga de vendas ou compras, sozinha, não basta."
+      "Best fit foi retirado: não há última compra, estoque, vendas, aduana ou reposição. ICP de canal não é intenção de compra. Feira ou vaga de compras, sozinha, não basta."
     )
   }
   if (notes.length) {
@@ -184,6 +187,7 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
       fromParallel: false,
       activity: activityLine(lead),
       activityLive: hasRecentActivity(lead),
+      commerce: commerceLine(lead),
       fitLevel: fit.level,
       fitIndex: fit.index,
       fitNote: fitProbabilityLine(fit),

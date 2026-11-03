@@ -1,4 +1,5 @@
 import { hasRecentActivity } from "./activity"
+import { hasCommercialBuyFacts, hasCommerceSignals, recentCommerce } from "./commerce"
 import type { Brief, BuyingFact, BuyingKind, Competitor, FitProbability, Lead } from "./types"
 import { clip } from "./text"
 
@@ -12,13 +13,13 @@ const KIND_LABEL: Record<BuyingKind, string> = {
 
 const PATTERNS: Record<BuyingKind, RegExp> = {
   last_purchase:
-    /ultima compra|last purchase|recent(?:ly)? (?:imported|received|shipped|bought)|acabamos de receber|just (?:received|imported|restocked)|shipment in 202[5-6]|imported in 202[5-6]|compra recente/i,
+    /ultima compra|última compra|última importaci[oó]n|last purchase|recent(?:ly)? (?:imported|received|shipped|bought)|acabamos de receber|just (?:received|imported|restocked)|shipment in 202[5-6]|imported in 202[5-6]|compra recente|import[oó] (?:un |una |el |la )?(?:contenedor|embarque|lote)|importamos en 202[5-6]|recibimos (?:un |el )?(?:embarque|contenedor)|embarque en 202[5-6]|despacho aduanero|bill of lading|manifiesto de carga/i,
   stock:
-    /\bestoque\b|in stock|out of stock|sold out|low stock|reposi[cç][aã]o|inventory|sem estoque|esgotado|restock/i,
+    /\bestoque\b|in stock|out of stock|sold out|low stock|reposi[cç][aã]o|reposici[oó]n|inventory|inventario|sem estoque|esgotado|agotado|restock|acaba de (?:llegar|chegar)|ya (?:tenemos|hay) stock|sin stock/i,
   brand_performance:
     /best[- ]seller|mais vendid|top selling|desempenho|leading brand|growing brand|ranking|marca l[ií]der/i,
   sales:
-    /faturamento|sales (?:grew|growth|volume|up)|volume de venda|units sold|import volume|receita|turnover|vendas cresceram/i,
+    /faturamento|sales (?:grew|growth|volume|up)|volume de venda|units sold|import volume|receita|turnover|vendas cresceram|ventas crecieron|facturaci[oó]n|volumen de (?:venta|importaci[oó]n)|unidades vendidas/i,
   competitor_move:
     /concorrente|competitor (?:launch|signed|dropped|moved)|exclusive (?:with|for)|perdeu a marca|nova exclusiva|rival brand/i,
 }
@@ -91,9 +92,29 @@ function factFromField(kind: BuyingKind, value: string | undefined, url?: string
 }
 
 export function hasPublishedBuyFacts(lead: Lead): boolean {
+  if (hasCommercialBuyFacts(lead)) return true
   return buyingFacts(lead).some(
     (fact) => fact.found && (fact.kind === "last_purchase" || fact.kind === "stock" || fact.kind === "sales")
   )
+}
+
+function factFromCommerce(kind: BuyingKind, lead: Lead): BuyingFact | null {
+  const hit =
+    kind === "last_purchase"
+      ? recentCommerce(lead).find((signal) => signal.kind === "customs")
+      : kind === "stock"
+        ? recentCommerce(lead).find((signal) => signal.kind === "restock")
+        : undefined
+  if (!hit) return null
+  const quote = clip(hit.quote || hit.title, 220)
+  if (!quote || looksUnpublished(quote)) return null
+  return {
+    kind,
+    found: true,
+    recency: recencyOf(`${quote} ${hit.publishedAt ?? ""}`),
+    quote,
+    url: hit.url,
+  }
 }
 
 export function buyingFacts(lead: Lead): BuyingFact[] {
@@ -128,6 +149,11 @@ export function buyingFacts(lead: Lead): BuyingFact[] {
         continue
       }
     }
+    const fromCommerce = factFromCommerce(kind, lead)
+    if (fromCommerce) {
+      facts.push(fromCommerce)
+      continue
+    }
     facts.push({ kind, found: false, recency: "unknown", quote: "" })
   }
   return facts
@@ -160,6 +186,16 @@ function competitorBoost(lead: Lead, competitors: Competitor[]): number {
   return local.length ? 8 : 0
 }
 
+/** Fair, open book, and a purchasing hire add context. They do not count as a purchase. */
+function commerceBoost(lead: Lead): number {
+  const kinds = new Set(recentCommerce(lead).map((signal) => signal.kind))
+  let points = 0
+  if (kinds.has("trade_fair")) points += 8
+  if (kinds.has("open_book")) points += 6
+  if (kinds.has("hiring_buy")) points += 4
+  return points
+}
+
 export function computeFitProbability(
   brief: Brief,
   lead: Lead,
@@ -176,12 +212,17 @@ export function computeFitProbability(
   index += roleBoost(lead)
   index += productBoost(brief, lead)
   index += competitorBoost(lead, competitors)
-  if (found.length === 0) index = Math.min(index, 38)
-  if (found.length < 2 && !hasRecentActivity(lead)) index = Math.min(index, 44)
+  index += commerceBoost(lead)
+  const commerceBuy = hasCommercialBuyFacts(lead)
+  if (found.length === 0 && !hasCommerceSignals(lead)) index = Math.min(index, 38)
+  if (found.length < 2 && !hasRecentActivity(lead) && recentCommerce(lead).length < 2) {
+    index = Math.min(index, 44)
+  }
   if (
     missing.includes("last_purchase") &&
     missing.includes("stock") &&
-    missing.includes("sales")
+    missing.includes("sales") &&
+    !commerceBuy
   ) {
     index = Math.min(index, 55)
   }
@@ -190,12 +231,12 @@ export function computeFitProbability(
   index = Math.max(0, Math.min(100, index))
   const level: FitProbability["level"] = index >= 70 ? "high" : index >= 45 ? "medium" : "low"
   let note =
-    found.length === 0
-      ? "Não há última compra, estoque, desempenho de marca, vendas ou ação de concorrente publicados. A probabilidade de fit fica baixa até aparecer um desses fatos — empresas só com folheto quase não respondem."
+    found.length === 0 && !hasCommerceSignals(lead)
+      ? "Não há última compra, estoque, desempenho de marca, vendas, aduana ou reposição publicados. A probabilidade de fit fica baixa até aparecer um desses fatos — empresas só com folheto quase não respondem."
       : level === "high"
         ? `Os fatos de compra publicados sustentam um fit alto. Índice de evidência ${index}/100. Isso não é um pedido confirmado.`
         : level === "medium"
-          ? `Alguns fatos de compra foram publicados, mas última compra, estoque ou vendas ainda estão fracos. Índice de evidência ${index}/100.`
+          ? `Alguns fatos de compra ou sinais comerciais foram publicados, mas última compra, estoque ou vendas ainda estão fracos. Índice de evidência ${index}/100.`
           : `Poucos fatos de compra publicados para um fit alto. Falta ${missing.map(buyingKindLabel).join(", ")}. Índice de evidência ${index}/100.`
   if (lead.rag?.checked) {
     note += lead.rag.match

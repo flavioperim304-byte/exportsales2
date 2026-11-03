@@ -246,6 +246,7 @@ function corpus(lead: Lead): string {
     (lead.context?.knownSuppliers ?? []).join(" "),
     (lead.context?.risks ?? []).join(" "),
     (lead.activity?.signals ?? []).map((signal) => `${signal.title} ${signal.quote}`).join(" "),
+    (lead.commerce?.signals ?? []).map((signal) => `${signal.title} ${signal.quote}`).join(" "),
   ]
     .filter(Boolean)
     .join("\n")
@@ -255,6 +256,7 @@ function latestEvidenceAt(lead: Lead, extra: DiligenceFinding[] = []): string | 
   const stamps = [
     ...buyingFacts(lead).filter((fact) => fact.found).map((fact) => recencyStamp(fact.recency, fact.quote)),
     ...(lead.activity?.signals ?? []).map((signal) => signal.publishedAt),
+    ...(lead.commerce?.signals ?? []).map((signal) => signal.publishedAt),
     ...extra.map((item) => item.evidenceAt),
   ]
     .filter((value): value is string => Boolean(value))
@@ -403,8 +405,9 @@ export function classifyBlocks(
 
   let imports: DiligenceEvidenceState = "absent"
   const publishedPurchase = facts.some((fact) => fact.kind === "last_purchase" && fact.found)
-  if (IMPORT_NO.test(text) && !IMPORT_YES.test(text) && !publishedPurchase) imports = "negative"
-  else if (IMPORT_YES.test(text) || publishedPurchase) imports = "strong"
+  const customsHit = (lead.commerce?.signals ?? []).some((signal) => signal.kind === "customs")
+  if (IMPORT_NO.test(text) && !IMPORT_YES.test(text) && !publishedPurchase && !customsHit) imports = "negative"
+  else if (IMPORT_YES.test(text) || publishedPurchase || customsHit) imports = "strong"
   else if (IMPORT_HINT.test(role) || IMPORT_HINT.test(text)) imports = "partial"
   else if (ROUTINE_SOCIAL.test(text) && !IMPORT_HINT.test(text)) imports = "inadequate"
 

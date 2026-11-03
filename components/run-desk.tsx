@@ -12,6 +12,7 @@ import { PromptPreview } from "@/components/prompt-preview"
 import { qualificationRows } from "@/lib/qualify"
 import { BAND_LABEL, STATUS_LABEL, formatWhen, isHttpUrl, leadPlace, mailtoHref, telHref } from "@/lib/format"
 import { activityKindLabel, hasRecentActivity } from "@/lib/activity"
+import { commerceKindLabel, hasCommercialBuyFacts, hasCommerceSignals } from "@/lib/commerce"
 import { buyingKindLabel } from "@/lib/fit-probability"
 import { diligenceBrands, latestReport } from "@/lib/diligence"
 import type { Band, DiligenceReport, Evidence, Lead, Run, StageState } from "@/lib/types"
@@ -20,7 +21,7 @@ import type { IcpLevel } from "@/lib/qualify"
 const STAGE_META = {
   search: { n: "01", source: "Exa Agent", title: "Search" },
   extract: { n: "02", source: "Firecrawl Agent", title: "ICP and contacts" },
-  classify: { n: "03", source: "Exa + OpenAI", title: "Activity and best fit" },
+  classify: { n: "03", source: "Exa + OpenAI", title: "Activity, commerce, and best fit" },
   context: { n: "04", source: "Parallel", title: "Refine and context" },
   diligence: { n: "05", source: "Desk + OpenAI", title: "Commercial due diligence" },
 } as const
@@ -620,6 +621,7 @@ function Dossier({ lead }: { lead: Lead }) {
       </div>
 
       <FitPanel lead={lead} />
+      <CommercePanel lead={lead} />
       <ActivityPanel lead={lead} />
       {lead.rag?.checked ? (
         <p className="mt-3 text-sm text-muted-foreground">
@@ -735,10 +737,10 @@ function QualificationTable({ run }: { run: Run }) {
       <h2 className="font-serif text-2xl">{fromParallel || fromOpenAI ? "Best fit" : "Evidence checklist"}</h2>
       <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
         {fromParallel
-          ? "O Parallel refinou estes níveis e definiu o best fit final. High é fit de produto e canal. Só sobe com última compra, estoque, marcas, vendas ou ação de concorrente publicados — não é um pedido confirmado."
+          ? "O Parallel refinou estes níveis e definiu o best fit final. High é fit de produto e canal. Só sobe com última compra, estoque, vendas, aduana ou reposição — feira ou vaga de compras, sozinha, não basta."
           : fromOpenAI
-            ? "A OpenAI pontuou esta lista. O Parallel ainda não refinou. High é fit de produto e canal, e só se mantém quando há fatos de compra publicados."
-            : "Nem a OpenAI nem o Parallel pontuaram esta lista. Os níveis abaixo são o checklist local. Sem última compra, estoque ou vendas publicados a probabilidade de fit fica baixa."}
+            ? "A OpenAI pontuou esta lista. O Parallel ainda não refinou. High é fit de produto e canal, e só se mantém quando há fatos de compra, aduana ou reposição."
+            : "Nem a OpenAI nem o Parallel pontuaram esta lista. Os níveis abaixo são o checklist local. Sem última compra, estoque, vendas, aduana ou reposição a probabilidade de fit fica baixa."}
       </p>
       <ul className="mt-4 flex flex-col gap-3 md:hidden">
         {rows.map((row) => (
@@ -769,13 +771,14 @@ function QualificationTable({ run }: { run: Run }) {
             </p>
             <p className="mt-1 text-sm text-muted-foreground">{row.fitNote}</p>
             <p className="mt-3 text-sm text-muted-foreground">{row.activity}</p>
+            <p className="mt-3 text-sm text-muted-foreground">{row.commerce}</p>
             <p className="mt-3 text-sm text-muted-foreground">{row.rationale}</p>
             <p className="mt-1 text-sm text-muted-foreground">{row.qualificationNeeded}</p>
           </li>
         ))}
       </ul>
       <div className="mt-4 hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-border text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               <th className="py-2 pr-3 font-medium">Company</th>
@@ -789,6 +792,7 @@ function QualificationTable({ run }: { run: Run }) {
               <th className="py-2 pr-3 font-medium">Best fit</th>
               <th className="py-2 pr-3 font-medium">Fit</th>
               <th className="py-2 pr-3 font-medium">Atividade</th>
+              <th className="py-2 pr-3 font-medium">Comércio</th>
               <th className="py-2 font-medium">Still to confirm</th>
             </tr>
           </thead>
@@ -813,6 +817,7 @@ function QualificationTable({ run }: { run: Run }) {
                   {row.fitLevel} · {row.fitIndex}/100
                 </td>
                 <td className="py-3 pr-3 text-muted-foreground">{row.activity}</td>
+                <td className="py-3 pr-3 text-muted-foreground">{row.commerce}</td>
                 <td className="py-3 text-muted-foreground">
                   <p>{row.rationale}</p>
                   <p className="mt-1">{row.qualificationNeeded}</p>
@@ -883,6 +888,56 @@ function FitPanel({ lead }: { lead: Lead }) {
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+function CommercePanel({ lead }: { lead: Lead }) {
+  const signals = lead.commerce?.signals ?? []
+  const live = hasCommerceSignals(lead)
+  const buy = hasCommercialBuyFacts(lead)
+  return (
+    <div className="mt-4 rounded-lg border border-border px-3 py-3">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+        Sinais comerciais · compra e venda
+      </p>
+      {!lead.commerce ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          A busca de aduana, reposição, feira e vaga de compras ainda não rodou nesta ficha.
+        </p>
+      ) : live ? (
+        <>
+          <p className="mt-2 text-sm">
+            {buy
+              ? "Há aduana ou reposição publicada. Isso entra no Fit como fato de compra — não é um pedido confirmado."
+              : "Há feira, livro aberto ou vaga de compras. Isso não desbloqueia best fit sozinho."}
+          </p>
+          <ul className="mt-2 flex flex-col gap-2">
+            {signals.map((signal) => (
+              <li key={`${signal.kind}:${signal.url}`} className="text-sm leading-relaxed">
+                <span className="font-medium">{commerceKindLabel(signal.kind)}</span>
+                {signal.publishedAt ? (
+                  <span className="text-muted-foreground"> · {signal.publishedAt.slice(0, 10)}</span>
+                ) : null}
+                <span> · </span>
+                {isHttpUrl(signal.url) ? (
+                  <a href={signal.url} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">
+                    {signal.title}
+                  </a>
+                ) : (
+                  signal.title
+                )}
+                {signal.quote ? <p className="mt-1 text-muted-foreground">{signal.quote}</p> : null}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="mt-2 text-sm">
+          Nenhuma aduana, reposição, feira, livro aberto ou vaga de compras nos últimos 24 meses. Sem isso o
+          Fit fica preso ao ICP e à similaridade de produto — empresas assim quase não respondem.
+        </p>
+      )}
     </div>
   )
 }

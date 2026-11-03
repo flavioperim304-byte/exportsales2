@@ -53,7 +53,7 @@ test("results download as a CSV with the table columns", () => {
     brief: { ...KANECHOM_BRIEF, markets: "Costa Rica" },
   } as Pick<Run, "leads" | "brief" | "also">
   const csv = resultsCsv(run)
-  assert.match(csv, /Company,Country,Role,ICP,Best fit,Activity,Fit probability,Fit evidence,Email/)
+  assert.match(csv, /Company,Country,Role,ICP,Best fit,Activity,Commerce,Fit probability,Fit evidence,Email/)
   assert.match(csv, /Grupo ImpoHogar,Costa Rica,distributors,medium,neither,Public activity has not been searched.,/)
   assert.equal(csvFilename(run.brief), "kanechom-costa-rica.csv")
 })

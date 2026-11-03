@@ -50,7 +50,7 @@ export function classifyActivity(url: string, title: string, text: string): Acti
   return "news"
 }
 
-function mentionsCompany(lead: Lead, title: string, url: string, text: string): boolean {
+export function mentionsCompany(lead: Lead, title: string, url: string, text: string): boolean {
   if (sameSite(url, lead.url) || sameSite(url, lead.domain)) return true
   const hay = `${title} ${url} ${text}`.toLowerCase()
   const tokens = lead.name

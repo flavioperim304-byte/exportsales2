@@ -73,6 +73,22 @@ export type ActivitySnapshot = {
   error?: string
 }
 
+export type CommerceKind = "customs" | "restock" | "trade_fair" | "open_book" | "hiring_buy"
+
+export type CommerceSignal = {
+  kind: CommerceKind
+  title: string
+  url: string
+  publishedAt?: string
+  quote: string
+}
+
+export type CommerceSnapshot = {
+  fetchedAt: string
+  signals: CommerceSignal[]
+  error?: string
+}
+
 export type DimensionScore = {
   key: string
   label: string
@@ -318,6 +334,8 @@ export type Lead = {
   openai?: FitJudgment
   /** News, launches, new brands, and social posts found after the company search. */
   activity?: ActivitySnapshot
+  /** Customs, restock, fair, open-book, and purchasing-hire hits. Fills the purchase/sales gap. */
+  commerce?: CommerceSnapshot
   /** Desk-calculated fit probability from published buying facts. */
   fit?: FitProbability
   /** Chroma RAG check against previously ingested dashboard CSVs. */

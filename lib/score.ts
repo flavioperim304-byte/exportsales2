@@ -4,6 +4,7 @@ import {
   hasRecentActivity,
   recentSignals,
 } from "./activity"
+import { commerceLine, hasCommercialBuyFacts, recentCommerce } from "./commerce"
 import { computeFitProbability } from "./fit-probability"
 import type {
   Band,
@@ -596,7 +597,10 @@ export function scoreLead(brief: Brief, lead: Lead, competitors: Competitor[] = 
   if (/\b(private label|annual contract|container|tender)\b/i.test(full)) {
     commercialPoints += 2
   }
+  if (hasCommercialBuyFacts(lead)) commercialPoints += 3
+  else if (recentCommerce(lead).length) commercialPoints += 1
   commercialPoints = Math.min(10, commercialPoints)
+  const commercialHits = recentCommerce(lead)
   const commercial: DimensionScore = {
     key: "commercial",
     label: "Commercial readiness",
@@ -609,7 +613,10 @@ export function scoreLead(brief: Brief, lead: Lead, competitors: Competitor[] = 
       extraction?.buyerSignals.length
         ? `${extraction.buyerSignals.length} buying ${extraction.buyerSignals.length === 1 ? "quote" : "quotes"} on the page.`
         : "No buying quote was extracted.",
-    ].join(" "),
+      lead.commerce ? commerceLine(lead) : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
     evidence: [
       ...overlap.slice(0, 2).map((cert) => ({
         source: "firecrawl" as const,
@@ -621,6 +628,12 @@ export function scoreLead(brief: Brief, lead: Lead, competitors: Competitor[] = 
         label: "Buying quote",
         quote: clip(signal),
       })) ?? []),
+      ...commercialHits.slice(0, 2).map((signal) => ({
+        source: "exa" as const,
+        label: signal.kind,
+        quote: clip(signal.quote || signal.title),
+        url: signal.url,
+      })),
     ],
   }
 

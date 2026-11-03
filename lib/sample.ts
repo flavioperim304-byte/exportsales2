@@ -93,6 +93,19 @@ function leads(): Lead[] {
         },
       ],
     },
+    commerce: {
+      fetchedAt: "2026-10-27T15:05:00.000Z",
+      signals: [
+        {
+          kind: "customs",
+          title: "Hamburg bill of lading: Nordlicht receives Brazilian naturals",
+          url: "https://trade.example/nordlicht-bl",
+          publishedAt: "2026-08-20T00:00:00.000Z",
+          quote:
+            "Bill of lading lists Nordlicht Kaffeeimport as importer of record for a Brazilian natural container.",
+        },
+      ],
+    },
   }
 
   const haven: Lead = {

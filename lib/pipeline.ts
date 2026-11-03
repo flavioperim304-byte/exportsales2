@@ -1,4 +1,5 @@
 import { emptyActivity, searchActivity } from "./activity"
+import { emptyCommerce, searchCommerce } from "./commerce"
 import {
   brandKindOf,
   buildReport,
@@ -771,6 +772,66 @@ async function attachMissingActivity(id: string): Promise<"wait" | "ready"> {
   return "wait"
 }
 
+async function attachMissingCommerce(id: string): Promise<"wait" | "ready"> {
+  const keys = getKeys()
+  const snapshot = await getRun(id)
+  if (!snapshot) return "ready"
+  if (!keys.exa) {
+    await updateRun(id, (run) => {
+      let filled = 0
+      for (const lead of run.leads) {
+        if (lead.commerce) continue
+        lead.commerce = emptyCommerce("Exa key missing. Commercial signals were not searched.")
+        filled += 1
+      }
+      if (filled) {
+        const classify = stage(run, "classify")
+        classify.status = "running"
+        classify.startedAt = classify.startedAt ?? now()
+        classify.detail = "Exa is not connected, so customs and restock signals were skipped."
+        log(run, "classify", classify.detail)
+      }
+    })
+    return "ready"
+  }
+  const pending = snapshot.leads.find((lead) => !lead.commerce)
+  if (!pending) return "ready"
+  await updateRun(id, (run) => {
+    const classify = stage(run, "classify")
+    classify.status = "running"
+    classify.startedAt = classify.startedAt ?? now()
+    classify.detail = `Exa is looking for customs, restock, trade-fair, and purchasing-hire signals. ${pending.name}.`
+  })
+  try {
+    const snapshotCommerce = await searchCommerce(pending, snapshot.brief, keys.exa)
+    await updateRun(id, (run) => {
+      const lead = run.leads.find((item) => item.id === pending.id)
+      if (!lead) return
+      lead.commerce = snapshotCommerce
+      lead.fit = computeFitProbability(run.brief, lead, run.competitors)
+      lead.score = scoreLead(run.brief, lead, run.competitors)
+      if (run.also) lead.alsoScore = scoreLead(run.also, lead, run.competitors)
+      const recent = snapshotCommerce.signals.length
+      log(
+        run,
+        "classify",
+        recent
+          ? `Commerce for ${lead.name}: ${recent} ${recent === 1 ? "signal" : "signals"}.`
+          : `Commerce for ${lead.name}: no customs, restock, fair, or purchasing-hire signal in the last 24 months.`
+      )
+    })
+  } catch (error) {
+    const message = publicError(error, secrets())
+    await updateRun(id, (run) => {
+      const lead = run.leads.find((item) => item.id === pending.id)
+      if (!lead) return
+      lead.commerce = emptyCommerce(message)
+      log(run, "classify", `Commercial search failed for ${lead.name}. ${message}`)
+    })
+  }
+  return "wait"
+}
+
 const ragRefreshAt = new Map<string, number>()
 const RAG_REFRESH_MS = 15000
 
@@ -822,6 +883,8 @@ async function doScore(id: string) {
   if (!snapshot) return
   const activity = await attachMissingActivity(id)
   if (activity === "wait") return
+  const commerce = await attachMissingCommerce(id)
+  if (commerce === "wait") return
   await attachRag(id)
   const current = (await getRun(id)) ?? snapshot
   if (!keys.openai) {
