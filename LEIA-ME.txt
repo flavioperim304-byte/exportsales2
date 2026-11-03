@@ -24,13 +24,16 @@ Na raiz têm de existir:
   lib/company-atlas.ts
   components/
 
-NÃO use "Add file" / "Upload files" no site do GitHub.
-Foi assim que o repo ficou truncado da última vez (sem /trade).
-Use GitHub Desktop ou git, um único commit em main, e push.
+O site do GitHub aceita 100 arquivos por vez. Este desk tem 134.
+Um único upload corta /trade. Use os dois lotes:
 
-  git add -A
-  git commit -m "Desk: Dump+API, Aduana e Company Atlas"
-  git push origin main
+1. lote-1.zip — extraia, Ctrl+A (app, components, package.json), arraste em
+   github.com/flavioperim304-byte/exportsales2/upload/main e faça commit.
+2. lote-2.zip — extraia, Ctrl+A (lib, tests), arraste de novo e faça commit.
+3. Confira app/trade/page.tsx e lib/anchors.ts no GitHub.
+4. Render → exportsales → Manual Deploy → Deploy latest commit.
+
+Não arraste a pasta do zip inteira (senão fica lote-1/app). Não arraste o .zip.
 
 Dois serviços Render, mesmo repositório. Não apague o repo. Não apague os discos.
 

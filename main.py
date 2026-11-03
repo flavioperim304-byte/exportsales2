@@ -309,13 +309,17 @@ def download_page() -> str:
     <title>Implantar no Render</title>
   </head>
   <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
-    <h1>Implantar no Render</h1>
-    <p>https://exportsales.onrender.com/trade ainda dá 404. Este zip é o repositório inteiro (Dump+API, Aduana, Company Atlas). No Windows: botão direito → Extrair tudo. Não abra com o Bloco de notas.</p>
-    <p><a href="/export-desk.zip" download="export-desk.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar export-desk.zip</a></p>
+    <h1>Dois lotes para o GitHub</h1>
+    <p>O site do GitHub aceita 100 arquivos por vez. O desk tem 134. Windows: botão direito → Extrair tudo. Não abra com o Bloco de notas.</p>
+    <p>
+      <a href="/lote-1.zip" download="lote-1.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;margin-right:0.5rem;">Lote 1 — app e tela</a>
+      <a href="/lote-2.zip" download="lote-2.zip" style="display:inline-block;padding:0.8rem 1.2rem;border:1px solid #111;color:#111;text-decoration:none;border-radius:8px;">Lote 2 — lib e testes</a>
+    </p>
     <ol>
-      <li>Extraia na raiz do GitHub <strong>exportsales2</strong>. Se o Windows criar uma pasta, copie o conteúdo. Um único commit em main — não use Upload files no site.</li>
-      <li>Render → serviço Node <strong>exportsales</strong> → Manual Deploy → Deploy latest commit. Não apague o disco.</li>
-      <li>Pronto quando /trade abrir. Fontes → Connect with Google liga o Atlas em https://exportsales.onrender.com/api/atlas/callback</li>
+      <li>Abra https://github.com/flavioperim304-byte/exportsales2/upload/main</li>
+      <li>Extraia o lote 1. Entre na pasta. Ctrl+A (app, components, package.json). Arraste. Não arraste a pasta lote-1. Commit em main.</li>
+      <li>Extraia o lote 2. Ctrl+A (lib, tests). Arraste. Commit.</li>
+      <li>Confira app/trade/page.tsx e lib/anchors.ts no GitHub. Depois Render → exportsales → Manual Deploy → Deploy latest commit.</li>
     </ol>
     <p>O mesmo repo alimenta o dashboard Node (<strong>exportsales</strong>) e o FastAPI (<strong>exportsales2</strong>). Não apague os discos. Não reenvie o CSV se o índice Chroma já está verde.</p>
   </body>
@@ -345,6 +349,26 @@ def head_project_zip():
             "Content-Length": str(path.stat().st_size),
             "X-Content-Type-Options": "nosniff",
         },
+    )
+
+
+@app.get("/lote-1.zip")
+def download_lote_1() -> FileResponse:
+    return FileResponse(
+        packaged_zip("lote-1.zip"),
+        media_type="application/octet-stream",
+        filename="lote-1.zip",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.get("/lote-2.zip")
+def download_lote_2() -> FileResponse:
+    return FileResponse(
+        packaged_zip("lote-2.zip"),
+        media_type="application/octet-stream",
+        filename="lote-2.zip",
+        headers={"X-Content-Type-Options": "nosniff"},
     )
 
 
