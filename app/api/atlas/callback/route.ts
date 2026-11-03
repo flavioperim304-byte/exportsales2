@@ -1,32 +1,31 @@
+import { cookies } from "next/headers"
+import { connection } from "next/server"
 import { decodeAtlasOAuthCookie, finishAtlasOAuth } from "@/lib/atlas-client"
 
-export const dynamic = "force-dynamic"
-
-function cookieValue(request: Request, name: string): string {
-  const header = request.headers.get("cookie") || ""
-  const parts = header.split(/;\s*/)
-  const hit = parts.find((part) => part.startsWith(`${name}=`))
-  return hit ? decodeURIComponent(hit.slice(name.length + 1)) : ""
-}
-
 export async function GET(request: Request) {
+  await connection()
   const url = new URL(request.url)
   const code = url.searchParams.get("code") || ""
   const state = url.searchParams.get("state") || ""
-  const pending = decodeAtlasOAuthCookie(cookieValue(request, "atlas_oauth"))
-  const clear = "atlas_oauth=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
-  const fail = (reason: string) => {
-    const response = Response.redirect(new URL(`/sources?atlas=error&reason=${encodeURIComponent(reason)}`, request.url), 302)
-    response.headers.append("Set-Cookie", clear)
-    return response
+  const jar = await cookies()
+  const pending = decodeAtlasOAuthCookie(jar.get("atlas_oauth")?.value || "")
+  const clear = () => {
+    jar.set("atlas_oauth", "", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 0 })
   }
-  if (!code || !state || !pending) return fail("missing_oauth")
+  if (!code || !state || !pending) {
+    clear()
+    return Response.redirect(new URL("/sources?atlas=error&reason=missing_oauth", request.url), 302)
+  }
   try {
     await finishAtlasOAuth(pending, code, state)
-    const response = Response.redirect(new URL("/sources?atlas=connected", request.url), 302)
-    response.headers.append("Set-Cookie", clear)
-    return response
+    clear()
+    return Response.redirect(new URL("/sources?atlas=connected", request.url), 302)
   } catch (error) {
-    return fail(error instanceof Error ? error.message : "token")
+    clear()
+    const reason = error instanceof Error ? error.message : "token"
+    return Response.redirect(
+      new URL(`/sources?atlas=error&reason=${encodeURIComponent(reason)}`, request.url),
+      302
+    )
   }
 }
