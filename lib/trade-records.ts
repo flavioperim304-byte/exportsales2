@@ -649,6 +649,16 @@ const FILE_COUNTRY: { re: RegExp; country: string }[] = [
   { re: /mexico|\bmex\b/i, country: "Mexico" },
   { re: /mauritania/i, country: "Mauritania" },
   { re: /argentina/i, country: "Argentina" },
+  { re: /netherlands|\bneth\b/i, country: "Netherlands" },
+  { re: /romania|\brom\b/i, country: "Romania" },
+  { re: /ivoire|\bciv\b|ivory\s*coast/i, country: "Cote d'Ivoire" },
+  { re: /indonesia|\bindo\b/i, country: "Indonesia" },
+  { re: /\bperu\b|\bpe\b/i, country: "Peru" },
+  { re: /repdom|dominican/i, country: "Dominican Republic" },
+  { re: /portugal|\bport\b/i, country: "Portugal" },
+  { re: /\bbolivia\b|\bbo\b/i, country: "Bolivia" },
+  { re: /bulgaria|\bbul\b/i, country: "Bulgaria" },
+  { re: /spain|espanha|españa/i, country: "Spain" },
 ]
 
 const COUNTRY_ALIAS: { re: RegExp; country: string }[] = [
@@ -657,6 +667,7 @@ const COUNTRY_ALIAS: { re: RegExp; country: string }[] = [
   { re: /south\s*africa/i, country: "South Africa" },
   { re: /united\s*states|\busa\b/i, country: "United States" },
   { re: /south\s*sudan/i, country: "South Sudan" },
+  { re: /ivoire|ivory\s*coast/i, country: "Cote d'Ivoire" },
 ]
 
 export function normalizeCountry(country: string): string {
