@@ -33,7 +33,7 @@ const TEMPLATE_DESC =
 const TAGS = /\b(high-transaction enterprise|leading enterprise|new enterprise)\b/gi
 
 const LOGISTICS =
-  /\b(logistic|logistics|freight|forwarder|shipping|courier|starlogic|amcar|o\s*&\s*m\s+logistic|ag logistics|\bag\b|nur logistic)\b/i
+  /\b(logistic|logistics|freight|forwarder|shipping|courier|starlogic|amcar|o\s*&\s*m\s+logistic|ag logistics|\bag\b|nur logistic|\bdhl\b)\b/i
 
 const ZONA = /\b(zona libre|colon free|z\.?l\.?s?\.?a)\b/i
 
@@ -609,7 +609,7 @@ export function parseTradeCsv(text: string, source: TradeSource = "csv", sourceF
 }
 
 const FILE_COUNTRY: { re: RegExp; country: string }[] = [
-  { re: /austsham|australia|\baust\b/i, country: "Australia" },
+  { re: /austsham|australia|\baust\b|\bau\b/i, country: "Australia" },
   { re: /\bjapan\b|\bjap\b/i, country: "Japan" },
   { re: /hong\s*kong|\bhk\b/i, country: "Hong Kong" },
   { re: /uzbekistan|\buz\b/i, country: "Uzbekistan" },
@@ -617,8 +617,8 @@ const FILE_COUNTRY: { re: RegExp; country: string }[] = [
   { re: /united\s*arab|\buae\b|dubai|emirates/i, country: "United Arab Emirates" },
   { re: /panama/i, country: "Panama" },
   { re: /bolivia/i, country: "Bolivia" },
-  { re: /chile/i, country: "Chile" },
-  { re: /colombia/i, country: "Colombia" },
+  { re: /chile|\bch\b/i, country: "Chile" },
+  { re: /colombia|\bco\b/i, country: "Colombia" },
   { re: /dominican|\bdr\b/i, country: "Dominican Republic" },
   { re: /south\s*africa|safrica/i, country: "South Africa" },
   { re: /madagascar|madag/i, country: "Madagascar" },
@@ -640,7 +640,7 @@ const FILE_COUNTRY: { re: RegExp; country: string }[] = [
   { re: /canada|\bcan\b/i, country: "Canada" },
   { re: /nicaragua|\bnic\b/i, country: "Nicaragua" },
   { re: /russia|\brus\b/i, country: "Russia" },
-  { re: /ethiopia|\bet\b/i, country: "Ethiopia" },
+  { re: /ethiopia|\bety\b|\bet\b/i, country: "Ethiopia" },
   { re: /costa\s*rica|\bcr\b/i, country: "Costa Rica" },
   { re: /paraguay|\bpar\b/i, country: "Paraguay" },
   { re: /belgium|\bbe\b/i, country: "Belgium" },
@@ -659,6 +659,12 @@ const FILE_COUNTRY: { re: RegExp; country: string }[] = [
   { re: /\bbolivia\b|\bbo\b/i, country: "Bolivia" },
   { re: /bulgaria|\bbul\b/i, country: "Bulgaria" },
   { re: /spain|espanha|españa/i, country: "Spain" },
+  { re: /iraq/i, country: "Iraq" },
+  { re: /pakistan|\bpk\b/i, country: "Pakistan" },
+  { re: /greece|\bgree\b/i, country: "Greece" },
+  { re: /france|\bfra\b/i, country: "France" },
+  { re: /ecuador|\becua\b/i, country: "Ecuador" },
+  { re: /morocco|\bmo\b/i, country: "Morocco" },
 ]
 
 const COUNTRY_ALIAS: { re: RegExp; country: string }[] = [
@@ -1104,7 +1110,7 @@ export function qualityLabel(quality: TradeFilingQuality): string {
 }
 
 const GLOBAL_IMPORTER =
-  /\b(unilever|avon|genomma|genonna|pricesmart|procter|feduro|l'?oreal|loreal|alfa parf|alfaparf|belcorp|\bl\.?\s*bel\b|mesoestetic|arabela|henkel|beiersdorf|colgate)/i
+  /\b(unilever|avon|genomma|genonna|pricesmart|procter|feduro|l'?oreal|loreal|alfa parf|alfaparf|belcorp|\bl\.?\s*bel\b|mesoestetic|arabela|henkel|beiersdorf|colgate|natura)/i
 
 export function isLogisticsName(name: string): boolean {
   return LOGISTICS.test(name) || ZONA.test(name)

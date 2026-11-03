@@ -13,6 +13,7 @@ import {
   filingSummary,
   isGlobalBrandImporter,
   isHsHeadingText,
+  isLogisticsName,
   isSearchCandidate,
   parseTradeBl,
   parseTradeDump,
@@ -223,6 +224,8 @@ test("Beiersdorf and Colgate subsidiaries are not dump search candidates", () =>
   assert.equal(isGlobalBrandImporter("BEIERSDORF EAST AFRICA LIMITED"), true)
   assert.equal(isGlobalBrandImporter("COLGATE PALMOLIVE INDUSTRIAL LTDA"), true)
   assert.equal(isGlobalBrandImporter("BELCORPORATION GUATEMALA S.A."), true)
+  assert.equal(isGlobalBrandImporter("NATURA COSMETICOS LTDA"), true)
+  assert.equal(isLogisticsName("DHL PAKISTAN PRIVATE LIMITED"), true)
 })
 
 test("arg.txt is Mauritania on the card, not Argentina", () => {
