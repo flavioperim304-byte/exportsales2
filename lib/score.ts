@@ -4,6 +4,7 @@ import {
   hasRecentActivity,
   recentSignals,
 } from "./activity"
+import { anchorSimilarity } from "./anchors"
 import { commerceLine, hasCommercialBuyFacts, recentCommerce } from "./commerce"
 import { computeFitProbability } from "./fit-probability"
 import type {
@@ -731,6 +732,15 @@ export function scoreLead(brief: Brief, lead: Lead, competitors: Competitor[] = 
 
   const activity = activityDimension(lead)
   const fit = computeFitProbability(brief, lead, competitors)
+  const similar = anchorSimilarity(brief, lead, full)
+  const anchor: DimensionScore = {
+    key: "anchor",
+    label: "Anchor similarity",
+    points: similar.points,
+    max: similar.max,
+    rationale: similar.rationale,
+    evidence: similar.evidence,
+  }
   const buying: DimensionScore = {
     key: "buying",
     label: "Buying facts",
@@ -757,6 +767,7 @@ export function scoreLead(brief: Brief, lead: Lead, competitors: Competitor[] = 
     evidence,
     activity,
     buying,
+    ...(anchor.max > 0 ? [anchor] : []),
   ]
   const total = dimensions.reduce((sum, item) => sum + item.points, 0)
   let band = bandFor(total)

@@ -1,7 +1,12 @@
 import { activityLine } from "./activity"
+import { anchorPromptBlock, briefUsesAnchorDistributors, firecrawlAnchorLine } from "./anchors"
 import { buyingEvidenceLine, computeFitProbability, fitProbabilityLine } from "./fit-probability"
 import type { Brief, Lead } from "./types"
 import { clip, splitList } from "./text"
+
+function anchorsFor(brief: Brief): string {
+  return briefUsesAnchorDistributors(brief) ? anchorPromptBlock() : ""
+}
 
 export const LEADS_PER_COUNTRY = 10
 
@@ -140,6 +145,7 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
       "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
       "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
       "buyerSignals must be short phrases from the page about importing or distributing hair care.",
+      firecrawlAnchorLine(brief),
       "Also extract lastPurchase, stock, brandPerformance, salesNote, and competitorMoves when the page states them. Leave each empty when unpublished.",
     ]
       .filter(Boolean)
@@ -157,6 +163,7 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
       brief.instructions?.trim() ?? "",
       "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
       "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
+      firecrawlAnchorLine(brief),
     ]
       .filter(Boolean)
       .join("\n")
@@ -172,8 +179,9 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
       brief.instructions?.trim() ?? "",
       "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
       "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
-      "buyerSignals must be short phrases taken from the page about how this company buys or sells.",
-      "Also extract lastPurchase, stock, brandPerformance, salesNote, and competitorMoves when the page states them. Leave each empty when unpublished.",
+    "buyerSignals must be short phrases taken from the page about how this company buys or sells.",
+    firecrawlAnchorLine(brief),
+    "Also extract lastPurchase, stock, brandPerformance, salesNote, and competitorMoves when the page states them. Leave each empty when unpublished.",
     ].join("\n")
   }
   const type = buyerType?.trim()
@@ -193,6 +201,7 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
     "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
     "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
     "buyerSignals must be short phrases about the buyer type named above, including importing, wholesale coverage, or trading.",
+    firecrawlAnchorLine(brief),
     "Also extract lastPurchase, stock, brandPerformance, salesNote, and competitorMoves when the page states them. Leave each empty when unpublished.",
     extra(brief),
   ]
@@ -240,6 +249,7 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       brief.instructions?.trim() ?? "",
       "qualification_needed is what a salesperson still has to confirm. icp is not the purchase probability.",
       marketAsk(),
+      anchorsFor(brief),
     ]
       .filter(Boolean)
       .join("\n")
@@ -256,6 +266,7 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       buyingAsk(),
       "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
       marketAsk(),
+      anchorsFor(brief),
     ]
       .filter(Boolean)
       .join("\n")
@@ -276,6 +287,7 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
     buyingAsk(),
     "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
     marketAsk(),
+    anchorsFor(brief),
     extra(brief),
   ]
     .filter(Boolean)
@@ -300,6 +312,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
       buyingAsk(),
       "qualification_needed is what still has to be confirmed. Put rival brand names in known suppliers when a source names them. In competitors, list direct competitor distributors in the searched countries that are not already in the candidate list. country is the searched country, not the rival brand’s headquarters.",
       marketAsk(),
+      anchorsFor(brief),
     ]
       .filter(Boolean)
       .join("\n")
@@ -319,6 +332,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
       buyingAsk(),
       "Say who to approach first, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and the supplier fit to high, medium, or low. Set best_fit to the supplier to pursue or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
       marketAsk(),
+      anchorsFor(brief),
       competitorMarketRule(brief, countries),
       "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers that already sell in those search countries (not the candidates, and not factories that only sell in the origin country), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
     ]
@@ -349,6 +363,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
     buyingAsk(),
     "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
     marketAsk(),
+    anchorsFor(brief),
     competitorMarketRule(brief, countries),
     "Return the category outlook in the target countries, how buyers purchase, import signals, up to five competitor suppliers that already sell in those search countries (not the candidates, and not factories that only sell in the origin country), and for each candidate a fit note, known current suppliers if published, risks, and citation URLs. If a candidate is not a buyer, say so in risks.",
   ]

@@ -135,6 +135,9 @@ test("similar-importer search drops logistics and global brands", () => {
   const query = dumpSimilarQuery(["Agencia y Mercadeo"], "Panama", KANECHOM_BRIEF)
   assert.match(query, /similar to/)
   assert.match(query, /Unilever/)
+  assert.match(query, /nazih\.com/)
+  assert.match(query, /gemegypt\.com/)
+  assert.match(query, /ssiz\.in/)
   assert.match(dumpConfirmQuery("Agencia y Mercadeo", "Panama", "shampoo"), /Official company website/)
 })
 

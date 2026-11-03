@@ -1,0 +1,152 @@
+import type { Brief, Evidence, Lead } from "./types"
+import { sameSite } from "./text"
+
+export type AnchorDistributor = {
+  name: string
+  domain: string
+  url: string
+  country: string
+  note: string
+}
+
+/** Hair-care distributors used as a channel shape, not as a Kanechom/LQ purchase. */
+export const ANCHOR_DISTRIBUTORS: AnchorDistributor[] = [
+  {
+    name: "Nazih Trading LLC",
+    domain: "nazih.com",
+    url: "https://www.nazih.com",
+    country: "United Arab Emirates (Dubai)",
+    note: "Large Dubai beauty distributor with a diversified professional and retail brand book and a wide salon and retail client base.",
+  },
+  {
+    name: "Gem Import & Export",
+    domain: "gemegypt.com",
+    url: "https://www.gemegypt.com",
+    country: "Egypt",
+    note: "Egyptian importer-exporter of a diversified beauty and hair brand book with a large customer base.",
+  },
+  {
+    name: "SSIZ",
+    domain: "ssiz.in",
+    url: "https://www.ssiz.in",
+    country: "India",
+    note: "Indian professional beauty distributor with a diversified brand portfolio and a large salon client base.",
+  },
+]
+
+export function briefUsesAnchorDistributors(brief: Brief): boolean {
+  const blob = [
+    brief.products,
+    brief.supplierName,
+    brief.mustHaves,
+    brief.instructions,
+    brief.differentiators,
+    brief.hsCode,
+  ].join(" ")
+  return /hair|shampoo|conditioner|keratin|straighten|salon|beauty|kanechom|lq professional|\b3305\b/i.test(
+    blob
+  )
+}
+
+export function isAnchorCompany(lead: Lead): AnchorDistributor | undefined {
+  return ANCHOR_DISTRIBUTORS.find(
+    (anchor) =>
+      sameSite(anchor.url, lead.url) ||
+      sameSite(anchor.domain, lead.domain) ||
+      sameSite(anchor.domain, lead.exa?.domain || "")
+  )
+}
+
+export function anchorPromptBlock(): string {
+  const listed = ANCHOR_DISTRIBUTORS.map(
+    (anchor) => `${anchor.name} (${anchor.url}, ${anchor.country}): ${anchor.note}`
+  ).join(" ")
+  return [
+    "Anchor distributors are a reference shape, not the buyer list and not a Kanechom or LQ purchase:",
+    listed,
+    "Raise the channel score when the candidate is published as the same kind of company: a diversified hair or beauty brand book and a large salon or retail client base, in the same range as these anchors.",
+    "Name the similar brands and any published client, salon, retailer, or point-of-sale count. Do not invent a count.",
+    "Similarity to an anchor raises icp (channel fit). It does not set best_fit and it does not confirm a Kanechom or LQ purchase. Last purchase, stock, or sales on the page are still required for best_fit.",
+    "Do not return the anchor companies themselves unless they operate in the search country and buy this category there.",
+  ].join(" ")
+}
+
+export function firecrawlAnchorLine(brief: Brief): string {
+  if (!briefUsesAnchorDistributors(brief)) return ""
+  return "Record the published brand portfolio and any salon, retailer, or client-count language so the desk can compare the company with Nazih Trading, Gem Import & Export, and SSIZ. Leave those fields empty when unpublished."
+}
+
+const BRAND_BOOK =
+  /brand (book|portfolio)|our brands|we distribute|distributes .+ and |exclusive (distributor|importer) of|multi-?brand|diversified brands|portfolio of (brands|lines)|lines we (carry|represent)|professional and retail/i
+
+const CLIENT_SCALE =
+  /\d{2,}\s+(salons?|clients?|customers?|retailers?|stores?|outlets?|points of sale)|nationwide (salon|retail)|large (salon|client|customer) (base|network)|thousands of (salons?|clients?)|wide (salon|retail) network|points of sale|rede de (sal[oõ]es|clientes)/i
+
+export function anchorSimilarity(brief: Brief, lead: Lead, corpus: string): {
+  points: number
+  max: number
+  rationale: string
+  evidence: Evidence[]
+} {
+  if (!briefUsesAnchorDistributors(brief)) {
+    return {
+      points: 0,
+      max: 0,
+      rationale: "Anchor distributors apply to hair-care briefs.",
+      evidence: [],
+    }
+  }
+  const hit = isAnchorCompany(lead)
+  if (hit) {
+    return {
+      points: 10,
+      max: 10,
+      rationale: `${hit.name} is a reference distributor: diversified brands and a large client base. That raises the channel score, not a Kanechom or LQ purchase.`,
+      evidence: [
+        {
+          source: "rule",
+          label: "Anchor distributor",
+          quote: hit.note,
+          url: hit.url,
+        },
+      ],
+    }
+  }
+  const blob = corpus
+  const brandBook = BRAND_BOOK.test(blob)
+  const clientScale = CLIENT_SCALE.test(blob)
+  let points = 0
+  if (brandBook) points += 4
+  if (clientScale) points += 4
+  if (brandBook && clientScale) points += 2
+  const evidence: Evidence[] = []
+  if (brandBook) {
+    evidence.push({
+      source: "firecrawl",
+      label: "Brand book",
+      quote: "Published diversified brands or a multi-brand portfolio.",
+      url: lead.url,
+    })
+  }
+  if (clientScale) {
+    evidence.push({
+      source: "firecrawl",
+      label: "Client base",
+      quote: "Published salon, retailer, or client scale.",
+      url: lead.url,
+    })
+  }
+  return {
+    points,
+    max: 10,
+    rationale: points
+      ? `Channel shape matches the anchors (Nazih, Gem, SSIZ): ${[
+          brandBook ? "diversified brand book" : "",
+          clientScale ? "large published client or salon base" : "",
+        ]
+          .filter(Boolean)
+          .join(" and ")}. This raises the score. It does not confirm a Kanechom or LQ purchase.`
+      : "No published brand book or salon/client scale to compare with Nazih Trading, Gem Import & Export, or SSIZ.",
+    evidence,
+  }
+}

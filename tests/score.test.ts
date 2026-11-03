@@ -174,3 +174,66 @@ test("a thin excerpt still returns a score without invented evidence", () => {
   assert.equal(competitive.points, 4)
   assert.match(competitive.rationale, /Parallel has not attached/)
 })
+
+function hairLead(id: string, summary: string, domain = `${id}.example`): Lead {
+  return {
+    id,
+    name: id,
+    domain,
+    url: `https://${domain}/`,
+    country: "Chile",
+    exa: {
+      title: id,
+      url: `https://${domain}/`,
+      domain,
+      text: summary,
+      highlights: [],
+      summary,
+    },
+    extraction: {
+      ok: true,
+      companyName: id,
+      headquarters: "Santiago",
+      country: "Chile",
+      role: "distributor",
+      buys: ["shampoo"],
+      sells: ["hair care"],
+      markets: ["Chile"],
+      certifications: [],
+      buyerSignals: [summary],
+      summary,
+      excerpt: "",
+    },
+  }
+}
+
+test("a diversified brand book and a large salon base raise the Kanechom score toward the anchors", () => {
+  const brochure = scoreLead(KANECHOM_BRIEF, hairLead("thin-hair", "We sell shampoo."))
+  const similar = scoreLead(
+    KANECHOM_BRIEF,
+    hairLead(
+      "wide-book",
+      "We distribute a multi-brand professional and retail portfolio and serve 400 salons nationwide."
+    )
+  )
+  const anchorDim = similar.dimensions.find((item) => item.key === "anchor")
+  const brochureDim = brochure.dimensions.find((item) => item.key === "anchor")
+  assert.ok(anchorDim)
+  assert.ok(brochureDim)
+  assert.equal(brochureDim.points, 0)
+  assert.ok(anchorDim.points >= 8, explain({ ...hairLead("wide-book", ""), score: similar }))
+  assert.ok(similar.total > brochure.total)
+  assert.match(anchorDim.rationale, /does not confirm a Kanechom or LQ purchase/)
+  assert.notEqual(similar.band, "best_fit")
+})
+
+test("Nazih itself scores as the reference distributor without unlocking a purchase", () => {
+  const score = scoreLead(
+    KANECHOM_BRIEF,
+    hairLead("nazih", "Nazih Trading LLC, Dubai.", "nazih.com")
+  )
+  const anchor = score.dimensions.find((item) => item.key === "anchor")
+  assert.equal(anchor?.points, 10)
+  assert.match(anchor?.rationale ?? "", /reference distributor/)
+  assert.doesNotMatch(score.headline, /Best fit/)
+})

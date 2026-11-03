@@ -211,6 +211,7 @@ export function dumpSimilarQuery(names: string[], country: string, brief: Brief)
   return [
     `Find importers and distributors in ${country} similar to: ${listed}.`,
     `They should buy or import ${products}.`,
+    "Similar means a diversified hair or beauty brand book and a large salon or retail client base, in the range of Nazih Trading (nazih.com, Dubai), Gem Import & Export (gemegypt.com), and SSIZ (ssiz.in).",
     "Return official company websites of local importers or distributors.",
     "Do not return logistics companies, freight forwarders, couriers, Amazon, or global-brand subsidiaries: Unilever, P&G, L'Oréal, Avon, Genomma, PriceSmart, Alfaparf, Belcorp, Mesoestetic, Arabela, Feduro, Henkel.",
     `These are buyers for ${brief.supplierName}, from ${brief.originCountry}. Do not return ${brief.supplierName} itself.`,

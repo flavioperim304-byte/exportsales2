@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { CADIVEU_COMPETITOR_BRIEF, KANECHOM_BRIEF, LQ_BRIEF, presentBrief, validateBrief } from "../lib/example"
+import { CADIVEU_COMPETITOR_BRIEF, EXAMPLE_BRIEF, KANECHOM_BRIEF, LQ_BRIEF, presentBrief, validateBrief } from "../lib/example"
 import {
   LEADS_PER_COUNTRY,
   buyerTypes,
@@ -57,6 +57,14 @@ test("Kanechom and LQ Professional prompts follow different must-haves", () => {
   assert.match(lq, /train hairdressers/)
   assert.doesNotMatch(kanechom, /train hairdressers/)
   assert.match(firecrawlPrompt(LQ_BRIEF, "Mexico"), /GMP, ANVISA/)
+  assert.match(openaiInstructions(KANECHOM_BRIEF), /nazih\.com/)
+  assert.match(openaiInstructions(KANECHOM_BRIEF), /gemegypt\.com/)
+  assert.match(openaiInstructions(KANECHOM_BRIEF), /ssiz\.in/)
+  assert.match(openaiInstructions(KANECHOM_BRIEF), /raises icp/)
+  assert.match(parallelInstructions(LQ_BRIEF), /Nazih Trading LLC/)
+  assert.match(parallelInstructions(LQ_BRIEF), /does not confirm a Kanechom or LQ purchase/)
+  assert.match(firecrawlPrompt(KANECHOM_BRIEF, "Chile"), /Nazih Trading/)
+  assert.doesNotMatch(openaiInstructions(EXAMPLE_BRIEF), /nazih\.com/)
 })
 
 test("a competitor search covers several countries and leaves the named ones out", () => {
