@@ -306,17 +306,41 @@ def download_page() -> str:
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Baixar código</title>
+    <title>Reconstruir o projeto</title>
   </head>
   <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
-    <h1>Baixar o zip</h1>
-    <p>Este é um arquivo .zip, não um texto. No Windows: botão direito → Extrair tudo. Não abra com o Bloco de notas.</p>
-    <p><a href="/desk-rag.zip" download="desk-rag.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar desk-rag.zip</a></p>
-    <p>Esse zip é o dashboard Node (due diligence). No GitHub <strong>exportsales2</strong>, copie <strong>lib/</strong> e <strong>components/</strong> no mesmo lugar. Não extraia na raiz fora dessas pastas.</p>
-    <p><a href="/fastapi-rag.zip" download="fastapi-rag.zip">fastapi-rag.zip</a> (Python — só se for atualizar main.py)</p>
+    <h1>Reconstruir o projeto</h1>
+    <p>Este zip é o repositório inteiro. No Windows: botão direito → Extrair tudo. Não abra com o Bloco de notas. Suba a pasta na raiz do GitHub <strong>exportsales2</strong> — um único commit.</p>
+    <p><a href="/export-desk.zip" download="export-desk.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar export-desk.zip</a></p>
+    <p>O mesmo repo alimenta o dashboard Node (<strong>exportsales</strong>) e o FastAPI (<strong>exportsales2</strong>). Não apague os discos. Não reenvie o CSV se o índice Chroma já está verde.</p>
   </body>
 </html>
 """
+
+
+@app.get("/export-desk.zip")
+def download_project_zip() -> FileResponse:
+    return FileResponse(
+        packaged_zip("export-desk.zip"),
+        media_type="application/octet-stream",
+        filename="export-desk.zip",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.head("/export-desk.zip")
+def head_project_zip():
+    path = packaged_zip("export-desk.zip")
+    return HTMLResponse(
+        content="",
+        status_code=200,
+        headers={
+            "Content-Type": "application/octet-stream",
+            "Content-Disposition": 'attachment; filename="export-desk.zip"',
+            "Content-Length": str(path.stat().st_size),
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @app.get("/fastapi-rag.zip")

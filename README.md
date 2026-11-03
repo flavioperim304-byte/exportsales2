@@ -12,6 +12,19 @@ A local checklist still files page evidence beside those scores. It is shown onl
 
 The worked example (Serra Alta, specialty coffee, Minas Gerais) is on the desk with no API keys. Its companies and citations are sample material.
 
+## Reconstruir no GitHub (`exportsales2`)
+
+Não suba arquivo por arquivo. Extraia o zip do projeto na **raiz** do repositório e faça um único commit. Na raiz têm de existir `package.json`, `main.py`, `requirements.txt`, `app/`, `lib/` e `components/`.
+
+O mesmo repositório alimenta **dois** Web Services no Render. Não apague o repo. Não apague os discos.
+
+| Serviço | URL | Runtime | Build | Start | Disco | Env |
+| --- | --- | --- | --- | --- | --- | --- |
+| `exportsales` | https://exportsales.onrender.com | Node 22 | `npm ci && npm run build` | `npx next start -H 0.0.0.0 -p $PORT` | 1 GB em `/opt/render/project/src/data` | `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `OPENAI_API_KEY`, `PARALLEL_API_KEY`, `RAG_API_URL=https://exportsales2.onrender.com` |
+| `exportsales2` | https://exportsales2.onrender.com | Python 3 | `pip install -r requirements.txt` | `uvicorn main:app --host 0.0.0.0 --port $PORT` | 1 GB em `/var/data` | `CHROMA_PATH=/var/data/chroma` |
+
+Depois do deploy do Node, **Manual Deploy → Deploy latest commit** se o Auto-Deploy não pegar. O índice Chroma já gravado permanece no disco: não reenvie o CSV do Panamá se `/enviar` ainda mostra as empresas em verde. Relatórios de due diligence antigos só mudam se você rodar a DD de novo.
+
 ## Run locally
 
 ```bash

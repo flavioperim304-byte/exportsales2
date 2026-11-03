@@ -1,0 +1,39 @@
+Export Desk — reconstruir o repositório
+=======================================
+
+No Windows:
+1. Botão direito neste zip → Extrair tudo
+2. Não abra os arquivos com o Bloco de notas
+
+O que você vê depois de extrair é o projeto inteiro.
+Suba essa pasta inteira para o GitHub exportsales2 (raiz do repo).
+Não copie arquivo por arquivo. Na raiz têm de existir:
+  package.json
+  main.py
+  requirements.txt
+  app/
+  lib/
+  components/
+
+Dois serviços Render, mesmo repositório:
+
+1) exportsales  (Node — dashboard)
+   https://exportsales.onrender.com
+   Build: npm ci && npm run build
+   Start: npx next start -H 0.0.0.0 -p $PORT
+   Node 22
+   Disco 1 GB em /opt/render/project/src/data
+   Env: EXA_API_KEY, FIRECRAWL_API_KEY, OPENAI_API_KEY, PARALLEL_API_KEY
+        RAG_API_URL=https://exportsales2.onrender.com
+
+2) exportsales2 (Python — FastAPI / Chroma)
+   https://exportsales2.onrender.com
+   Build: pip install -r requirements.txt
+   Start: uvicorn main:app --host 0.0.0.0 --port $PORT
+   Disco 1 GB em /var/data
+   Env: CHROMA_PATH=/var/data/chroma
+   Não apague o disco. Não reenvie o CSV se o índice já está verde.
+
+Due diligence: Opportunity não entra no Fit.
+Importação só confirma com fato publicado (we import / importamos / última compra).
+Não rode de novo a DD do Panamá até o dashboard Node estar neste código.
