@@ -306,12 +306,17 @@ def download_page() -> str:
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Reconstruir o projeto</title>
+    <title>Implantar no Render</title>
   </head>
   <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
-    <h1>Reconstruir o projeto</h1>
-    <p>Este zip é o repositório inteiro. No Windows: botão direito → Extrair tudo. Não abra com o Bloco de notas. Suba a pasta na raiz do GitHub <strong>exportsales2</strong> — um único commit.</p>
+    <h1>Implantar no Render</h1>
+    <p>https://exportsales.onrender.com/trade ainda dá 404. Este zip é o repositório inteiro (Dump+API, Aduana, Company Atlas). No Windows: botão direito → Extrair tudo. Não abra com o Bloco de notas.</p>
     <p><a href="/export-desk.zip" download="export-desk.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">Baixar export-desk.zip</a></p>
+    <ol>
+      <li>Extraia na raiz do GitHub <strong>exportsales2</strong>. Se o Windows criar uma pasta, copie o conteúdo. Um único commit em main — não use Upload files no site.</li>
+      <li>Render → serviço Node <strong>exportsales</strong> → Manual Deploy → Deploy latest commit. Não apague o disco.</li>
+      <li>Pronto quando /trade abrir. Fontes → Connect with Google liga o Atlas em https://exportsales.onrender.com/api/atlas/callback</li>
+    </ol>
     <p>O mesmo repo alimenta o dashboard Node (<strong>exportsales</strong>) e o FastAPI (<strong>exportsales2</strong>). Não apague os discos. Não reenvie o CSV se o índice Chroma já está verde.</p>
   </body>
 </html>

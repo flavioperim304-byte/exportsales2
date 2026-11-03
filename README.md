@@ -12,9 +12,11 @@ A local checklist still files page evidence beside those scores. It is shown onl
 
 The worked example (Serra Alta, specialty coffee, Minas Gerais) is on the desk with no API keys. Its companies and citations are sample material.
 
-## Reconstruir no GitHub (`exportsales2`)
+## Implantar no Render (GitHub `exportsales2`)
 
-Não suba arquivo por arquivo. Extraia o zip do projeto na **raiz** do repositório e faça um único commit. Na raiz têm de existir `package.json`, `main.py`, `requirements.txt`, `app/`, `lib/` e `components/`.
+O live https://exportsales.onrender.com/trade ainda dá **404** enquanto o GitHub `flavioperim304-byte/exportsales2` estiver truncado (sem `app/trade`, Dump+API, Atlas). Este ambiente não tem token de GitHub nem de Render: o overlay é o zip, depois um commit em `main` e **Manual Deploy**.
+
+Não suba arquivo por arquivo no site do GitHub. Extraia o zip na **raiz** do repositório (se o Windows criar uma pasta `export-desk`, copie o conteúdo). Um único commit. Na raiz têm de existir `package.json`, `main.py`, `requirements.txt`, `app/trade/page.tsx`, `lib/dump-search.ts`, `lib/company-atlas.ts` e `components/`.
 
 O mesmo repositório alimenta **dois** Web Services no Render. Não apague o repo. Não apague os discos.
 
@@ -23,7 +25,10 @@ O mesmo repositório alimenta **dois** Web Services no Render. Não apague o rep
 | `exportsales` | https://exportsales.onrender.com | Node 22 | `npm ci && npm run build` | `npx next start -H 0.0.0.0 -p $PORT` | 1 GB em `/opt/render/project/src/data` | `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `OPENAI_API_KEY`, `PARALLEL_API_KEY`, `RAG_API_URL=https://exportsales2.onrender.com` |
 | `exportsales2` | https://exportsales2.onrender.com | Python 3 | `pip install -r requirements.txt` | `uvicorn main:app --host 0.0.0.0 --port $PORT` | 1 GB em `/var/data` | `CHROMA_PATH=/var/data/chroma` |
 
-Depois do deploy do Node, **Manual Deploy → Deploy latest commit** se o Auto-Deploy não pegar. O índice Chroma já gravado permanece no disco: não reenvie o CSV do Panamá se `/enviar` ainda mostra as empresas em verde. Relatórios de due diligence antigos só mudam se você rodar a DD de novo.
+1. Extraia `export-desk.zip` na raiz de `exportsales2` e faça push de **um** commit em `main`.
+2. No Render, abra o serviço Node **`exportsales`** → **Manual Deploy → Deploy latest commit**.
+3. Espere Live. `/trade` tem de abrir; `/qualify` mostra Dump + API; Fontes → Connect with Google registra o callback `https://exportsales.onrender.com/api/atlas/callback`.
+4. Aduana no live começa vazia (os dumps desta máquina não vão no zip). Cole de novo em `/trade`. Não reenvie o CSV do Panamá se `/enviar` no Python ainda está verde.
 
 ## Run locally
 

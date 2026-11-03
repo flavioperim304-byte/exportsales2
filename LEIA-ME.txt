@@ -1,41 +1,72 @@
-Export Desk — reconstruir o repositório
-=======================================
+Export Desk — implantar no Render
+=================================
+
+Hoje https://exportsales.onrender.com/trade ainda dá 404.
+Este zip coloca Dump+API, Aduana e Company Atlas na raiz do GitHub
+flavioperim304-byte/exportsales2. Sem esse commit o Render não muda.
 
 No Windows:
 1. Botão direito neste zip → Extrair tudo
-2. Não abra os arquivos com o Bloco de notas
+2. Não abra com o Bloco de notas. Use o Explorer ou o 7-Zip.
 
-O que você vê depois de extrair é o projeto inteiro.
-Suba essa pasta inteira para o GitHub exportsales2 (raiz do repo).
-Não copie arquivo por arquivo. Na raiz têm de existir:
+Se o Windows criar uma pasta export-desk, copie o CONTEÚDO dela
+para a raiz do repositório (onde já existe package.json).
+Não deixe uma pasta dentro da outra.
+
+Na raiz têm de existir:
   package.json
   main.py
   requirements.txt
   app/
+  app/trade/page.tsx
   lib/
+  lib/dump-search.ts
+  lib/company-atlas.ts
   components/
 
-Dois serviços Render, mesmo repositório:
+NÃO use "Add file" / "Upload files" no site do GitHub.
+Foi assim que o repo ficou truncado da última vez (sem /trade).
+Use GitHub Desktop ou git, um único commit em main, e push.
 
-1) exportsales  (Node — dashboard)
-   https://exportsales.onrender.com
-   Build: npm ci && npm run build
-   Start: npx next start -H 0.0.0.0 -p $PORT
+  git add -A
+  git commit -m "Desk: Dump+API, Aduana e Company Atlas"
+  git push origin main
+
+Dois serviços Render, mesmo repositório. Não apague o repo. Não apague os discos.
+
+1) Node — dashboard (é este que falta implantar)
+   Serviço: exportsales
+   URL:     https://exportsales.onrender.com
+   Build:   npm ci && npm run build
+   Start:   npx next start -H 0.0.0.0 -p $PORT
    Node 22
    Disco 1 GB em /opt/render/project/src/data
    Env: EXA_API_KEY, FIRECRAWL_API_KEY, OPENAI_API_KEY, PARALLEL_API_KEY
         RAG_API_URL=https://exportsales2.onrender.com
 
-2) exportsales2 (Python — FastAPI / Chroma)
-   https://exportsales2.onrender.com
-   Build: pip install -r requirements.txt
-   Start: uvicorn main:app --host 0.0.0.0 --port $PORT
+   No Render: abra exportsales → Manual Deploy → Deploy latest commit.
+   Espere o build ficar Live. Auto-Deploy às vezes não pega o push.
+
+   Pronto quando:
+   - https://exportsales.onrender.com/trade abre (Aduana)
+   - /qualify mostra Dump + API
+   - Fontes → Connect with Google liga o Company Atlas
+     (callback: https://exportsales.onrender.com/api/atlas/callback)
+
+2) Python — FastAPI / Chroma
+   Serviço: exportsales2
+   URL:     https://exportsales2.onrender.com
+   Build:   pip install -r requirements.txt
+   Start:   uvicorn main:app --host 0.0.0.0 --port $PORT
    Disco 1 GB em /var/data
    Env: CHROMA_PATH=/var/data/chroma
-   Não apague o disco. Não reenvie o CSV se o índice já está verde.
+   Não apague o disco. Não reenvie o CSV do Panamá se /enviar
+   ainda mostra as empresas em verde.
+
+Aduana no live começa vazia: os 1398 nomes desta máquina não vão no zip.
+Depois do deploy, cole de novo os dumps em /trade. Dump não confirma
+compra Kanechom/LQ. Atlas é indicação em 36 mercados, não é Fit.
 
 Due diligence: Opportunity não entra no Fit.
 Importação só confirma com fato publicado (we import / importamos / última compra).
-Dump de aduana (TradeInData etc.) é indicação, com falsos; não confirma compra.
 Feira, vaga de compras ou menção web de aduana, sozinha, não desbloqueia best fit.
-Não rode de novo a DD do Panamá até o dashboard Node estar neste código.
