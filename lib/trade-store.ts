@@ -1,7 +1,27 @@
 import fs from "node:fs"
 import path from "node:path"
-import { parseTradeDump, parseTradeInput } from "./trade-records"
+import { parseTradeExcel } from "./trade-excel"
+import { isExcelName, parseTradeDump, parseTradeInput } from "./trade-records"
 import type { TradeFiling } from "./types"
+
+export type TradeUpload = {
+  name: string
+  text?: string
+  buffer?: Buffer
+}
+
+function parseUpload(file: TradeUpload): TradeFiling[] {
+  if (file.buffer && (isExcelName(file.name) || looksLikeExcelBuffer(file.buffer))) {
+    return parseTradeExcel(file.buffer, file.name)
+  }
+  const text = file.text ?? (file.buffer ? file.buffer.toString("utf8") : "")
+  return parseTradeInput(text, undefined, file.name)
+}
+
+function looksLikeExcelBuffer(buffer: Buffer): boolean {
+  if (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b) return true
+  return buffer.length >= 8 && buffer[0] === 0xd0 && buffer[1] === 0xcf && buffer[2] === 0x11 && buffer[3] === 0xe0
+}
 
 const file = path.join(process.cwd(), "data", "trade-records.json")
 const seedFile = path.join(process.cwd(), "lib", "data", "panama-shampoo.txt")
@@ -98,7 +118,7 @@ export async function addFilings(
   return { added, total, filings, parsed }
 }
 
-export async function addFilingFiles(files: { name: string; text: string }[]): Promise<{
+export async function addFilingFiles(files: TradeUpload[]): Promise<{
   added: number
   total: number
   filings: TradeFiling[]
@@ -114,7 +134,7 @@ export async function addFilingFiles(files: { name: string; text: string }[]): P
     const db = loadDatabase()
     const byId = new Map(db.filings.map((row) => [row.id, row]))
     for (const file of files) {
-      const rows = parseTradeInput(file.text, undefined, file.name)
+      const rows = parseUpload(file)
       let fileAdded = 0
       for (const row of rows) {
         if (!byId.has(row.id)) {

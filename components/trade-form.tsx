@@ -116,22 +116,13 @@ export function TradeForm() {
 
   async function onFile(list: FileList | null) {
     if (!list?.length) return
-    if (list.length === 1) {
-      setText(await list[0].text())
-      return
-    }
     setSaving(true)
     setError("")
     setNote("")
     try {
-      const files = await Promise.all(
-        [...list].map(async (file) => ({ name: file.name, text: await file.text() }))
-      )
-      const response = await fetch("/api/trade-records", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ files }),
-      })
+      const form = new FormData()
+      for (const file of list) form.append("files", file)
+      const response = await fetch("/api/trade-records", { method: "POST", body: form })
       const data = (await response.json()) as Payload
       if (!response.ok) {
         setError(data.error || "O arquivo não pôde ser lido.")
@@ -139,7 +130,7 @@ export function TradeForm() {
       }
       const names = data.files?.map((item) => `${item.name}: ${item.parsed}`).join(" · ")
       setNote(
-        `Li ${data.parsed} empresas em ${files.length} arquivos. ${data.added} novas. ${names || ""} ${data.summary?.note ?? ""}`
+        `Li ${data.parsed} empresas em ${list.length} arquivo${list.length === 1 ? "" : "s"}. ${data.added} novas. ${names || ""} ${data.summary?.note ?? ""}`
       )
       await refresh()
     } catch {
@@ -160,11 +151,11 @@ export function TradeForm() {
         </p>
         {summary && (summary.total ?? count) > 0 ? <DumpCut summary={summary} /> : null}
         <div className="flex flex-col gap-2">
-          <Label htmlFor="trade-file">CSV ou dump</Label>
+          <Label htmlFor="trade-file">Txt, CSV ou Excel</Label>
           <input
             id="trade-file"
             type="file"
-            accept=".txt,.csv,.tsv,text/plain,text/csv"
+            accept=".txt,.csv,.tsv,.xlsx,.xlsm,.xls,.xlsb,text/plain,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             multiple
             className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-card file:px-3 file:py-1.5"
             onChange={(event) => void onFile(event.target.files)}

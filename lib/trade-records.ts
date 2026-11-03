@@ -508,7 +508,7 @@ export function parseTradeDump(text: string, source: TradeSource = "tradeindata"
       })
     )
   }
-  return dedupeFilings(cards)
+  return stampFileCountry(dedupeFilings(cards), sourceFile)
 }
 
 function splitCsvLine(line: string, delimiter: string): string[] {
@@ -556,14 +556,14 @@ export function parseTradeCsv(text: string, source: TradeSource = "csv", sourceF
   const headers = splitCsvLine(rows[0], delimiter).map(headerKey)
   const index = (aliases: string[]): number =>
     headers.findIndex((header) => aliases.some((alias) => header.includes(alias)))
-  const importerAt = index(["importer", "company", "consignee", "name", "empresa"])
-  const countryAt = index(["country", "pais", "market"])
-  const dateAt = index(["last_trade", "date", "fecha"])
-  const descAt = index(["description", "product", "desc"])
+  const importerAt = index(["importer_name", "company_name", "consignee", "importer", "empresa", "company", "name"])
+  const countryAt = index(["country", "pais", "market", "nation"])
+  const dateAt = index(["last_trade_date", "last_trade", "trade_date", "fecha", "date"])
+  const descAt = index(["description", "product", "cargo", "desc"])
   const hsAt = index(["hscode", "hs_code", "hs", "ncm"])
   const hsCountAt = index(["hs_shipment", "shipment_330", "330510"])
   const totalAt = index(["total_shipment", "shipments", "embarque"])
-  const partnersAt = index(["partner", "supplier", "exportador"])
+  const partnersAt = index(["partner", "supplier", "exportador", "shipper"])
   if (importerAt < 0) return []
   const cards: TradeFiling[] = []
   for (const row of rows.slice(1)) {
@@ -604,7 +604,43 @@ export function parseTradeCsv(text: string, source: TradeSource = "csv", sourceF
       })
     )
   }
-  return dedupeFilings(cards)
+  return stampFileCountry(dedupeFilings(cards), sourceFile)
+}
+
+const FILE_COUNTRY: { re: RegExp; country: string }[] = [
+  { re: /austsham|australia|\baust\b/i, country: "Australia" },
+  { re: /\bjapan\b|\bjap\b/i, country: "Japan" },
+  { re: /hong\s*kong|\bhk\b/i, country: "Hong Kong" },
+  { re: /uzbekistan|\buz\b/i, country: "Uzbekistan" },
+  { re: /germany|\bger\b/i, country: "Germany" },
+  { re: /united\s*arab|\buae\b|dubai|emirates/i, country: "United Arab Emirates" },
+  { re: /panama/i, country: "Panama" },
+  { re: /bolivia/i, country: "Bolivia" },
+  { re: /chile/i, country: "Chile" },
+  { re: /colombia/i, country: "Colombia" },
+  { re: /dominican|\bdr\b/i, country: "Dominican Republic" },
+  { re: /south\s*africa/i, country: "South Africa" },
+]
+
+export function countryFromFilename(name: string): string {
+  const stem = name
+    .split(/[/\\]/)
+    .pop()
+    ?.replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .trim()
+  if (!stem) return ""
+  const hit = FILE_COUNTRY.find((row) => row.re.test(stem))
+  return hit?.country ?? ""
+}
+
+export function stampFileCountry(rows: TradeFiling[], sourceFile?: string): TradeFiling[] {
+  const guessed = sourceFile ? countryFromFilename(sourceFile) : ""
+  if (!guessed) return rows
+  return rows.map((row) => {
+    if (row.country && row.country !== "Unknown") return row
+    return { ...row, country: guessed, id: filingId(row.importer, guessed, row.hs) }
+  })
 }
 
 export function looksLikeCsv(text: string): boolean {
@@ -618,6 +654,10 @@ export function parseTradeInput(text: string, source?: TradeSource, sourceFile?:
   if (!trimmed) return []
   if (source === "csv" || looksLikeCsv(trimmed)) return parseTradeCsv(trimmed, source ?? "csv", sourceFile)
   return parseTradeDump(trimmed, source ?? "tradeindata", sourceFile)
+}
+
+export function isExcelName(name: string): boolean {
+  return /\.(xlsx|xlsm|xls|xlsb)$/i.test(name)
 }
 
 export type TradeFileResult = {

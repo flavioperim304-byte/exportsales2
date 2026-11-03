@@ -61,7 +61,7 @@ export async function POST(request: Request) {
   const contentType = request.headers.get("content-type") || ""
   let text = ""
   let sourceFile = ""
-  let files: { name: string; text: string }[] = []
+  let files: { name: string; text?: string; buffer?: Buffer }[] = []
   if (contentType.includes("multipart/form-data")) {
     const form = await request.formData()
     const pasted = form.get("text")
@@ -70,9 +70,10 @@ export async function POST(request: Request) {
     if (typeof named === "string") sourceFile = named
     const uploaded = form.getAll("file").concat(form.getAll("files"))
     for (const item of uploaded) {
-      if (item && typeof item === "object" && "text" in item) {
+      if (item && typeof item === "object" && "arrayBuffer" in item) {
         const file = item as File
-        files.push({ name: file.name, text: await file.text() })
+        const buffer = Buffer.from(await file.arrayBuffer())
+        files.push({ name: file.name, buffer })
       }
     }
   } else {
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
       : []
   }
   if (!text.trim() && files.length === 0) {
-    return Response.json({ error: "Cole o dump da TradeInData ou envie um CSV." }, { status: 400 })
+    return Response.json({ error: "Cole o dump da TradeInData ou envie txt, CSV ou Excel." }, { status: 400 })
   }
   try {
     const result =
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
         : await addFilings(text, undefined, sourceFile)
     if (result.parsed.length === 0) {
       return Response.json(
-        { error: "Não reconheci empresas neste arquivo. Cole o dump da ficha TradeInData ou um CSV com coluna de importador." },
+        { error: "Não reconheci empresas neste arquivo. Mande o txt da ficha, um CSV com coluna de importador, ou o Excel da época." },
         { status: 400 }
       )
     }
