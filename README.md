@@ -14,9 +14,9 @@ The worked example (Serra Alta, specialty coffee, Minas Gerais) is on the desk w
 
 ## Implantar no Render (GitHub `exportsales2`)
 
-O live https://exportsales.onrender.com/trade ainda dá **404** enquanto o GitHub `flavioperim304-byte/exportsales2` estiver truncado (sem `app/trade`, Dump+API, Atlas). Este ambiente não tem token de GitHub nem de Render: o overlay é o zip, depois um commit em `main` e **Manual Deploy**.
+O live https://exportsales.onrender.com/trade ainda dá **404** porque o Node no Render ficou no deploy antigo: o `next build` quebra. O overlay já está no GitHub (`app/trade/page.tsx` e `lib/anchors.ts` existem), mas um arrasto abriu a pasta `lib` e copiou dezenas de `.ts` na raiz. O `tsconfig.json` agora ignora esses arquivos soltos. A página `/leads` precisa de `<Suspense>` em volta de `connection()` senão o build de produção cai.
 
-Não suba arquivo por arquivo no site do GitHub. Extraia o zip na **raiz** do repositório (se o Windows criar uma pasta `export-desk`, copie o conteúdo). Um único commit. Na raiz têm de existir `package.json`, `main.py`, `requirements.txt`, `app/trade/page.tsx`, `lib/dump-search.ts`, `lib/company-atlas.ts` e `components/`.
+**Pare de subir lote-1 e lote-2.** Extraia `consertar-build.zip` e arraste só `tsconfig.json` e a pasta `app` em https://github.com/flavioperim304-byte/exportsales2/upload/main. Commit em `main`. Render → **exportsales** → Manual Deploy. Não apague o disco. Se https://exportsales2.onrender.com já mostrar `status: ok`, não mexa no Python e não reenvie o CSV do Panamá.
 
 O mesmo repositório alimenta **dois** Web Services no Render. Não apague o repo. Não apague os discos.
 

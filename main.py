@@ -309,19 +309,18 @@ def download_page() -> str:
     <title>Implantar no Render</title>
   </head>
   <body style="font-family: sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem;">
-    <h1>Dois lotes para o GitHub</h1>
-    <p>O site do GitHub aceita 100 arquivos por vez. O desk tem 134. Windows: botão direito → Extrair tudo. Não abra com o Bloco de notas.</p>
+    <h1>Dois arquivos para o Render voltar</h1>
+    <p>Pare de subir lote-1 e lote-2. O overlay já está no GitHub; o último arrasto abriu a pasta lib e jogou os .ts na raiz. O Node quebra no next build. Este zip tem só tsconfig.json e app/leads/page.tsx. Windows: botão direito → Extrair tudo. Não abra com o Bloco de notas.</p>
     <p>
-      <a href="/lote-1.zip" download="lote-1.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;margin-right:0.5rem;">Lote 1 — app e tela</a>
-      <a href="/lote-2.zip" download="lote-2.zip" style="display:inline-block;padding:0.8rem 1.2rem;border:1px solid #111;color:#111;text-decoration:none;border-radius:8px;">Lote 2 — lib e testes</a>
+      <a href="/consertar-build.zip" download="consertar-build.zip" style="display:inline-block;padding:0.8rem 1.2rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;">consertar-build.zip — só 2 arquivos</a>
     </p>
     <ol>
       <li>Abra https://github.com/flavioperim304-byte/exportsales2/upload/main</li>
-      <li>Extraia o lote 1. Entre na pasta. Ctrl+A (app, components, package.json). Arraste. Não arraste a pasta lote-1. Commit em main.</li>
-      <li>Extraia o lote 2. Ctrl+A (lib, tests). Arraste. Commit.</li>
-      <li>Confira app/trade/page.tsx e lib/anchors.ts no GitHub. Depois Render → exportsales → Manual Deploy → Deploy latest commit.</li>
+      <li>Extraia. Entre na pasta. Arraste tsconfig.json e a pasta app. Não abra app nem leads. Commit em main.</li>
+      <li>Render → exportsales (Node) → Manual Deploy → Deploy latest commit. Não apague o disco.</li>
+      <li>Se https://exportsales2.onrender.com mostrar status ok, não mexa no Python. Não reenvie o CSV do Panamá.</li>
     </ol>
-    <p>O mesmo repo alimenta o dashboard Node (<strong>exportsales</strong>) e o FastAPI (<strong>exportsales2</strong>). Não apague os discos. Não reenvie o CSV se o índice Chroma já está verde.</p>
+    <p>Pronto quando https://exportsales.onrender.com/trade abrir. Os .ts soltos na raiz podem ficar: o tsconfig novo ignora eles.</p>
   </body>
 </html>
 """
@@ -368,6 +367,16 @@ def download_lote_2() -> FileResponse:
         packaged_zip("lote-2.zip"),
         media_type="application/octet-stream",
         filename="lote-2.zip",
+        headers={"X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.get("/consertar-build.zip")
+def download_consertar_build() -> FileResponse:
+    return FileResponse(
+        packaged_zip("consertar-build.zip"),
+        media_type="application/octet-stream",
+        filename="consertar-build.zip",
         headers={"X-Content-Type-Options": "nosniff"},
     )
 

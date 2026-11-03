@@ -1,10 +1,25 @@
+import { Suspense } from "react"
 import Link from "next/link"
 import { connection } from "next/server"
 import { LeadsBoard } from "@/components/leads-board"
 import { postgresStatus } from "@/lib/lead-db"
 import { listLeadRecords } from "@/lib/store"
 
-export default async function LeadsPage() {
+export default function LeadsPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto w-full max-w-7xl px-4 py-10">
+          <p className="text-sm text-muted-foreground">Abrindo as leads…</p>
+        </main>
+      }
+    >
+      <LeadsLoader />
+    </Suspense>
+  )
+}
+
+async function LeadsLoader() {
   await connection()
   const [records, db] = await Promise.all([listLeadRecords(), postgresStatus()])
   return (

@@ -2,26 +2,21 @@ export default function BaixarPage() {
   return (
     <main className="mx-auto w-full max-w-xl px-4 py-12">
       <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Deploy</p>
-      <h1 className="mt-2 font-serif text-3xl">Dois lotes para o GitHub</h1>
+      <h1 className="mt-2 font-serif text-3xl">Dois arquivos para o Render voltar</h1>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        O site do GitHub aceita no máximo 100 arquivos por upload. O desk tem 134, por isso um zip
-        só corta o <code>/trade</code>. São dois arrastos, cada um abaixo de 100. Windows: botão
-        direito → Extrair tudo. Não abra com o Bloco de notas.
+        Pare de subir lote-1 e lote-2. O GitHub já tem o overlay, mas o último arrasto abriu a pasta{" "}
+        <code>lib</code> e jogou os <code>.ts</code> na raiz. Por isso o Node quebra no{" "}
+        <code>next build</code> e o live fica no deploy antigo (<code>/trade</code> 404). Este zip
+        tem só o <code>tsconfig.json</code> e a página <code>/leads</code>. Windows: botão direito →
+        Extrair tudo. Não abra com o Bloco de notas.
       </p>
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-6 flex flex-col gap-3">
         <a
-          href="/api/lote-1.zip"
-          download="lote-1.zip"
+          href="/api/consertar-build.zip"
+          download="consertar-build.zip"
           className="inline-flex rounded-lg bg-primary px-5 py-3 text-sm font-medium text-primary-foreground"
         >
-          Lote 1 — app e tela
-        </a>
-        <a
-          href="/api/lote-2.zip"
-          download="lote-2.zip"
-          className="inline-flex rounded-lg border border-border px-5 py-3 text-sm"
-        >
-          Lote 2 — lib e testes
+          consertar-build.zip — só 2 arquivos
         </a>
       </div>
       <ol className="mt-6 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-muted-foreground">
@@ -36,22 +31,28 @@ export default function BaixarPage() {
           .
         </li>
         <li>
-          Extraia o lote 1. Entre na pasta. Ctrl+A nos itens (<code>app</code>,{" "}
-          <code>components</code>, <code>package.json</code>). Arraste para a página. Não arraste a
-          pasta lote-1 inteira. Commit em <code>main</code>.
+          Extraia o zip. Entre na pasta. Arraste os dois itens: o arquivo{" "}
+          <code>tsconfig.json</code> e a pasta <code>app</code>. Não abra <code>app</code> nem{" "}
+          <code>leads</code>. Não arraste a pasta consertar-build inteira.
         </li>
         <li>
-          Extraia o lote 2. Ctrl+A (<code>lib</code>, <code>tests</code>). Arraste de novo. Commit.
-        </li>
-        <li>
-          Confira no GitHub se existem <code>app/trade/page.tsx</code> e{" "}
-          <code>lib/anchors.ts</code>. Sem isso o Render continua 404.
+          Commit em <code>main</code>. Confira no GitHub se{" "}
+          <code>app/leads/page.tsx</code> ainda está dentro de <code>app/leads</code> (não na raiz).
         </li>
         <li>
           Render → serviço Node <strong>exportsales</strong> → Manual Deploy → Deploy latest commit.
           Não apague o disco.
         </li>
+        <li>
+          Se https://exportsales2.onrender.com mostrar <code>status: ok</code>, não mexa no Python.
+          Não reenvie o CSV do Panamá.
+        </li>
       </ol>
+      <p className="mt-6 text-sm leading-relaxed text-muted-foreground">
+        Pronto quando https://exportsales.onrender.com/trade abrir. Os arquivos soltos na raiz do
+        GitHub podem ficar: o tsconfig novo ignora eles. Não arraste de novo o conteúdo de{" "}
+        <code>lib</code>.
+      </p>
     </main>
   )
 }
