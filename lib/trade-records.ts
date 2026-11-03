@@ -44,7 +44,7 @@ const MASS_BRANDS: { re: RegExp; label: string }[] = [
   { re: /\bprocter\b|\bp&g\b|\bprocter\s*&?\s*gamble\b/i, label: "P&G" },
   { re: /\bavon\b/i, label: "Avon" },
   { re: /\bgenomma|genonna\b/i, label: "Genomma" },
-  { re: /\bbelcorp\b|\bbel star\b|\bl\.?\s*bel\b/i, label: "Belcorp" },
+  { re: /\bbelcorp|\bbel star\b|\bl\.?\s*bel\b/i, label: "Belcorp" },
   { re: /\bnazca\b/i, label: "Nazca" },
   { re: /\bskala\b/i, label: "Skala" },
   { re: /\bpricesmart\b/i, label: "PriceSmart" },
@@ -634,6 +634,21 @@ const FILE_COUNTRY: { re: RegExp; country: string }[] = [
   { re: /sudan/i, country: "Sudan" },
   { re: /italy|italia/i, country: "Italy" },
   { re: /uruguay|\buru\b/i, country: "Uruguay" },
+  { re: /ireland|\bir\b/i, country: "Ireland" },
+  { re: /turkey|\btk\b/i, country: "Turkey" },
+  { re: /switzerland|\bsw\b/i, country: "Switzerland" },
+  { re: /canada|\bcan\b/i, country: "Canada" },
+  { re: /nicaragua|\bnic\b/i, country: "Nicaragua" },
+  { re: /russia|\brus\b/i, country: "Russia" },
+  { re: /ethiopia|\bet\b/i, country: "Ethiopia" },
+  { re: /costa\s*rica|\bcr\b/i, country: "Costa Rica" },
+  { re: /paraguay|\bpar\b/i, country: "Paraguay" },
+  { re: /belgium|\bbe\b/i, country: "Belgium" },
+  { re: /mozambique|\bmoz\b/i, country: "Mozambique" },
+  { re: /guatemala|\bgua\b/i, country: "Guatemala" },
+  { re: /mexico|\bmex\b/i, country: "Mexico" },
+  { re: /mauritania/i, country: "Mauritania" },
+  { re: /argentina/i, country: "Argentina" },
 ]
 
 const COUNTRY_ALIAS: { re: RegExp; country: string }[] = [
@@ -1078,7 +1093,7 @@ export function qualityLabel(quality: TradeFilingQuality): string {
 }
 
 const GLOBAL_IMPORTER =
-  /\b(unilever|avon|genomma|genonna|pricesmart|procter|feduro|l'?oreal|loreal|alfa parf|alfaparf|belcorp|\bl\.?\s*bel\b|mesoestetic|arabela|henkel|beiersdorf|colgate)\b/i
+  /\b(unilever|avon|genomma|genonna|pricesmart|procter|feduro|l'?oreal|loreal|alfa parf|alfaparf|belcorp|\bl\.?\s*bel\b|mesoestetic|arabela|henkel|beiersdorf|colgate)/i
 
 export function isLogisticsName(name: string): boolean {
   return LOGISTICS.test(name) || ZONA.test(name)

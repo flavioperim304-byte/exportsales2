@@ -222,6 +222,16 @@ test("a BL tab dump yields named importers and drops tiny parcels as sample", ()
 test("Beiersdorf and Colgate subsidiaries are not dump search candidates", () => {
   assert.equal(isGlobalBrandImporter("BEIERSDORF EAST AFRICA LIMITED"), true)
   assert.equal(isGlobalBrandImporter("COLGATE PALMOLIVE INDUSTRIAL LTDA"), true)
+  assert.equal(isGlobalBrandImporter("BELCORPORATION GUATEMALA S.A."), true)
+})
+
+test("arg.txt is Mauritania on the card, not Argentina", () => {
+  const rows = parseTradeDump(
+    "MST MOHAMED MOHAMED EL MOKHTAR TEVRAGH ZEGNA\nMauritania Importer\nLast Trade Date: 2026-04-20\nDescription\n330590\nhair removal cream\nTotal Shipment\n330590\n1\nTotal Shipment\n2\n",
+    "tradeindata",
+    "arg.txt"
+  )
+  assert.equal(rows[0]?.country, "Mauritania")
 })
 
 test("parseTradeInput still reads a Product Data card when BL-like dates are absent", () => {
