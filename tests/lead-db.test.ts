@@ -1,7 +1,12 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { KANECHOM_BRIEF } from "../lib/example"
-import { listLeadRecordsFromRuns, postgresConfigured, toLeadRecord } from "../lib/lead-db"
+import {
+  listLeadRecordsFromRuns,
+  postgresConfigured,
+  postgresWantsSsl,
+  toLeadRecord,
+} from "../lib/lead-db"
 import { createRun } from "../lib/pipeline"
 import { SAMPLE_RUN_ID } from "../lib/ids"
 import { sampleRun } from "../lib/sample"
@@ -9,6 +14,20 @@ import { sampleRun } from "../lib/sample"
 test("postgres stays off when DATABASE_URL is missing", () => {
   assert.equal(Boolean(process.env.DATABASE_URL), false)
   assert.equal(postgresConfigured(), false)
+})
+
+test("Supabase and Render URLs use SSL; localhost does not", () => {
+  assert.equal(postgresWantsSsl("postgres://x@db.abcd.supabase.co:5432/postgres"), true)
+  assert.equal(
+    postgresWantsSsl("postgres://x@aws-0-sa-east-1.pooler.supabase.com:5432/postgres"),
+    true
+  )
+  assert.equal(postgresWantsSsl("postgres://x@dpg-xxx.render.com/desk"), true)
+  assert.equal(postgresWantsSsl("postgres://x@localhost:5432/desk"), false)
+  assert.equal(
+    postgresWantsSsl("postgres://x@db.abcd.supabase.co:5432/postgres?sslmode=disable"),
+    false
+  )
 })
 
 test("toLeadRecord copies published contacts and never treats a dump seed as a purchase", () => {

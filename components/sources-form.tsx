@@ -219,10 +219,10 @@ export function SourcesForm() {
           </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Banco das empresas das buscas. No Render, ligue o Postgres ao serviço Node{" "}
-          <code>exportsales</code> e use a Internal Database URL em <code>DATABASE_URL</code>. Não
-          cole a senha aqui. Sem a URL o desk continua em <code>data/runs.json</code>. Aduana e
-          Chroma ficam fora desta tabela.
+          Banco das empresas das buscas. Pode ser o Postgres do Supabase: no Render, serviço Node{" "}
+          <code>exportsales</code>, variável <code>DATABASE_URL</code> com a URI Session pooler
+          (porta 5432). Não cole a senha aqui. Sem a URL o desk continua em{" "}
+          <code>data/runs.json</code>. Aduana e Chroma ficam fora desta tabela.
         </p>
         {db?.postgres && !db.error ? (
           <p className="text-sm">

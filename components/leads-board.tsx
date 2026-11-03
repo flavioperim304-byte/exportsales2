@@ -48,7 +48,7 @@ export function LeadsBoard({
       {visible.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border px-4 py-8 text-sm text-muted-foreground">
           {records.length === 0
-            ? "Nenhuma lead gravada ainda. Rode Nova busca. Depois do deploy, ligue o Postgres ao serviço Node exportsales (DATABASE_URL)."
+            ? "Nenhuma lead gravada ainda. Rode Nova busca. Depois, no Render (serviço Node exportsales), grave DATABASE_URL com a URI Session pooler do Supabase."
             : "Nenhuma lead neste filtro."}
         </p>
       ) : (

@@ -55,12 +55,12 @@ export function postgresLastError(): string | undefined {
   return lastError
 }
 
-function wantsSsl(url: string): boolean {
+export function postgresWantsSsl(url: string): boolean {
   if (process.env.DATABASE_SSL === "false") return false
   if (process.env.DATABASE_SSL === "true" || process.env.PGSSLMODE === "require") return true
   if (/sslmode=require/i.test(url)) return true
   if (/sslmode=(disable|allow|prefer)/i.test(url)) return false
-  return /\.render\.com/i.test(url)
+  return /\.render\.com|\.supabase\.co|\.supabase\.com/i.test(url)
 }
 
 function getPool(): Pool {
@@ -72,7 +72,7 @@ function getPool(): Pool {
       max: 5,
       idleTimeoutMillis: 20_000,
       connectionTimeoutMillis: 8_000,
-      ssl: wantsSsl(url) ? { rejectUnauthorized: false } : undefined,
+      ssl: postgresWantsSsl(url) ? { rejectUnauthorized: false } : undefined,
     })
   }
   return pool

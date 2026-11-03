@@ -22,13 +22,13 @@ O mesmo repositório alimenta **dois** Web Services no Render. Não apague o rep
 
 | Serviço | URL | Runtime | Build | Start | Disco | Env |
 | --- | --- | --- | --- | --- | --- | --- |
-| `exportsales` | https://exportsales.onrender.com | Node 22 | `npm ci && npm run build` | `npx next start -H 0.0.0.0 -p $PORT` | 1 GB em `/opt/render/project/src/data` | `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `OPENAI_API_KEY`, `PARALLEL_API_KEY`, `RAG_API_URL=https://exportsales2.onrender.com`, `DATABASE_URL` (Internal Database URL do Postgres) |
+| `exportsales` | https://exportsales.onrender.com | Node 22 | `npm ci && npm run build` | `npx next start -H 0.0.0.0 -p $PORT` | 1 GB em `/opt/render/project/src/data` | `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `OPENAI_API_KEY`, `PARALLEL_API_KEY`, `RAG_API_URL=https://exportsales2.onrender.com`, `DATABASE_URL` (URI Session pooler do Supabase, porta 5432) |
 | `exportsales2` | https://exportsales2.onrender.com | Python 3 | `pip install -r requirements.txt` | `uvicorn main:app --host 0.0.0.0 --port $PORT` | 1 GB em `/var/data` | `CHROMA_PATH=/var/data/chroma` |
 
 1. Extraia `export-desk.zip` na raiz de `exportsales2` e faça push de **um** commit em `main`.
 2. No Render, abra o serviço Node **`exportsales`** → **Manual Deploy → Deploy latest commit**.
 3. Espere Live. `/trade` tem de abrir; `/qualify` mostra Dump + API; Fontes → Connect with Google registra o callback `https://exportsales.onrender.com/api/atlas/callback`.
-4. Ligue o Postgres ao serviço Node `exportsales` e grave `DATABASE_URL` com a **Internal Database URL** (não a External). Fontes mostra “Postgres (leads) Connected”. `/leads` lista as empresas. Sem essa variável o desk continua em `data/runs.json`. Não cole a senha no GitHub.
+4. No Render **não precisa** criar um Postgres. Use o banco do **Supabase**: Project Settings → Database → Connect → URI → **Session pooler** (porta 5432). Cole essa URI em `DATABASE_URL` no serviço Node `exportsales` (Environment). Troque `[YOUR-PASSWORD]` pela senha do banco. Não cole a senha no GitHub. Fontes mostra “Postgres (leads) Connected”. `/leads` lista as empresas. Sem essa variável o desk continua em `data/runs.json`.
 5. Aduana no live começa vazia (os dumps desta máquina não vão no zip). Cole de novo em `/trade`. Não reenvie o CSV do Panamá se `/enviar` no Python ainda está verde.
 
 ## Run locally
@@ -65,7 +65,7 @@ A Dump + API run spends at most 12 Atlas credits: one HS 3305 rank per overlappi
 
 Or open [Sources](http://127.0.0.1:3847/sources) from the top bar (**Sources 0/4** means nothing is connected yet). Those values are written to `data/secrets.json` (mode 0600, gitignored) and are sent only to those four APIs. An environment variable wins over a saved key. The key routes return connection flags, never the key values.
 
-Live runs are stored in Postgres when `DATABASE_URL` is set (Render Internal Database URL on the Node service). The desk creates `desk_runs` and `desk_leads` on first connect and copies existing `data/runs.json` into an empty database once. Without that variable, live runs stay in `data/runs.json`. Keys, Aduana dumps, and Chroma stay out of Postgres. Exa Agent and Parallel can each take several minutes. Leave the run open. If Parallel is still going after eight minutes, the desk keeps OpenAI’s score and attaches Parallel’s final best fit when you reopen the run.
+Live runs are stored in Postgres when `DATABASE_URL` is set on the Node service. A Supabase Session pooler URI (`*.pooler.supabase.com:5432`) is the expected live value; SSL turns on for `supabase.co` / `supabase.com`. The desk creates `desk_runs` and `desk_leads` on first connect and copies existing `data/runs.json` into an empty database once. Without that variable, live runs stay in `data/runs.json`. Keys, Aduana dumps, and Chroma stay out of Postgres. Exa Agent and Parallel can each take several minutes. Leave the run open. If Parallel is still going after eight minutes, the desk keeps OpenAI’s score and attaches Parallel’s final best fit when you reopen the run.
 
 Each live run spends one Exa Agent search per country (a second search only if that country returned fewer than 10 companies), one Firecrawl Agent read per lead, one Exa Search per lead for activity and two more for commercial signals, one OpenAI score, and one Parallel task. Ten countries means about 100 company reads. The qualification form shows the prompts and the page count before you start. Firecrawl Agent is given about 70 seconds per page; if it stays pending, the desk tries a fast scrape and then moves on so scoring is not blocked. After eight minutes the remaining pages are skipped.
 
