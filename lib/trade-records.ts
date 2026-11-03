@@ -226,6 +226,7 @@ function finishFiling(
   const picked = pickPrimaryHs(partial.hs, partial.hsCodes ?? [], partial.hsShipments)
   const draft = {
     ...partial,
+    country: normalizeCountry(partial.country),
     hs: picked.hs,
     hsShipments: picked.hsShipments,
     hsCodes: partial.hsCodes ?? [],
@@ -619,8 +620,36 @@ const FILE_COUNTRY: { re: RegExp; country: string }[] = [
   { re: /chile/i, country: "Chile" },
   { re: /colombia/i, country: "Colombia" },
   { re: /dominican|\bdr\b/i, country: "Dominican Republic" },
-  { re: /south\s*africa/i, country: "South Africa" },
+  { re: /south\s*africa|safrica/i, country: "South Africa" },
+  { re: /madagascar|madag/i, country: "Madagascar" },
+  { re: /zambia|\bzam\b/i, country: "Zambia" },
+  { re: /uganda|\buga\b/i, country: "Uganda" },
+  { re: /libya|\blyb\b/i, country: "Libya" },
+  { re: /botswana|botsw/i, country: "Botswana" },
+  { re: /mauritius|\bmaur\b/i, country: "Mauritius" },
+  { re: /kenya|\bken\b/i, country: "Kenya" },
+  { re: /algeria|\bal\s*2\b/i, country: "Algeria" },
+  { re: /senegal|\bsene\b/i, country: "Senegal" },
+  { re: /south\s*sudan/i, country: "South Sudan" },
+  { re: /sudan/i, country: "Sudan" },
+  { re: /italy|italia/i, country: "Italy" },
+  { re: /uruguay|\buru\b/i, country: "Uruguay" },
 ]
+
+const COUNTRY_ALIAS: { re: RegExp; country: string }[] = [
+  { re: /hong\s*kong/i, country: "Hong Kong" },
+  { re: /state of libya|libya/i, country: "Libya" },
+  { re: /south\s*africa/i, country: "South Africa" },
+  { re: /united\s*states|\busa\b/i, country: "United States" },
+  { re: /south\s*sudan/i, country: "South Sudan" },
+]
+
+export function normalizeCountry(country: string): string {
+  const trimmed = country.trim()
+  if (!trimmed || trimmed === "Unknown") return trimmed || "Unknown"
+  const hit = COUNTRY_ALIAS.find((row) => row.re.test(trimmed))
+  return hit?.country ?? trimmed
+}
 
 export function countryFromFilename(name: string): string {
   const stem = name
@@ -649,11 +678,116 @@ export function looksLikeCsv(text: string): boolean {
   return /importer|company|consignee|hscode|hs code|shipment/i.test(first)
 }
 
+export function looksLikeBl(text: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}\t.+/m.test(text) && /\d+(?:\.\d+)?\s*KG/i.test(text)
+}
+
+function blHs(description: string): string {
+  const coded = description.match(/hs(?:\s*code)?\s*:?\s*(\d{4,12})/i)
+  if (coded) return coded[1].replace(/\D/g, "").slice(0, 6)
+  const hair = description.match(/\b(3305\d{2,})\b/)
+  if (hair) return hair[1].replace(/\D/g, "").slice(0, 6)
+  return "330590"
+}
+
+function blKg(text: string): number {
+  const match = text.match(/([\d.]+)\s*KG/i)
+  return match ? Number(match[1]) : 0
+}
+
+export function parseTradeBl(text: string, sourceFile?: string): TradeFiling[] {
+  const lines = text.replace(/\r\n/g, "\n").split("\n")
+  type Raw = { date: string; importer: string; body: string[] }
+  const raw: Raw[] = []
+  let current: Raw | null = null
+  for (const line of lines) {
+    const start = line.match(/^(\d{4}-\d{2}-\d{2})\t+(.+)$/)
+    if (start) {
+      if (current) raw.push(current)
+      current = { date: start[1], importer: start[2].trim(), body: [] }
+      continue
+    }
+    if (current) current.body.push(line)
+  }
+  if (current) raw.push(current)
+  const cards: TradeFiling[] = []
+  for (const row of raw) {
+    const importer = row.importer.replace(/\s+/g, " ").trim()
+    if (!importer || /^unpublished$/i.test(importer) || importer.length < 3) continue
+    const blob = row.body.join("\n")
+    const countryLine = row.body.find((line) => /^[A-Z][A-Za-z .,'()]+\t/.test(line) || /^[A-Z][A-Za-z .,'()]+$/.test(line.trim()))
+    const country = normalizeCountry((countryLine?.split("\t")[0] || "").trim() || "Unknown")
+    const description = row.body
+      .map((line) => line.replace(/\t/g, " ").replace(/\s+/g, " ").trim())
+      .filter((line) => line && !/^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?$/.test(line))
+      .slice(-1)[0] || blob.replace(/\t/g, " ")
+    const kg = blKg(blob)
+    const hs = blHs(`${description} ${blob}`)
+    const shipper = row.body
+      .map((line) => line.split("\t")[1]?.trim() || "")
+      .find((name) => name.length > 3 && !/^unpublished$/i.test(name) && !/\d+\s*KG/i.test(name))
+    const partners = shipper
+      ? [
+          {
+            name: shipper,
+            kind: classifyPartner(shipper).kind,
+            canonical: classifyPartner(shipper).canonical,
+          } satisfies TradePartner,
+        ]
+      : []
+    const cargo = kg > 0 && kg < 2 ? "sample" : classifyCargo(description, hs)
+    const shipments = kg >= 50 ? 2 : 1
+    cards.push(
+      finishFiling({
+        importer,
+        country,
+        lastTradeDate: row.date,
+        description: description.slice(0, 280),
+        hs,
+        hsShipments: shipments,
+        totalShipments: shipments,
+        partners,
+        latestMonths: [row.date.replace(/-/g, "").slice(0, 6)],
+        cargo,
+        hsCodes: [{ code: hs, shipments: 1 }],
+        tradingCountries: [],
+        ports: [],
+        originsRedacted: /unpublished/i.test(blob),
+        portsRedacted: false,
+        partnersRedacted: /unpublished/i.test(shipper || ""),
+        headingOnly: isHsHeadingText(description),
+        source: "tradeindata",
+        sourceFile,
+      })
+    )
+  }
+  const merged = new Map<string, TradeFiling>()
+  for (const row of cards) {
+    const previous = merged.get(row.id)
+    if (!previous) {
+      merged.set(row.id, row)
+      continue
+    }
+    merged.set(row.id, {
+      ...previous,
+      hsShipments: previous.hsShipments + row.hsShipments,
+      totalShipments: previous.totalShipments + row.totalShipments,
+      lastTradeDate:
+        (row.lastTradeDate || "") > (previous.lastTradeDate || "") ? row.lastTradeDate : previous.lastTradeDate,
+      description: previous.description,
+    })
+  }
+  return stampFileCountry([...merged.values()].map((row) => finishFiling(row)), sourceFile)
+}
+
 export function parseTradeInput(text: string, source?: TradeSource, sourceFile?: string): TradeFiling[] {
   const trimmed = text.trim()
   if (!trimmed) return []
   if (source === "csv" || looksLikeCsv(trimmed)) return parseTradeCsv(trimmed, source ?? "csv", sourceFile)
-  return parseTradeDump(trimmed, source ?? "tradeindata", sourceFile)
+  const dump = parseTradeDump(trimmed, source ?? "tradeindata", sourceFile)
+  if (dump.length) return dump
+  if (looksLikeBl(trimmed)) return parseTradeBl(trimmed, sourceFile)
+  return dump
 }
 
 export function isExcelName(name: string): boolean {
@@ -944,7 +1078,7 @@ export function qualityLabel(quality: TradeFilingQuality): string {
 }
 
 const GLOBAL_IMPORTER =
-  /\b(unilever|avon|genomma|genonna|pricesmart|procter|feduro|l'?oreal|loreal|alfa parf|alfaparf|belcorp|\bl\.?\s*bel\b|mesoestetic|arabela|henkel)\b/i
+  /\b(unilever|avon|genomma|genonna|pricesmart|procter|feduro|l'?oreal|loreal|alfa parf|alfaparf|belcorp|\bl\.?\s*bel\b|mesoestetic|arabela|henkel|beiersdorf|colgate)\b/i
 
 export function isLogisticsName(name: string): boolean {
   return LOGISTICS.test(name) || ZONA.test(name)

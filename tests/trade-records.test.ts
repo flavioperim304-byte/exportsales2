@@ -14,7 +14,9 @@ import {
   isGlobalBrandImporter,
   isHsHeadingText,
   isSearchCandidate,
+  parseTradeBl,
   parseTradeDump,
+  parseTradeInput,
 } from "../lib/trade-records"
 import type { Lead } from "../lib/types"
 
@@ -184,4 +186,50 @@ test("a TradeInData dump does not confirm purchase or unlock best fit", () => {
   const states = classifyBlocks("lq", lead)
   assert.notEqual(states.import, "strong")
   assert.equal(states.import, "partial")
+})
+
+test("Hong Kong, China and State of Libya collapse to the country name", () => {
+  const hk = parseTradeDump(
+    "EVLON CONSUMER PRODUCTS CORP\nHong Kong, China Importer\nLast Trade Date: 2026-04-30\nDescription\n330590\ntintes para el cabello\nTotal Shipment\n330590\n42\nTotal Shipment\n58\n"
+  )
+  assert.equal(hk[0]?.country, "Hong Kong")
+  const libya = parseTradeDump(
+    "AL KIRAM CO\nState of Libya Importer\nLast Trade Date: 2024-07-11\nDescription\n33059000\nellips hair mask\nTotal Shipment\n33059000\n7\nTotal Shipment\n12\n"
+  )
+  assert.equal(libya[0]?.country, "Libya")
+})
+
+test("a BL tab dump yields named importers and drops tiny parcels as sample", () => {
+  const text = [
+    "2026-07-15\tla espanola beauty supply inc",
+    "United States\talcantara s.a.",
+    "Spain\tcosmetics. hs code: 330590 330510\t379KG",
+    "",
+    "2026-06-26\tgian reyes",
+    "Philippines\tamazon com indc llc",
+    "United States\t1 pc hair pomade\t0.22KG",
+  ].join("\n")
+  const rows = parseTradeBl(text, "bldata.txt")
+  const beauty = rows.find((row) => /espanola/i.test(row.importer))
+  const gian = rows.find((row) => /gian/i.test(row.importer))
+  assert.equal(beauty?.country, "United States")
+  assert.equal(beauty?.hs, "330590")
+  assert.ok(gian?.quality === "sample" || gian?.quality === "parcel")
+  assert.equal(isSearchCandidate(gian!), false)
+  assert.equal(isSearchCandidate(beauty!), true)
+})
+
+test("Beiersdorf and Colgate subsidiaries are not dump search candidates", () => {
+  assert.equal(isGlobalBrandImporter("BEIERSDORF EAST AFRICA LIMITED"), true)
+  assert.equal(isGlobalBrandImporter("COLGATE PALMOLIVE INDUSTRIAL LTDA"), true)
+})
+
+test("parseTradeInput still reads a Product Data card when BL-like dates are absent", () => {
+  const rows = parseTradeInput(
+    "TOZAI CORPORATION\nJapan Importer\nLast Trade Date: 2026-01-30\nDescription\n330590\nhenna brown\nTotal Shipment\n330590\n336\nTotal Shipment\n352\n",
+    undefined,
+    "jap.txt"
+  )
+  assert.equal(rows[0]?.importer, "TOZAI CORPORATION")
+  assert.equal(rows[0]?.country, "Japan")
 })
