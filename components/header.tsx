@@ -33,6 +33,9 @@ export function Header() {
           <Button variant="ghost" className="h-11 shrink-0 px-4 sm:h-8" nativeButton={false} render={<Link href="/" />}>
             Painel
           </Button>
+          <Button variant="ghost" className="h-11 shrink-0 px-4 sm:h-8" nativeButton={false} render={<Link href="/leads" />}>
+            Leads
+          </Button>
           <Button variant="ghost" className="h-11 shrink-0 px-4 sm:h-8" nativeButton={false} render={<Link href="/qualify" />}>
             Nova busca
           </Button>

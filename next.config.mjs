@@ -2,7 +2,7 @@
 const nextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
-  serverExternalPackages: ["xlsx"],
+  serverExternalPackages: ["xlsx", "pg"],
   allowedDevOrigins: ["127.0.0.1", "localhost", "**.trycloudflare.com"],
   turbopack: {
     rules: {

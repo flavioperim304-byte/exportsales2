@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { KeyFlags } from "@/lib/types"
+import type { DbStatus, KeyFlags } from "@/lib/types"
 
 const EMPTY_FLAGS: KeyFlags = {
   exa: false,
@@ -30,6 +30,7 @@ export function SourcesForm() {
   const [error, setError] = useState("")
   const [saved, setSaved] = useState(false)
   const [atlasNote, setAtlasNote] = useState("")
+  const [db, setDb] = useState<DbStatus | null>(null)
 
   async function refresh() {
     const response = await fetch("/api/keys")
@@ -50,6 +51,12 @@ export function SourcesForm() {
       .then((response) => (response.ok ? response.json() : null))
       .then((data: { flags: KeyFlags } | null) => {
         if (!cancelled && data?.flags) setFlags(data.flags)
+      })
+      .catch(() => undefined)
+    fetch("/api/db")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: DbStatus | null) => {
+        if (!cancelled && data) setDb(data)
       })
       .catch(() => undefined)
     return () => {
@@ -203,6 +210,32 @@ export function SourcesForm() {
           </Button>
         )}
         {atlasNote ? <p className="text-sm text-muted-foreground">{atlasNote}</p> : null}
+      </div>
+      <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between gap-3">
+          <Label>Postgres (leads)</Label>
+          <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+            {db?.postgres && !db.error ? "Connected" : db?.error ? "Error" : "File"}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Banco das empresas das buscas. No Render, ligue o Postgres ao serviço Node{" "}
+          <code>exportsales</code> e use a Internal Database URL em <code>DATABASE_URL</code>. Não
+          cole a senha aqui. Sem a URL o desk continua em <code>data/runs.json</code>. Aduana e
+          Chroma ficam fora desta tabela.
+        </p>
+        {db?.postgres && !db.error ? (
+          <p className="text-sm">
+            {db.leadCount} lead{db.leadCount === 1 ? "" : "s"} em {db.runCount} busca
+            {db.runCount === 1 ? "" : "s"}.
+          </p>
+        ) : db?.error ? (
+          <p className="text-sm text-destructive">{db.error}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            DATABASE_URL not set on this process. Leads stay on disk until you link Postgres.
+          </p>
+        )}
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {saved ? <p className="text-sm">Keys saved. A new qualification will use them.</p> : null}

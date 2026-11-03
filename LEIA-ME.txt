@@ -43,6 +43,7 @@ Dois serviços Render, mesmo repositório. Não apague o repo. Não apague os di
    Disco 1 GB em /opt/render/project/src/data
    Env: EXA_API_KEY, FIRECRAWL_API_KEY, OPENAI_API_KEY, PARALLEL_API_KEY
         RAG_API_URL=https://exportsales2.onrender.com
+        DATABASE_URL = Internal Database URL do Postgres (não a External)
 
    No Render: abra exportsales → Manual Deploy → Deploy latest commit.
    Espere o build ficar Live. Auto-Deploy às vezes não pega o push.
@@ -52,6 +53,8 @@ Dois serviços Render, mesmo repositório. Não apague o repo. Não apague os di
    - /qualify mostra Dump + API
    - Fontes → Connect with Google liga o Company Atlas
      (callback: https://exportsales.onrender.com/api/atlas/callback)
+   - Fontes mostra Postgres (leads) Connected e /leads lista as empresas
+     (depois de ligar o banco ao serviço Node e gravar DATABASE_URL)
 
 2) Python — FastAPI / Chroma
    Serviço: exportsales2

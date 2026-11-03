@@ -2,8 +2,17 @@ import fs from "node:fs"
 import path from "node:path"
 import { getStore } from "@netlify/blobs"
 import { SAMPLE_RUN_ID } from "./ids"
+import {
+  pgDeleteRun,
+  pgGetRun,
+  pgListLeadRecords,
+  pgListRuns,
+  pgSaveRun,
+  readyPostgres,
+  listLeadRecordsFromRuns,
+} from "./lead-db"
 import { sampleRun } from "./sample"
-import type { Run } from "./types"
+import type { LeadRecord, Run } from "./types"
 
 function durable(): boolean {
   return process.env.NETLIFY === "true" && process.env.NEXT_PHASE !== "phase-production-build"
@@ -88,28 +97,55 @@ function write(db: Database) {
   fs.renameSync(tmp, file)
 }
 
+async function postgresReady(): Promise<boolean> {
+  return readyPostgres(() => loadDatabase().runs)
+}
+
 export async function listRuns(): Promise<Run[]> {
-  const stored = (durable() ? await blobList() : loadDatabase().runs).filter((run) => run.id !== SAMPLE_RUN_ID)
+  const fromPg = (await postgresReady()) ? await pgListRuns() : null
+  const stored = (fromPg ?? (durable() ? await blobList() : loadDatabase().runs)).filter(
+    (run) => run.id !== SAMPLE_RUN_ID
+  )
   stored.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   return [sampleRun(), ...stored]
 }
 
 export async function getRun(id: string): Promise<Run | null> {
   if (id === SAMPLE_RUN_ID) return sampleRun()
+  if (await postgresReady()) return pgGetRun(id)
   if (durable()) return blobGet(id)
   return loadDatabase().runs.find((run) => run.id === id) ?? null
 }
 
+export async function listLeadRecords(): Promise<LeadRecord[]> {
+  if (await postgresReady()) return pgListLeadRecords()
+  const runs = await listRuns()
+  return listLeadRecordsFromRuns(runs)
+}
+
+function writeJson(run: Run) {
+  const db = loadDatabase()
+  db.runs = db.runs.filter((item) => item.id !== run.id)
+  db.runs.unshift(run)
+  write(db)
+}
+
 export async function insertRun(run: Run): Promise<void> {
   const job = queue.then(async () => {
+    if (await postgresReady()) {
+      await pgSaveRun(run)
+      try {
+        writeJson(run)
+      } catch {
+        // Disk backup is optional once Postgres holds the run.
+      }
+      return
+    }
     if (durable()) {
       await blobs().setJSON(`run:${run.id}`, run)
       return
     }
-    const db = loadDatabase()
-    db.runs = db.runs.filter((item) => item.id !== run.id)
-    db.runs.unshift(run)
-    write(db)
+    writeJson(run)
   })
   queue = job.then(
     () => undefined,
@@ -127,11 +163,23 @@ export async function updateRun<T>(
   let failed: unknown
   const job = queue.then(async () => {
     try {
-      const run = durable() ? await blobGet(id) : loadDatabase().runs.find((item) => item.id === id)
+      const usePg = await postgresReady()
+      const run = usePg
+        ? await pgGetRun(id)
+        : durable()
+          ? await blobGet(id)
+          : loadDatabase().runs.find((item) => item.id === id)
       if (!run) return
       result = fn(run)
       run.updatedAt = new Date().toISOString()
-      if (durable()) await blobs().setJSON(`run:${id}`, run)
+      if (usePg) {
+        await pgSaveRun(run)
+        try {
+          writeJson(run)
+        } catch {
+          // Disk backup is optional once Postgres holds the run.
+        }
+      } else if (durable()) await blobs().setJSON(`run:${id}`, run)
       else {
         const db = loadDatabase()
         const index = db.runs.findIndex((item) => item.id === id)
@@ -154,6 +202,17 @@ export async function updateRun<T>(
 
 export async function deleteRun(id: string): Promise<void> {
   const job = queue.then(async () => {
+    if (await postgresReady()) {
+      await pgDeleteRun(id)
+      try {
+        const db = loadDatabase()
+        db.runs = db.runs.filter((item) => item.id !== id)
+        write(db)
+      } catch {
+        // Disk backup is optional once Postgres holds the run.
+      }
+      return
+    }
     if (durable()) {
       try {
         await blobs().delete(`run:${id}`)

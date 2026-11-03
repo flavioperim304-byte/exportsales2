@@ -608,6 +608,36 @@ export type KeyFlags = {
   atlasEnv: boolean
 }
 
+/** Flattened buyer row for the Postgres leads table (and the /leads page). */
+export type LeadRecord = {
+  id: string
+  runId: string
+  name: string
+  domain: string
+  url: string
+  country: string
+  market?: string
+  seed?: LeadSeed
+  supplier: string
+  status: RunStatus
+  band?: Band
+  score?: number
+  fit?: FitProbability["level"]
+  email?: string
+  phone?: string
+  website?: string
+  lastPurchase?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type DbStatus = {
+  postgres: boolean
+  leadCount: number
+  runCount: number
+  error?: string
+}
+
 export type RunSummary = {
   id: string
   mode: "live" | "sample"

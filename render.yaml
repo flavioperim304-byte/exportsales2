@@ -1,5 +1,6 @@
 # Web Service on Render. Link this repo, then attach the Environment Group
 # that holds EXA_API_KEY, FIRECRAWL_API_KEY, OPENAI_API_KEY, PARALLEL_API_KEY.
+# Link the Postgres instance and set DATABASE_URL to the Internal Database URL.
 # There is no extra "run" step: when the deploy is Live, open the .onrender.com URL.
 
 services:
@@ -15,6 +16,8 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
+      # Set DATABASE_URL in the dashboard from the Postgres Internal Database URL.
+      # Do not commit the password. Do not use the External URL from this Web Service.
     disk:
       name: export-desk-data
       mountPath: /opt/render/project/src/data

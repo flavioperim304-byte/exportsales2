@@ -14,8 +14,9 @@ export default function SourcesPage() {
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
           The desk stays disconnected until these keys are saved. The same values can go in the file
           api-keys.env at the top of the project, next to API-KEYS.txt. Company Atlas is optional:
-          Connect with Google here, or add the remote MCP URL in Cursor. The worked example on the
-          desk does not need them.
+          Connect with Google here, or add the remote MCP URL in Cursor. Postgres holds the lead
+          table when DATABASE_URL is set on the Node service — do not paste the database password
+          here. The worked example on the desk does not need them.
         </p>
       </div>
       <SourcesForm />
