@@ -1,7 +1,7 @@
 import { connection } from "next/server"
 import { rematchFilingsOnRuns } from "@/lib/pipeline"
-import { cargoLabel, qualityLabel } from "@/lib/trade-records"
-import { addFilings, listFilings, seedFilingCount } from "@/lib/trade-store"
+import { cargoLabel, filingSummary, qualityLabel } from "@/lib/trade-records"
+import { addFilingFiles, addFilings, listFilings, seedFilingCount } from "@/lib/trade-store"
 
 export const maxDuration = 60
 
@@ -28,6 +28,12 @@ function present(row: Awaited<ReturnType<typeof listFilings>>[number]) {
       kind: partner.kind,
     })),
     description: row.description,
+    sourceFile: row.sourceFile || "",
+    hsCodes: row.hsCodes,
+    tradingCountries: row.tradingCountries,
+    ports: row.ports,
+    originsRedacted: row.originsRedacted,
+    portsRedacted: row.portsRedacted,
     note: `${row.hsShipments} HS ${row.hs}`,
   }
 }
@@ -35,10 +41,12 @@ function present(row: Awaited<ReturnType<typeof listFilings>>[number]) {
 export async function GET() {
   await connection()
   const filings = await listFilings()
+  const summary = filingSummary(filings)
   return Response.json({
     count: filings.length,
     seedCount: seedFilingCount(),
-    source: "TradeInData Panama HS 330510 (pasta + uploads)",
+    source: "trade dump / CSV (indicação, há falsos)",
+    summary,
     filings: filings
       .slice()
       .sort((a, b) => b.hsShipments - a.hsShipments)
@@ -50,23 +58,43 @@ export async function POST(request: Request) {
   await connection()
   const contentType = request.headers.get("content-type") || ""
   let text = ""
+  let sourceFile = ""
+  let files: { name: string; text: string }[] = []
   if (contentType.includes("multipart/form-data")) {
     const form = await request.formData()
-    const file = form.get("file")
     const pasted = form.get("text")
     if (typeof pasted === "string") text = pasted
-    if (file && typeof file === "object" && "text" in file) {
-      text = await (file as File).text()
+    const named = form.get("sourceFile")
+    if (typeof named === "string") sourceFile = named
+    const uploaded = form.getAll("file").concat(form.getAll("files"))
+    for (const item of uploaded) {
+      if (item && typeof item === "object" && "text" in item) {
+        const file = item as File
+        files.push({ name: file.name, text: await file.text() })
+      }
     }
   } else {
-    const body = (await request.json().catch(() => null)) as { text?: string } | null
+    const body = (await request.json().catch(() => null)) as {
+      text?: string
+      sourceFile?: string
+      files?: { name?: string; text?: string }[]
+    } | null
     text = typeof body?.text === "string" ? body.text : ""
+    sourceFile = typeof body?.sourceFile === "string" ? body.sourceFile : ""
+    files = Array.isArray(body?.files)
+      ? body.files
+          .filter((item): item is { name: string; text: string } => Boolean(item && item.text))
+          .map((item) => ({ name: item.name || "paste.txt", text: item.text }))
+      : []
   }
-  if (!text.trim()) {
+  if (!text.trim() && files.length === 0) {
     return Response.json({ error: "Cole o dump da TradeInData ou envie um CSV." }, { status: 400 })
   }
   try {
-    const result = await addFilings(text)
+    const result =
+      files.length > 0
+        ? await addFilingFiles(files)
+        : await addFilings(text, undefined, sourceFile)
     if (result.parsed.length === 0) {
       return Response.json(
         { error: "Não reconheci empresas neste arquivo. Cole o dump da ficha TradeInData ou um CSV com coluna de importador." },
@@ -79,6 +107,8 @@ export async function POST(request: Request) {
       total: result.total,
       parsed: result.parsed.length,
       rematched,
+      summary: filingSummary(result.filings),
+      files: "files" in result ? result.files : undefined,
       filings: result.parsed
         .slice()
         .sort((a, b) => b.hsShipments - a.hsShipments)

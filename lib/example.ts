@@ -118,7 +118,12 @@ function searchFields(
   brief: Brief
 ): Pick<Brief, "searchKind" | "exaEffort" | "countryCount" | "excludedMarkets" | "parallelMode" | "hsCode"> {
   return {
-    searchKind: brief.searchKind === "competitors" ? "competitors" : "buyers",
+    searchKind:
+      brief.searchKind === "competitors"
+        ? "competitors"
+        : brief.searchKind === "dump"
+          ? "dump"
+          : "buyers",
     exaEffort: brief.exaEffort === "deep" ? "deep" : "ultra",
     countryCount: countryCountOf(brief.countryCount),
     excludedMarkets: brief.excludedMarkets?.trim() ?? "",
@@ -180,7 +185,8 @@ export function validateBrief(input: unknown): { brief?: Brief; error?: string }
     exclusions: text(raw.exclusions),
     instructions: text(raw.instructions).slice(0, 8000),
     leadCount: LEADS_PER_COUNTRY,
-    searchKind: raw.searchKind === "competitors" ? "competitors" : "buyers",
+    searchKind:
+      raw.searchKind === "competitors" ? "competitors" : raw.searchKind === "dump" ? "dump" : "buyers",
     exaEffort: raw.exaEffort === "deep" ? "deep" : "ultra",
     countryCount: countryCountOf(raw.countryCount),
     excludedMarkets: text(raw.excludedMarkets),

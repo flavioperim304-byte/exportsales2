@@ -29,6 +29,7 @@ export function QualifyForm({
   const [error, setError] = useState("")
   const [pending, setPending] = useState(false)
   const [notice, setNotice] = useState("")
+  const [dumpNote, setDumpNote] = useState("")
 
   useEffect(() => {
     fetch("/api/keys")
@@ -39,6 +40,40 @@ export function QualifyForm({
       .catch(() => undefined)
     void loadSaved()
   }, [])
+
+  useEffect(() => {
+    if (brief.searchKind !== "dump") {
+      setDumpNote("")
+      return
+    }
+    fetch("/api/trade-records")
+      .then((response) => (response.ok ? response.json() : null))
+      .then(
+        (data: {
+          count?: number
+          summary?: { candidates?: number; excluded?: number; countries?: { country: string; candidates: number }[] }
+        } | null) => {
+          if (!data) {
+            setDumpNote("Abra Aduana e cole austsham, jap, hk, uz, ger ou UAE. Sem arquivo, a busca dump não tem semente.")
+            return
+          }
+          const countries = (data.summary?.countries ?? [])
+            .filter((row) => row.candidates > 0)
+            .map((row) => `${row.country} (${row.candidates})`)
+          const candidates = data.summary?.candidates ?? 0
+          if (!candidates) {
+            setDumpNote(
+              "Nenhum candidato no arquivo (logística e marcas globais já saem). Cole outro dump em Aduana."
+            )
+            return
+          }
+          setDumpNote(
+            `${candidates} candidatos no arquivo. ${countries.join(" · ") || ""}. Coloque esses países em Target markets. O dump não confirma compra — Exa e Firecrawl confirmam ou descartam.`
+          )
+        }
+      )
+      .catch(() => setDumpNote("Não li o arquivo de Aduana."))
+  }, [brief.searchKind])
 
   async function loadSaved() {
     const response = await fetch("/api/prompts", { cache: "no-store" }).catch(() => null)
@@ -115,7 +150,8 @@ export function QualifyForm({
         <div>
           {compact ? null : <h1 className="font-serif text-3xl sm:text-4xl">Nova busca</h1>}
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Escolha o tipo de busca e qual API do Parallel entra nesta rodada. Task é o padrão.
+            Escolha o tipo de busca e qual API do Parallel entra nesta rodada. No fluxo dump, o
+            arquivo de Aduana só nomeia; Exa e Firecrawl confirmam ou descartam. Task é o padrão.
             Decisions só roda se você selecionar o botão abaixo.
           </p>
         </div>
@@ -138,12 +174,18 @@ export function QualifyForm({
       <section className="grid gap-4 rounded-xl border border-border bg-card p-4 lg:grid-cols-2">
         <div className="flex flex-col gap-2">
           <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Tipo de busca</p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <ChoiceButton
-              selected={brief.searchKind !== "competitors"}
+              selected={brief.searchKind !== "competitors" && brief.searchKind !== "dump"}
               title="Compradores"
               hint="Distribuidores e importadores para a sua marca."
               onClick={() => set("searchKind", "buyers")}
+            />
+            <ChoiceButton
+              selected={brief.searchKind === "dump"}
+              title="Dump + API"
+              hint="Nomes do arquivo Aduana. Exa e Firecrawl confirmam. Depois, similares."
+              onClick={() => set("searchKind", "dump")}
             />
             <ChoiceButton
               selected={brief.searchKind === "competitors"}
@@ -217,6 +259,11 @@ export function QualifyForm({
               />
             </Field>
           </div>
+          {brief.searchKind === "dump" ? (
+            <p className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-muted-foreground">
+              {dumpNote || "Lendo o arquivo de Aduana…"}
+            </p>
+          ) : null}
           {brief.searchKind === "competitors" ? (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -264,7 +311,11 @@ export function QualifyForm({
             <Field
               label="Target markets"
               htmlFor="markets"
-              hint={`Comma separated countries. ${LEADS_PER_COUNTRY} leads in each.`}
+              hint={
+                brief.searchKind === "dump"
+                  ? "Países do dump (Panama, Japan, Germany, UAE…). Só entram nomes desse arquivo."
+                  : `Comma separated countries. ${LEADS_PER_COUNTRY} leads in each.`
+              }
             >
               <Input
                 id="markets"
@@ -371,6 +422,8 @@ export function QualifyForm({
         <p className="text-xs text-muted-foreground">
           {usingDecisions
             ? "Esta rodada chama a Decisions API em modo fast. As demais buscas continuam no Task."
+            : brief.searchKind === "dump"
+              ? "O dump só nomeia. Exa confirma ou descarta cada empresa. Firecrawl lê a página. Depois busca concorrentes similares. Logística e marcas globais ficam fora. Sem fato publicado na página, Fit continua baixo."
             : brief.searchKind === "competitors" && brief.exaEffort !== "deep"
               ? "Exa Ultra pode levar cerca de 15 minutos. Depois o Parallel Task confere os distribuidores."
               : "Depois das páginas, o Exa busca notícias, lançamentos e fatos de compra: última compra, estoque, desempenho das marcas, vendas e ação de concorrente. Sem esses dados a probabilidade de fit fica baixa — folheto sozinho quase não responde."}

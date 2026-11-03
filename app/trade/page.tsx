@@ -12,10 +12,12 @@ export default function TradePage() {
         </p>
         <h1 className="mt-2 font-serif text-3xl sm:text-4xl">Aduana</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Ainda não há plataforma assinada. Cole um CSV ou dump de qualquer fornecedor — o desk só
-          normaliza nomes e marca ruído (logística, Amazon, marcas globais, amostra). Isso é
-          indicação, com falsos, e não sobe Fit nem confirma importação. A API é que confirma ou
-          descarta.
+          A página de Company Data do TradeInData não é Bill of Lading. O cartão mostra nome, país,
+          last trade date, um recorte de PRODUCTS, HSCODE(S) com totais, barras dos últimos meses e
+          TOTAL SHIPMENT da empresa inteira. TOP TRADING COUNTRIES e TOP 5 PORTS vêm quase sempre
+          mascarados (*** ) sem assinatura. Contatos ficam atrás de Subscribe. Cole austsham, jap,
+          hk, uz, ger, UAE ou o dump do Panamá — o desk só lê essa ficha. Na Nova busca, Dump + API:
+          Exa confirma ou descarta o nome, Firecrawl lê a página, depois busca similares.
         </p>
       </div>
       <TradeForm />

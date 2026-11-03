@@ -15,6 +15,8 @@ import {
 import { computeFitProbability } from "./fit-probability"
 import { brazilExports, countriesForTrade, tradeCooldownActive } from "./comexstat"
 import { matchLeads, ragConfigured, ragNeedsRetry } from "./rag"
+import { apiConfirmNote, dumpCountries, firecrawlConfirms } from "./confirm"
+import { searchDumpFlow } from "./dump-search"
 import { advanceExa, searchLeads } from "./exa"
 import {
   EXTRACT_POLL_MS,
@@ -68,12 +70,18 @@ function secrets(): string[] {
   )
 }
 
-export function blankStages(): StageState[] {
+export function blankStages(kind?: Brief["searchKind"]): StageState[] {
+  const searchDetail =
+    kind === "dump"
+      ? "Dump names go to Exa. The APIs confirm or reject each importer, then search similar competitors."
+      : kind === "competitors"
+        ? "Exa is mapping the brand’s distributors and direct competitor importers."
+        : "Exa Agent is in search mode, asking for 10 companies in each target country."
   return [
     {
       id: "search",
       status: "running",
-      detail: "Exa Agent is in search mode, asking for 10 companies in each target country.",
+      detail: searchDetail,
       startedAt: now(),
     },
     {
@@ -102,6 +110,10 @@ export function blankStages(): StageState[] {
 export function createRun(brief: Brief, also?: Brief): Run {
   const timestamp = now()
   const names = also ? `${brief.supplierName} and ${also.supplierName}` : brief.supplierName
+  const startNote =
+    brief.searchKind === "dump"
+      ? `Qualification started for ${names}. Dump names seed the list. Exa and Firecrawl confirm or reject. Then Exa searches similar importers. Logistics and global brands stay out. The dump never confirms a purchase.`
+      : `Qualification started for ${names}. Exa searches, Firecrawl collects contacts, OpenAI scores, and Parallel refines the best fit.`
   return {
     id: crypto.randomUUID(),
     createdAt: timestamp,
@@ -110,12 +122,12 @@ export function createRun(brief: Brief, also?: Brief): Run {
     status: "searching",
     brief,
     also,
-    stages: blankStages(),
+    stages: blankStages(brief.searchKind),
     logs: [
       {
         at: timestamp,
         stage: "search",
-        message: `Qualification started for ${names}. Exa searches, Firecrawl collects contacts, OpenAI scores, and Parallel refines the best fit.`,
+        message: startNote,
       },
     ],
     leads: [],
@@ -287,6 +299,99 @@ function finish(run: Run) {
   )
 }
 
+function searchCounts(leads: Lead[]): string {
+  const byCountry = new Map<string, number>()
+  for (const lead of leads) {
+    const country = lead.market || "Unassigned"
+    byCountry.set(country, (byCountry.get(country) ?? 0) + 1)
+  }
+  return [...byCountry.entries()].map(([country, count]) => `${country}: ${count}`).join(" · ")
+}
+
+function beginExtract(run: Run, detail: string) {
+  run.status = "extracting"
+  const search = stage(run, "search")
+  search.status = "done"
+  search.finishedAt = now()
+  search.detail = detail
+  log(run, "search", detail)
+  const extract = stage(run, "extract")
+  extract.status = "running"
+  extract.startedAt = now()
+  extract.detail = "Reading the first company page."
+}
+
+async function fileOpenSearch(id: string, found: { leads: Lead[]; outside: number }) {
+  const leads = found.leads
+  await updateRun(id, (current) => {
+    if (leads.length === 0) {
+      current.status = "failed"
+      current.error =
+        found.outside > 0
+          ? `Exa suggested ${found.outside} ${found.outside === 1 ? "company" : "companies"} from another country or another supplier. None were in ${current.brief.markets}.`
+          : "Exa returned no company pages after the supplier’s own domain was removed. Broaden the products or the markets and run again."
+      const search = stage(current, "search")
+      search.status = "failed"
+      search.detail = current.error
+      search.finishedAt = now()
+      log(current, "search", current.error)
+      return
+    }
+    current.leads = leads
+    const counts = searchCounts(leads)
+    beginExtract(current, `Exa Agent search returned ${leads.length} companies. ${counts}.`)
+  })
+}
+
+async function runDumpSearch(id: string, key: string) {
+  const snapshot = await getRun(id)
+  if (!snapshot) return
+  await updateRun(id, (run) => {
+    const search = stage(run, "search")
+    search.detail = "Exa is confirming dump names. Firecrawl confirms the page later. The dump does not confirm a purchase."
+    log(run, "search", search.detail)
+  })
+  const filings = await listFilings()
+  const found = await searchDumpFlow(snapshot.brief, key, filings, snapshot.also)
+  await updateRun(id, (current) => {
+    current.rejectedSeeds = found.rejected
+    if (found.leads.length === 0) {
+      const available = dumpCountries(filings)
+      const sample = found.rejected
+        .slice(0, 4)
+        .map((row) => `${row.importer}: ${row.reason}`)
+        .join(" ")
+      current.status = "failed"
+      current.error =
+        found.candidates === 0
+          ? `Nenhum candidato no dump para ${current.brief.markets || "estes mercados"}. Cole austsham, jap, hk, uz, ger ou UAE em Aduana e coloque esses países em Target markets.${available.length ? ` Arquivo atual: ${available.join(", ")}.` : ""} Logística e marcas globais já ficam de fora.`
+          : `Exa não confirmou nenhum importador do dump (${found.candidates} nomes). ${sample}`.trim()
+      const search = stage(current, "search")
+      search.status = "failed"
+      search.detail = current.error
+      search.finishedAt = now()
+      log(current, "search", current.error)
+      return
+    }
+    current.leads = found.leads
+    const rejected = found.rejected.length
+    beginExtract(
+      current,
+      `Exa confirmou ${found.confirmed} de ${found.candidates} nomes do dump. ${found.similar} concorrentes similares.${rejected ? ` ${rejected} descartados.` : ""} ${searchCounts(found.leads)}.`
+    )
+    if (rejected) {
+      log(
+        current,
+        "search",
+        `APIs descartaram ${rejected} nomes do dump: ${found.rejected
+          .slice(0, 8)
+          .map((row) => row.importer)
+          .join(", ")}.`
+      )
+    }
+  })
+}
+
 const activeSearches = new Set<string>()
 
 async function doSearch(id: string): Promise<"busy" | "done"> {
@@ -338,40 +443,12 @@ async function doSearch(id: string): Promise<"busy" | "done"> {
   try {
     const run = await getRun(id)
     if (!run) return "done"
-    const found = await searchLeads(run.brief, keys.exa, run.also)
-    const leads = found.leads
-    await updateRun(id, (current) => {
-      if (leads.length === 0) {
-        current.status = "failed"
-        current.error =
-          found.outside > 0
-            ? `Exa suggested ${found.outside} ${found.outside === 1 ? "company" : "companies"} from another country or another supplier. None were in ${current.brief.markets}.`
-            : "Exa returned no company pages after the supplier’s own domain was removed. Broaden the products or the markets and run again."
-        const search = stage(current, "search")
-        search.status = "failed"
-        search.detail = current.error
-        search.finishedAt = now()
-        log(current, "search", current.error)
-        return
-      }
-      current.leads = leads
-      current.status = "extracting"
-      const search = stage(current, "search")
-      search.status = "done"
-      search.finishedAt = now()
-      const byCountry = new Map<string, number>()
-      for (const lead of leads) {
-        const country = lead.market || "Unassigned"
-        byCountry.set(country, (byCountry.get(country) ?? 0) + 1)
-      }
-      const counts = [...byCountry.entries()].map(([country, count]) => `${country}: ${count}`)
-      search.detail = `Exa Agent search returned ${leads.length} companies. ${counts.join(" · ")}.`
-      log(current, "search", search.detail)
-      const extract = stage(current, "extract")
-      extract.status = "running"
-      extract.startedAt = now()
-      extract.detail = "Reading the first company page."
-    })
+    if (run.brief.searchKind === "dump") {
+      await runDumpSearch(id, keys.exa)
+    } else {
+      const found = await searchLeads(run.brief, keys.exa, run.also)
+      await fileOpenSearch(id, found)
+    }
     void attachTrade(id)
   } catch (error) {
     const message = publicError(error, secrets())
@@ -396,11 +473,15 @@ function finishExtractStage(run: Run, detail?: string) {
   extract.status = "done"
   extract.finishedAt = now()
   const failed = run.leads.filter((lead) => lead.extraction && !lead.extraction.ok).length
+  const confirmed = run.leads.filter((lead) => lead.apiConfirm?.firecrawl === "confirmed").length
+  const dumpRun = run.brief.searchKind === "dump"
   extract.detail =
     detail ??
-    (failed > 0
-      ? `Pages read. ${failed} ${failed === 1 ? "page" : "pages"} could not be extracted.`
-      : `Firecrawl Agent collected ICP fields and contacts for ${run.leads.length} companies.`)
+    (dumpRun
+      ? `Firecrawl confirmou ${confirmed} de ${run.leads.length} páginas.${failed ? ` ${failed} sem leitura.` : ""} O dump não confirma compra.`
+      : failed > 0
+        ? `Pages read. ${failed} ${failed === 1 ? "page" : "pages"} could not be extracted.`
+        : `Firecrawl Agent collected ICP fields and contacts for ${run.leads.length} companies.`)
   run.extractJobId = undefined
   run.extractLeadId = undefined
   run.extractJobStartedAt = undefined
@@ -408,26 +489,48 @@ function finishExtractStage(run: Run, detail?: string) {
   log(run, "extract", extract.detail)
 }
 
+function stampFirecrawl(lead: Lead) {
+  if (!lead.apiConfirm && lead.seed !== "dump" && lead.seed !== "similar") return
+  const confirm = firecrawlConfirms(lead.extraction)
+  lead.apiConfirm = {
+    exa: lead.apiConfirm?.exa ?? "confirmed",
+    firecrawl: confirm.status,
+    note: apiConfirmNote({
+      exa: lead.apiConfirm?.exa ?? "confirmed",
+      firecrawl: confirm.status,
+      note: confirm.reason,
+    }),
+  }
+}
+
 function fileExtraction(run: Run, leadId: string, extraction: Extraction) {
   const lead = run.leads.find((item) => item.id === leadId)
   if (!lead) return
   lead.extraction = extraction
   if (!lead.country && extraction.country) lead.country = extraction.country
+  stampFirecrawl(lead)
   run.extractJobId = undefined
   run.extractLeadId = undefined
   run.extractJobStartedAt = undefined
+  const api =
+    lead.apiConfirm?.firecrawl === "confirmed"
+      ? " Firecrawl confirmou."
+      : lead.apiConfirm?.firecrawl === "rejected"
+        ? " Firecrawl não confirmou."
+        : ""
   log(
     run,
     "extract",
     extraction.ok
-      ? `Extracted ${lead.name}: ${extraction.role || "role unpublished"}.`
-      : `Could not extract ${lead.name}. ${extraction.error ?? "Unknown page error."}`
+      ? `Extracted ${lead.name}: ${extraction.role || "role unpublished"}.${api}`
+      : `Could not extract ${lead.name}. ${extraction.error ?? "Unknown page error."}${api}`
   )
 }
 
 function skipUnreadPages(run: Run, message: string) {
   for (const lead of run.leads) {
     if (!lead.extraction) lead.extraction = failedExtraction(message)
+    stampFirecrawl(lead)
   }
   finishExtractStage(run, `${message} OpenAI will score the pages already read.`)
 }
@@ -439,10 +542,22 @@ async function doExtract(id: string): Promise<"wait" | "next"> {
 
   if (!keys.firecrawl) {
     await updateRun(id, (run) => {
+      for (const lead of run.leads) {
+        if (lead.seed === "dump" || lead.seed === "similar" || lead.apiConfirm) {
+          lead.apiConfirm = {
+            exa: lead.apiConfirm?.exa ?? "confirmed",
+            firecrawl: "skipped",
+            note: "Firecrawl key missing. Só o Exa confirmou o nome. O dump não confirma compra.",
+          }
+        }
+      }
       const extract = stage(run, "extract")
       extract.status = "blocked"
       extract.finishedAt = now()
-      extract.detail = "Firecrawl API key is missing. OpenAI will score the Exa search notes only."
+      extract.detail =
+        run.brief.searchKind === "dump"
+          ? "Firecrawl API key is missing. Exa confirmed names stay unconfirmed by the page. The dump does not confirm a purchase."
+          : "Firecrawl API key is missing. OpenAI will score the Exa search notes only."
       log(run, "extract", extract.detail)
       run.status = "scoring"
     })
@@ -1085,6 +1200,24 @@ async function doSearchTick(id: string) {
         search.finishedAt = now()
       }
     })
+    return
+  }
+  if (current.brief.searchKind === "dump") {
+    try {
+      await runDumpSearch(id, keys.exa)
+      void attachTrade(id)
+    } catch (error) {
+      const message = publicError(error, secrets())
+      await updateRun(id, (run) => {
+        run.status = "failed"
+        run.error = message
+        const search = stage(run, "search")
+        search.status = "failed"
+        search.detail = message
+        search.finishedAt = now()
+        log(run, "search", message)
+      })
+    }
     return
   }
   const result = await advanceExa(

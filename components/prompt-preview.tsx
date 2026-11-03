@@ -1,7 +1,9 @@
+import { dumpConfirmQuery, dumpSimilarQuery } from "@/lib/confirm"
 import {
   buyerTypes,
   competitorQuery,
   competitorSystemPrompt,
+  dumpConfirmQueryLine,
   exaQuery,
   exaSystemPrompt,
   firecrawlPrompt,
@@ -14,6 +16,31 @@ import { decisionOutline } from "@/lib/parallel"
 import type { Brief } from "@/lib/types"
 
 export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: boolean }) {
+  if (brief.searchKind === "dump") {
+    const countries = targetCountries(brief)
+    const sample = countries[0] || "the target market"
+    return (
+      <section className={bare ? "flex flex-col gap-4" : "flex flex-col gap-4 rounded-xl border border-border bg-card p-4"}>
+        <div>
+          <h2 className="font-serif text-2xl">Prompts</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+            Nomes do arquivo Aduana vão para o Exa. A API confirma ou descarta. Firecrawl lê a
+            página. Depois o Exa busca importadores similares. Logística e marcas globais ficam de
+            fora. O dump nunca confirma compra.
+          </p>
+        </div>
+        <PromptBlock label="Exa · confirma o nome do dump" text={dumpConfirmQuery("AGENCIA Y. MERCADEO S.A.", sample, brief.products)} />
+        <PromptBlock label="Exa · concorrentes similares" text={dumpSimilarQuery(["confirmed importer"], sample, brief)} />
+        <PromptBlock label="Firecrawl Agent" text={firecrawlPrompt(brief, sample)} />
+        <PromptBlock label="Como a busca trata o dump" text={dumpConfirmQueryLine(brief, sample)} />
+        <PromptBlock label="OpenAI" text={openaiInstructions(brief)} />
+        <PromptBlock
+          label={brief.parallelMode === "decisions" ? "Parallel · Decisions" : "Parallel · deep research"}
+          text={brief.parallelMode === "decisions" ? decisionOutline(brief) : parallelInstructions(brief)}
+        />
+      </section>
+    )
+  }
   if (brief.searchKind === "competitors") {
     const effort = brief.exaEffort === "deep" ? "Exa Deep" : "Exa Ultra"
     return (

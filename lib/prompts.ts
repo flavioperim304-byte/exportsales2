@@ -113,7 +113,38 @@ export function exaBackupQuery(brief: Brief, country: string, buyerType?: string
     .join(" ")
 }
 
+export function dumpConfirmQueryLine(brief: Brief, country: string): string {
+  return [
+    `Confirm whether named importers in ${country} exist as ${brief.products || "hair care"} importers or distributors.`,
+    "Exa looks up each dump name. Firecrawl then reads the official page.",
+    "A trade dump never confirms a purchase. Logistics and global brand subsidiaries stay out.",
+    extra(brief),
+  ]
+    .filter(Boolean)
+    .join(" ")
+}
+
 export function firecrawlPrompt(brief: Brief, country: string, buyerType?: string): string {
+  if (brief.searchKind === "dump") {
+    return [
+      "Extract a buyer profile for an export salesperson.",
+      `Supplier: ${brief.supplierName} (${brief.originCountry}).`,
+      country
+        ? `This name came from a trade dump for ${country}. Confirm or reject it from the page.`
+        : "This name came from a trade dump. Confirm or reject it from the page.",
+      "Confirm whether the page shows a local importer or distributor of hair care, shampoo, or cosmetics.",
+      "Reject logistics, freight forwarders, Amazon, salons with no wholesale, and global brand subsidiaries (Unilever, P&G, L'Oréal, Avon, Genomma, PriceSmart, Alfaparf, Belcorp, Mesoestetic, Arabela, Feduro, Henkel).",
+      "The dump is not evidence. Only facts on the page count.",
+      buyerType ? `The search labeled this company as: ${buyerType}.` : "",
+      brief.instructions?.trim() ?? "",
+      "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
+      "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
+      "buyerSignals must be short phrases from the page about importing or distributing hair care.",
+      "Also extract lastPurchase, stock, brandPerformance, salesNote, and competitorMoves when the page states them. Leave each empty when unpublished.",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  }
   if (brief.searchKind === "competitors") {
     return [
       "Extract a buyer profile for an export salesperson.",

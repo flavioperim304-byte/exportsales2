@@ -21,6 +21,12 @@ type FilingRow = {
   brazilHint: boolean
   partners: { name: string; sharePct?: number; kind: string }[]
   description: string
+  sourceFile?: string
+  hsCodes?: { code: string; shipments: number }[]
+  tradingCountries?: string[]
+  ports?: string[]
+  originsRedacted?: boolean
+  portsRedacted?: boolean
 }
 
 type Payload = {
@@ -30,6 +36,13 @@ type Payload = {
   added?: number
   parsed?: number
   rematched?: number
+  summary?: {
+    candidates: number
+    excluded: number
+    countries: { country: string; count: number; candidates: number }[]
+    files: string[]
+  }
+  files?: { name: string; parsed: number; added: number }[]
   error?: string
 }
 
@@ -41,6 +54,7 @@ export function TradeForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [note, setNote] = useState("")
+  const [summary, setSummary] = useState<Payload["summary"]>()
 
   async function refresh() {
     const response = await fetch("/api/trade-records")
@@ -49,6 +63,7 @@ export function TradeForm() {
     setRows(data.filings ?? [])
     setCount(data.count ?? 0)
     setSeedCount(data.seedCount ?? 0)
+    setSummary(data.summary)
   }
 
   useEffect(() => {
@@ -72,8 +87,9 @@ export function TradeForm() {
         return
       }
       setText("")
+      const files = data.files?.map((item) => `${item.name}: ${item.parsed}`).join(" · ")
       setNote(
-        `Li ${data.parsed} empresas. ${data.added} novas no arquivo. Cruzei ${data.rematched} buscas já na mesa.`
+        `Li ${data.parsed} empresas. ${data.added} novas no arquivo. Cruzei ${data.rematched} buscas já na mesa.${files ? ` ${files}.` : ""} ${data.summary ? `${data.summary.candidates} candidatos para a busca dump.` : ""}`
       )
       await refresh()
     } catch {
@@ -83,9 +99,39 @@ export function TradeForm() {
     }
   }
 
-  async function onFile(file: File | undefined) {
-    if (!file) return
-    setText(await file.text())
+  async function onFile(list: FileList | null) {
+    if (!list?.length) return
+    if (list.length === 1) {
+      setText(await list[0].text())
+      return
+    }
+    setSaving(true)
+    setError("")
+    setNote("")
+    try {
+      const files = await Promise.all(
+        [...list].map(async (file) => ({ name: file.name, text: await file.text() }))
+      )
+      const response = await fetch("/api/trade-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files }),
+      })
+      const data = (await response.json()) as Payload
+      if (!response.ok) {
+        setError(data.error || "O arquivo não pôde ser lido.")
+        return
+      }
+      const names = data.files?.map((item) => `${item.name}: ${item.parsed}`).join(" · ")
+      setNote(
+        `Li ${data.parsed} empresas em ${files.length} arquivos. ${data.added} novas. ${names || ""} ${data.summary ? `${data.summary.candidates} candidatos para a busca dump.` : ""}`
+      )
+      await refresh()
+    } catch {
+      setError("O desk não alcançou o arquivo de aduana.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -94,7 +140,11 @@ export function TradeForm() {
         <p className="text-sm text-muted-foreground">
           {count} importadores no arquivo
           {seedCount ? ` · ${seedCount} do dump Panamá HS 330510 (agosto, sem assinatura)` : ""}.
-          Há falsos. Logística e marcas globais ficam marcadas, não viram compra.
+          {summary
+            ? ` ${summary.candidates} candidatos para Dump + API; ${summary.excluded} logística/marca global/ruído.`
+            : ""}{" "}
+          Há falsos. A busca dump manda os nomes para Exa e Firecrawl confirmarem. Logística e marcas
+          globais ficam de fora.
         </p>
         <div className="flex flex-col gap-2">
           <Label htmlFor="trade-file">CSV ou dump</Label>
@@ -102,8 +152,9 @@ export function TradeForm() {
             id="trade-file"
             type="file"
             accept=".txt,.csv,.tsv,text/plain,text/csv"
+            multiple
             className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-card file:px-3 file:py-1.5"
-            onChange={(event) => void onFile(event.target.files?.[0])}
+            onChange={(event) => void onFile(event.target.files)}
           />
         </div>
         <div className="flex flex-col gap-2">
@@ -150,8 +201,26 @@ export function TradeForm() {
                     {row.description ? (
                       <p className="mt-1 max-w-xs text-muted-foreground">{row.description}</p>
                     ) : null}
+                    {row.originsRedacted || row.portsRedacted ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {row.originsRedacted ? "origem *** na página" : ""}
+                        {row.originsRedacted && row.portsRedacted ? " · " : ""}
+                        {row.portsRedacted ? "portos ***" : ""}
+                        {row.tradingCountries?.length ? ` · visível: ${row.tradingCountries.join(", ")}` : ""}
+                      </p>
+                    ) : null}
                   </td>
-                  <td className="py-3 pr-3 text-muted-foreground">{row.hs}</td>
+                  <td className="py-3 pr-3 text-muted-foreground">
+                    {row.hs}
+                    {row.hsCodes && row.hsCodes.length > 1 ? (
+                      <p className="text-xs">
+                        {row.hsCodes
+                          .slice(0, 4)
+                          .map((item) => item.code)
+                          .join(" · ")}
+                      </p>
+                    ) : null}
+                  </td>
                   <td className="py-3 pr-3">{row.hsShipments.toLocaleString("pt-BR")}</td>
                   <td className="py-3 pr-3 text-muted-foreground">{row.lastTradeDate?.slice(0, 10) || "—"}</td>
                   <td className="py-3 pr-3">

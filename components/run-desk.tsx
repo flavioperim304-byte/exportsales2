@@ -19,7 +19,7 @@ import type { Band, DiligenceReport, Evidence, Lead, Run, StageState } from "@/l
 import type { IcpLevel } from "@/lib/qualify"
 
 const STAGE_META = {
-  search: { n: "01", source: "Exa Agent", title: "Search" },
+  search: { n: "01", source: "Exa", title: "Search" },
   extract: { n: "02", source: "Firecrawl Agent", title: "ICP and contacts" },
   classify: { n: "03", source: "Exa + OpenAI", title: "Activity, commerce, and best fit" },
   context: { n: "04", source: "Parallel", title: "Refine and context" },
@@ -231,10 +231,28 @@ export function RunDesk({ initial }: { initial: Run }) {
         <div>
           <h2 className="font-serif text-2xl">Leads</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {run.leads.length
-              ? "Ranked for this supplier. Disqualified accounts stay on the list so the reason is visible. Mark companies for commercial due diligence."
-              : "Companies appear here as soon as Exa returns them."}
+            {run.brief.searchKind === "dump"
+              ? run.leads.length
+                ? "Só entram nomes que o Exa confirmou. Firecrawl confirma a página. O dump não confirma compra. Logística e marcas globais ficam fora."
+                : "Os nomes do dump aparecem aqui só depois que o Exa confirmar."
+              : run.leads.length
+                ? "Ranked for this supplier. Disqualified accounts stay on the list so the reason is visible. Mark companies for commercial due diligence."
+                : "Companies appear here as soon as Exa returns them."}
           </p>
+          {run.rejectedSeeds && run.rejectedSeeds.length > 0 ? (
+            <details className="mt-3 rounded-lg border border-border bg-secondary/60 px-3 py-2">
+              <summary className="cursor-pointer text-sm font-medium">
+                {run.rejectedSeeds.length} nomes do dump que as APIs descartaram
+              </summary>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                {run.rejectedSeeds.slice(0, 20).map((row) => (
+                  <li key={`${row.importer}-${row.country}`}>
+                    {row.importer} · {row.country}: {row.reason}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
           {run.leads.length > 0 ? (
             <DiligenceBar
               run={run}
@@ -305,6 +323,7 @@ export function RunDesk({ initial }: { initial: Run }) {
                         {item.market ? ` · for ${item.market}` : ""}
                       </p>
                       <p className="font-medium">{item.name}</p>
+                      <ApiBadge lead={item} />
                       <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                         {item.score?.headline ||
                           item.extraction?.summary ||
@@ -604,6 +623,10 @@ function Dossier({ lead }: { lead: Lead }) {
             {leadPlace(lead)} · {lead.domain}
           </p>
           <h2 className="mt-1 break-words font-serif text-2xl sm:text-3xl">{lead.name}</h2>
+          <ApiBadge lead={lead} />
+          {lead.apiConfirm?.note ? (
+            <p className="mt-1 max-w-xl text-sm text-muted-foreground">{lead.apiConfirm.note}</p>
+          ) : null}
           {isHttpUrl(lead.url) && !lead.url.includes(".example") ? (
             <a
               href={lead.url}
@@ -980,6 +1003,25 @@ function ActivityPanel({ lead }: { lead: Lead }) {
       )}
     </div>
   )
+}
+
+function ApiBadge({ lead }: { lead: Lead }) {
+  if (!lead.seed && !lead.apiConfirm) return null
+  const seed =
+    lead.seed === "dump" ? "dump" : lead.seed === "similar" ? "similar" : lead.seed === "exa" ? "exa" : ""
+  const api =
+    lead.apiConfirm?.exa === "confirmed" && lead.apiConfirm.firecrawl === "confirmed"
+      ? "APIs confirmaram"
+      : lead.apiConfirm?.exa === "confirmed" && lead.apiConfirm.firecrawl === "rejected"
+        ? "Exa sim · Firecrawl não"
+        : lead.apiConfirm?.exa === "confirmed"
+          ? "Exa confirmou"
+          : lead.apiConfirm?.exa === "rejected"
+            ? "Exa descartou"
+            : ""
+  const text = [seed, api].filter(Boolean).join(" · ")
+  if (!text) return null
+  return <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{text}</p>
 }
 
 function EvidenceList({ items }: { items: Evidence[] }) {

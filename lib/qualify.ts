@@ -1,5 +1,6 @@
 import { activityLine, hasRecentActivity } from "./activity"
 import { commerceLine } from "./commerce"
+import { apisConfirmed } from "./confirm"
 import { computeFitProbability, fitProbabilityLine, hasPublishedBuyFacts } from "./fit-probability"
 import type { Brief, FitJudgment, Lead, LeadScore } from "./types"
 
@@ -108,6 +109,19 @@ function guardFit(lead: Lead, row: QualificationRow): QualificationRow {
     notes.push(
       "Best fit foi retirado: não há última compra, estoque, vendas ou reposição publicados. ICP de canal não é intenção de compra. Dump de aduana, feira, vaga de compras ou menção web, sozinha, não basta."
     )
+  }
+  if (lead.apiConfirm || lead.seed === "dump" || lead.seed === "similar") {
+    if (!apisConfirmed(lead)) {
+      next = { ...next, bestFit: "neither" }
+      notes.push(
+        lead.apiConfirm?.note ||
+          "APIs não confirmaram este importador. O dump não basta e não confirma compra."
+      )
+    } else {
+      notes.push(
+        "Exa e Firecrawl confirmaram a empresa. O dump continua só indicação de embarque (há falsos) e não confirma compra."
+      )
+    }
   }
   if (lead.filing) {
     const brands = lead.filing.occupiedBrands.join(", ")

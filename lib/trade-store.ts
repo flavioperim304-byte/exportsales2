@@ -63,13 +63,17 @@ export async function listFilings(): Promise<TradeFiling[]> {
   return job
 }
 
-export async function addFilings(text: string, source?: TradeFiling["source"]): Promise<{
+export async function addFilings(
+  text: string,
+  source?: TradeFiling["source"],
+  sourceFile?: string
+): Promise<{
   added: number
   total: number
   filings: TradeFiling[]
   parsed: TradeFiling[]
 }> {
-  const parsed = parseTradeInput(text, source)
+  const parsed = parseTradeInput(text, source, sourceFile)
   let added = 0
   let total = 0
   let filings: TradeFiling[] = []
@@ -92,6 +96,48 @@ export async function addFilings(text: string, source?: TradeFiling["source"]): 
   )
   await job
   return { added, total, filings, parsed }
+}
+
+export async function addFilingFiles(files: { name: string; text: string }[]): Promise<{
+  added: number
+  total: number
+  filings: TradeFiling[]
+  parsed: TradeFiling[]
+  files: { name: string; parsed: number; added: number }[]
+}> {
+  let added = 0
+  let total = 0
+  let filings: TradeFiling[] = []
+  const parsed: TradeFiling[] = []
+  const report: { name: string; parsed: number; added: number }[] = []
+  const job = queue.then(() => {
+    const db = loadDatabase()
+    const byId = new Map(db.filings.map((row) => [row.id, row]))
+    for (const file of files) {
+      const rows = parseTradeInput(file.text, undefined, file.name)
+      let fileAdded = 0
+      for (const row of rows) {
+        if (!byId.has(row.id)) {
+          added += 1
+          fileAdded += 1
+        }
+        byId.set(row.id, row)
+        parsed.push(row)
+      }
+      report.push({ name: file.name, parsed: rows.length, added: fileAdded })
+    }
+    db.filings = [...byId.values()]
+    db.updatedAt = new Date().toISOString()
+    write(db)
+    filings = db.filings
+    total = db.filings.length
+  })
+  queue = job.then(
+    () => undefined,
+    () => undefined
+  )
+  await job
+  return { added, total, filings, parsed, files: report }
 }
 
 export async function replaceFilings(text: string, source?: TradeFiling["source"]): Promise<{

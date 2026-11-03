@@ -7,6 +7,7 @@ import type {
   TradeFiling,
   TradeFilingMatch,
   TradeFilingQuality,
+  TradeHsCode,
   TradePartner,
   TradePartnerKind,
   TradeSource,
@@ -17,7 +18,12 @@ const LEGAL =
   /\b(s\.?a\.?|s\.?a\.?\s*de\s*c\.?v\.?|inc\.?|corp\.?|ltda?\.?|llc|co\.?|company|sas|srl|gmbh|ag)\b/gi
 
 const CHROME =
-  /^(port of (?:discharge|loading)|enter port of|trade time|select|weight|kg|-|amount|\$|search method|smart search|strict search|exclude logistics companies|yes|no|sort order|smart order|shipments|recently|search|bulk|download|full access|subscribe to view.*|contatc icon|\d[\d,]* companies in total)$/i
+  /^(port of (?:discharge|loading)|enter port of|trade time|select|weight|kg|-|amount|\$|search method|smart search|strict search|exclude logistics companies|yes|no|sort order|smart order|shipments|recently|search|bulk|download|full access|subscribe to view.*|contatc icon|\d[\d,]* companies in total|view details|follow|company data|product data|bill of lading|countries covered|product analysis|pricing|api)$/i
+
+const REDACTED = /^\*+$|^[x]{4,}$/i
+
+const TEMPLATE_DESC =
+  /shipper_description|hscd_description|consignee_description|notify_description|hscd_/i
 
 const TAGS = /\b(high-transaction enterprise|leading enterprise|new enterprise)\b/gi
 
@@ -109,13 +115,17 @@ export function classifyPartner(name: string): { kind: TradePartnerKind; canonic
   return { kind: "factory", canonical: trimmed.toUpperCase() }
 }
 
-export function classifyCargo(description: string): TradeCargoKind {
+export function classifyCargo(description: string, hs = ""): TradeCargoKind {
+  if (TEMPLATE_DESC.test(description)) return "noise"
   const text = description.toLowerCase()
   if (/\bmuestra|sample\b|\b\d+\s*ml muestra/.test(text) || /\b6\s*ml\b/.test(text)) return "sample"
   if (/gorros de shampoo|gorro/.test(text)) return "noise"
   if (/champiojo|gamabenceno|piojos|quassia|uso externo/.test(text)) return "medicated"
   if (/\b30\s*ml\b|guest supply|hotel/.test(text)) return "hotel_amenity"
-  return "shampoo"
+  if (/shampoo|champ[uú]|capilar|hair\s*care|condicionador|keratin|queratin/.test(text)) return "shampoo"
+  if (hs.startsWith("3305")) return "shampoo"
+  if (!text.trim()) return hs ? "other" : "noise"
+  return "other"
 }
 
 function occupiedFrom(partners: TradePartner[], description: string): { brands: string[]; share: number } {
@@ -175,16 +185,44 @@ function filingId(importer: string, country: string, hs: string): string {
   return `${foldName(importer) || "importer"}|${foldName(country) || "xx"}|${hs || "hs"}`
 }
 
+function pickPrimaryHs(hs: string, codes: TradeHsCode[], hsShipments: number): { hs: string; hsShipments: number } {
+  if (hs && hsShipments > 0) return { hs, hsShipments }
+  if (!hs && codes.length === 0) return { hs: "", hsShipments }
+  const ranked = [...codes].sort((left, right) => right.shipments - left.shipments)
+  const hair = ranked.find((row) => row.code.startsWith("3305"))
+  const match = hs
+    ? codes.find((row) => row.code === hs || row.code.startsWith(hs) || hs.startsWith(row.code))
+    : undefined
+  const chosen = match || hair || ranked[0]
+  if (!chosen) return { hs, hsShipments }
+  return { hs: hs || chosen.code, hsShipments: hsShipments || chosen.shipments }
+}
+
 function finishFiling(
   partial: Omit<TradeFiling, "id" | "quality" | "occupiedBrands" | "occupiedShare" | "logisticsShare" | "brazilHint">
 ): TradeFiling {
   const occupied = occupiedFrom(partial.partners, partial.description)
   const logisticsShare = logisticsShareOf(partial.partners)
   const brazilHint = brazilHintOf(partial.description, partial.partners)
-  const draft = { ...partial, occupiedBrands: occupied.brands, occupiedShare: occupied.share, logisticsShare, brazilHint }
+  const picked = pickPrimaryHs(partial.hs, partial.hsCodes ?? [], partial.hsShipments)
+  const draft = {
+    ...partial,
+    hs: picked.hs,
+    hsShipments: picked.hsShipments,
+    hsCodes: partial.hsCodes ?? [],
+    tradingCountries: partial.tradingCountries ?? [],
+    ports: partial.ports ?? [],
+    originsRedacted: partial.originsRedacted ?? false,
+    portsRedacted: partial.portsRedacted ?? false,
+    cargo: partial.cargo || classifyCargo(partial.description, picked.hs),
+    occupiedBrands: occupied.brands,
+    occupiedShare: occupied.share,
+    logisticsShare,
+    brazilHint,
+  }
   return {
     ...draft,
-    id: filingId(partial.importer, partial.country, partial.hs),
+    id: filingId(draft.importer, draft.country, draft.hs),
     quality: qualityOf(draft),
   }
 }
@@ -207,7 +245,7 @@ function isChrome(line: string): boolean {
   return !line || CHROME.test(line)
 }
 
-export function parseTradeDump(text: string, source: TradeSource = "tradeindata"): TradeFiling[] {
+export function parseTradeDump(text: string, source: TradeSource = "tradeindata", sourceFile?: string): TradeFiling[] {
   const lines = text.replace(/\r\n/g, "\n").split("\n").map((line) => line.trim())
   const cards: TradeFiling[] = []
   let i = 0
@@ -220,9 +258,9 @@ export function parseTradeDump(text: string, source: TradeSource = "tradeindata"
     const country = role[1].replace(/\s+Importer$/i, "").trim() || "Unknown"
     let name = ""
     for (let look = i - 1; look >= 0; look -= 1) {
-      if (isChrome(lines[look])) continue
-      if (/^(description|total shipment|hscode|top trade partners|latest shipments|last trade date)/i.test(lines[look])) {
-        break
+      if (isChrome(lines[look]) || REDACTED.test(lines[look])) continue
+      if (/^(description|products|total shipment|hscode|top trade|top 5 ports|latest shipments|shipments over|last trade date)/i.test(lines[look])) {
+        continue
       }
       name = stripTags(lines[look])
       break
@@ -236,19 +274,27 @@ export function parseTradeDump(text: string, source: TradeSource = "tradeindata"
     let totalShipments = 0
     const partners: TradePartner[] = []
     const latestMonths: string[] = []
+    const hsCodes: TradeHsCode[] = []
+    const tradingCountries: string[] = []
+    const ports: string[] = []
+    let originsRedacted = false
+    let portsRedacted = false
     let section:
       | "none"
       | "description"
-      | "hs_count"
-      | "all_count"
+      | "shipment_value"
       | "partners"
       | "months"
-      | "hscodes" = "none"
+      | "hscodes"
+      | "countries"
+      | "ports" = "none"
     let pendingPartner = ""
+    let pendingHs = ""
+    let shipmentSawHs = false
 
     const flushPartner = (raw: string, sharePct?: number) => {
       const label = raw.trim()
-      if (!label || isHsLine(label) || isChrome(label)) return
+      if (!label || isHsLine(label) || isChrome(label) || REDACTED.test(label)) return
       const classified = classifyPartner(label)
       partners.push({
         name: label,
@@ -271,18 +317,20 @@ export function parseTradeDump(text: string, source: TradeSource = "tradeindata"
         i += 1
         continue
       }
-      if (/^Description$/i.test(line)) {
+      if (/^(Description|Products)$/i.test(line)) {
         section = "description"
         i += 1
         continue
       }
       if (/^Total Shipment$/i.test(line)) {
-        section = hsShipments === 0 ? "hs_count" : "all_count"
+        section = "shipment_value"
+        shipmentSawHs = false
         i += 1
         continue
       }
       if (/^Hscode/i.test(line)) {
         section = "hscodes"
+        pendingHs = ""
         i += 1
         continue
       }
@@ -292,7 +340,17 @@ export function parseTradeDump(text: string, source: TradeSource = "tradeindata"
         i += 1
         continue
       }
-      if (/^Latest shipments$/i.test(line)) {
+      if (/^Top Trading Countries$/i.test(line)) {
+        section = "countries"
+        i += 1
+        continue
+      }
+      if (/^Top 5 Ports$/i.test(line) || /^Top Ports$/i.test(line)) {
+        section = "ports"
+        i += 1
+        continue
+      }
+      if (/^Latest shipments$/i.test(line) || /^Shipments over the last/i.test(line)) {
         if (pendingPartner) flushPartner(pendingPartner)
         pendingPartner = ""
         section = "months"
@@ -309,38 +367,49 @@ export function parseTradeDump(text: string, source: TradeSource = "tradeindata"
       }
       if (section === "description") {
         if (isHsLine(line) && !hs) {
-          hs = line.slice(0, 6)
+          hs = line.replace(/\D/g, "").slice(0, 6)
           i += 1
           continue
         }
-        if (line && !/^Total Shipment$/i.test(line)) {
+        if (line && !/^Total Shipment$/i.test(line) && !REDACTED.test(line)) {
           description = description ? `${description} ${line}` : line
         }
         i += 1
         continue
       }
-      if (section === "hs_count") {
+      if (section === "shipment_value") {
         if (isHsLine(line)) {
+          shipmentSawHs = true
           i += 1
           continue
         }
         if (/\d/.test(line)) {
-          hsShipments = parseNumber(line)
+          const count = parseNumber(line)
+          if (shipmentSawHs && hsShipments === 0) hsShipments = count
+          else totalShipments = Math.max(totalShipments, count)
           section = "none"
         }
         i += 1
         continue
       }
-      if (section === "all_count") {
-        if (/\d/.test(line)) {
-          totalShipments = parseNumber(line)
-          section = "none"
+      if (section === "hscodes") {
+        if (isHsLine(line)) {
+          pendingHs = line.replace(/\D/g, "").slice(0, 6)
+          i += 1
+          continue
+        }
+        const total = line.match(/^Total:\s*([\d,.]+)/i)
+        if (total && pendingHs) {
+          hsCodes.push({ code: pendingHs, shipments: parseNumber(total[1]) })
+          pendingHs = ""
+          i += 1
+          continue
         }
         i += 1
         continue
       }
       if (section === "partners") {
-        if (isHsLine(line)) {
+        if (isHsLine(line) || REDACTED.test(line)) {
           i += 1
           continue
         }
@@ -356,6 +425,22 @@ export function parseTradeDump(text: string, source: TradeSource = "tradeindata"
         i += 1
         continue
       }
+      if (section === "countries") {
+        if (REDACTED.test(line)) originsRedacted = true
+        else if (line && !isHsLine(line) && !isChrome(line) && !/^\d/.test(line)) {
+          tradingCountries.push(line)
+        }
+        i += 1
+        continue
+      }
+      if (section === "ports") {
+        if (REDACTED.test(line)) portsRedacted = true
+        else if (line && !isHsLine(line) && !isChrome(line) && !/^\d{6}$/.test(line)) {
+          ports.push(line)
+        }
+        i += 1
+        continue
+      }
       if (section === "months") {
         if (/^\d{6}$/.test(line)) latestMonths.push(line)
         i += 1
@@ -364,19 +449,26 @@ export function parseTradeDump(text: string, source: TradeSource = "tradeindata"
       i += 1
     }
     if (pendingPartner) flushPartner(pendingPartner)
+    const primary = pickPrimaryHs(hs, hsCodes, hsShipments)
     cards.push(
       finishFiling({
         importer: name,
         country,
         lastTradeDate: lastTradeDate || undefined,
         description,
-        hs: hs || "330510",
-        hsShipments,
+        hs: primary.hs,
+        hsShipments: primary.hsShipments,
         totalShipments,
         partners,
         latestMonths,
-        cargo: classifyCargo(description),
+        hsCodes,
+        tradingCountries,
+        ports,
+        originsRedacted,
+        portsRedacted,
+        cargo: classifyCargo(description, primary.hs),
         source,
+        sourceFile,
       })
     )
   }
@@ -419,7 +511,7 @@ function headerKey(value: string): string {
   return foldName(value).replace(/\s+/g, "_")
 }
 
-export function parseTradeCsv(text: string, source: TradeSource = "csv"): TradeFiling[] {
+export function parseTradeCsv(text: string, source: TradeSource = "csv", sourceFile?: string): TradeFiling[] {
   const raw = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").trim()
   const first = raw.split("\n")[0] ?? ""
   const delimiter = first.split(";").length > first.split(",").length ? ";" : ","
@@ -463,8 +555,14 @@ export function parseTradeCsv(text: string, source: TradeSource = "csv"): TradeF
         totalShipments: totalAt >= 0 ? parseNumber(cells[totalAt] ?? "") : 0,
         partners,
         latestMonths: [],
-        cargo: classifyCargo(description),
+        cargo: classifyCargo(description, (hsAt >= 0 ? cells[hsAt] : "").replace(/\D/g, "").slice(0, 6)),
+        hsCodes: [],
+        tradingCountries: [],
+        ports: [],
+        originsRedacted: false,
+        portsRedacted: false,
         source,
+        sourceFile,
       })
     )
   }
@@ -477,11 +575,46 @@ export function looksLikeCsv(text: string): boolean {
   return /importer|company|consignee|hscode|hs code|shipment/i.test(first)
 }
 
-export function parseTradeInput(text: string, source?: TradeSource): TradeFiling[] {
+export function parseTradeInput(text: string, source?: TradeSource, sourceFile?: string): TradeFiling[] {
   const trimmed = text.trim()
   if (!trimmed) return []
-  if (source === "csv" || looksLikeCsv(trimmed)) return parseTradeCsv(trimmed, source ?? "csv")
-  return parseTradeDump(trimmed, source ?? "tradeindata")
+  if (source === "csv" || looksLikeCsv(trimmed)) return parseTradeCsv(trimmed, source ?? "csv", sourceFile)
+  return parseTradeDump(trimmed, source ?? "tradeindata", sourceFile)
+}
+
+export type TradeFileResult = {
+  name: string
+  parsed: number
+  added: number
+  error?: string
+}
+
+export function filingSummary(rows: TradeFiling[]): {
+  countries: { country: string; count: number; candidates: number }[]
+  candidates: number
+  excluded: number
+  files: string[]
+} {
+  const byCountry = new Map<string, { count: number; candidates: number }>()
+  const files = new Set<string>()
+  let candidates = 0
+  for (const row of rows) {
+    if (row.sourceFile) files.add(row.sourceFile)
+    const hit = isSearchCandidate(row)
+    if (hit) candidates += 1
+    const current = byCountry.get(row.country) ?? { count: 0, candidates: 0 }
+    current.count += 1
+    if (hit) current.candidates += 1
+    byCountry.set(row.country, current)
+  }
+  return {
+    countries: [...byCountry.entries()]
+      .map(([country, stats]) => ({ country, ...stats }))
+      .sort((a, b) => b.count - a.count),
+    candidates,
+    excluded: rows.length - candidates,
+    files: [...files].sort(),
+  }
 }
 
 function dedupeFilings(rows: TradeFiling[]): TradeFiling[] {
@@ -553,32 +686,64 @@ export function toMatch(filing: TradeFiling): TradeFilingMatch {
     partners: filing.partners,
     description: filing.description,
     latestMonths: filing.latestMonths,
+    hsCodes: filing.hsCodes,
+    tradingCountries: filing.tradingCountries,
+    ports: filing.ports,
+    originsRedacted: filing.originsRedacted,
+    portsRedacted: filing.portsRedacted,
     brazilHint: filing.brazilHint,
     logisticsShare: filing.logisticsShare,
     note,
   }
 }
 
-export function filingNote(filing: Pick<TradeFiling, "hs" | "hsShipments" | "lastTradeDate" | "partners" | "quality" | "occupiedBrands" | "cargo" | "description" | "brazilHint" | "logisticsShare">): string {
+export function filingNote(
+  filing: Pick<
+    TradeFiling,
+    | "hs"
+    | "hsShipments"
+    | "lastTradeDate"
+    | "partners"
+    | "quality"
+    | "occupiedBrands"
+    | "cargo"
+    | "description"
+    | "brazilHint"
+    | "logisticsShare"
+    | "hsCodes"
+    | "tradingCountries"
+    | "originsRedacted"
+    | "portsRedacted"
+  >
+): string {
   const top = filing.partners
     .slice(0, 3)
     .map((partner) =>
       partner.sharePct != null ? `${partner.canonical ?? partner.name} ${partner.sharePct}%` : partner.canonical ?? partner.name
     )
     .join(", ")
+  const extraHs = (filing.hsCodes ?? [])
+    .map((row) => row.code)
+    .filter((code) => code && code !== filing.hs)
+    .slice(0, 3)
   const bits = [
     `${filing.hsShipments} embarques HS ${filing.hs}`,
+    extraHs.length ? `outros HS ${extraHs.join(", ")}` : "",
     filing.lastTradeDate ? `último ${filing.lastTradeDate.slice(0, 10)}` : "",
     filing.cargo !== "shampoo" ? filing.cargo.replace("_", " ") : "",
     top ? `parceiros: ${top}` : "",
+    filing.tradingCountries?.length ? `origens visíveis: ${filing.tradingCountries.slice(0, 3).join(", ")}` : "",
+    filing.originsRedacted ? "origem mascarada (***) na página" : "",
+    filing.portsRedacted ? "portos mascarados (***)" : "",
     filing.quality === "occupied" && filing.occupiedBrands.length
       ? `livro ocupado (${filing.occupiedBrands.join(", ")})`
       : "",
     filing.quality === "logistics_only" ? "parceiros são logística, não fábrica" : "",
     filing.quality === "parcel" ? "parcela Amazon, não distribuidor" : "",
     filing.brazilHint ? "menciona origem Brasil" : "",
+    "ficha Company Data, não BL",
   ].filter(Boolean)
-  return clip(bits.join(". ") + ".", 280)
+  return clip(bits.join(". ") + ".", 320)
 }
 
 export function filingCommerceSignal(match: TradeFilingMatch): CommerceSignal {
@@ -636,7 +801,7 @@ export function qualityLabel(quality: TradeFilingQuality): string {
 }
 
 const GLOBAL_IMPORTER =
-  /\b(unilever|avon|genomma|genonna|pricesmart|procter|feduro|l'?oreal|loreal|alfa parf|alfaparf|belcorp|\bl\.?\s*bel\b|mesoestetic|arabela)\b/i
+  /\b(unilever|avon|genomma|genonna|pricesmart|procter|feduro|l'?oreal|loreal|alfa parf|alfaparf|belcorp|\bl\.?\s*bel\b|mesoestetic|arabela|henkel)\b/i
 
 export function isLogisticsName(name: string): boolean {
   return LOGISTICS.test(name) || ZONA.test(name)
@@ -660,5 +825,6 @@ export function cargoLabel(cargo: TradeCargoKind): string {
   if (cargo === "sample") return "amostra"
   if (cargo === "hotel_amenity") return "amenity hotel"
   if (cargo === "medicated") return "medicado"
+  if (cargo === "other") return "outro produto"
   return "ruído"
 }

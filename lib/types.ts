@@ -36,8 +36,8 @@ export type Brief = {
   instructions?: string
   /** Leads requested in each target country. Live runs use 10. */
   leadCount: number
-  /** buyers finds customers for the supplier. competitors maps who already distributes a brand. */
-  searchKind?: "buyers" | "competitors"
+  /** buyers finds customers for the supplier. competitors maps who already distributes a brand. dump seeds stored trade names and lets Exa/Firecrawl confirm. */
+  searchKind?: "buyers" | "competitors" | "dump"
   /** Exa Deep is the faster search. Exa Ultra is the long list-building agent. */
   exaEffort?: "deep" | "ultra"
   /** Task is the default Parallel research. Decisions is opt-in for that run. */
@@ -98,7 +98,12 @@ export type TradePartnerKind =
   | "affiliate"
   | "unknown"
 
-export type TradeCargoKind = "shampoo" | "sample" | "hotel_amenity" | "medicated" | "noise"
+export type TradeCargoKind = "shampoo" | "sample" | "hotel_amenity" | "medicated" | "noise" | "other"
+
+export type TradeHsCode = {
+  code: string
+  shipments: number
+}
 
 export type TradeFilingQuality = "usable" | "occupied" | "logistics_only" | "parcel" | "sample"
 
@@ -120,6 +125,14 @@ export type TradeFiling = {
   totalShipments: number
   partners: TradePartner[]
   latestMonths: string[]
+  /** HS lines from the Company Data card (HSCODE(S) + Total). */
+  hsCodes: TradeHsCode[]
+  /** TOP TRADING COUNTRIES. Empty when the page shows ***. */
+  tradingCountries: string[]
+  /** TOP 5 PORTS. Empty when the page shows ***. */
+  ports: string[]
+  originsRedacted: boolean
+  portsRedacted: boolean
   cargo: TradeCargoKind
   occupiedBrands: string[]
   occupiedShare: number
@@ -127,6 +140,8 @@ export type TradeFiling = {
   brazilHint: boolean
   quality: TradeFilingQuality
   source: TradeSource
+  /** Original dump or CSV filename. Several files merge into one store. */
+  sourceFile?: string
 }
 
 export type TradeFilingMatch = {
@@ -142,6 +157,11 @@ export type TradeFilingMatch = {
   partners: TradePartner[]
   description: string
   latestMonths: string[]
+  hsCodes: TradeHsCode[]
+  tradingCountries: string[]
+  ports: string[]
+  originsRedacted: boolean
+  portsRedacted: boolean
   brazilHint: boolean
   logisticsShare: number
   note: string
@@ -378,6 +398,22 @@ export type DiligenceReport = {
   error?: string
 }
 
+export type LeadSeed = "dump" | "similar" | "exa"
+
+export type ApiConfirmStatus = "confirmed" | "rejected" | "pending" | "skipped"
+
+export type ApiConfirm = {
+  exa: ApiConfirmStatus
+  firecrawl: ApiConfirmStatus
+  note: string
+}
+
+export type RejectedSeed = {
+  importer: string
+  country: string
+  reason: string
+}
+
 export type Lead = {
   id: string
   name: string
@@ -388,6 +424,10 @@ export type Lead = {
   market?: string
   /** Buyer type this lead was searched under, when the brief lists more than one. */
   buyerType?: string
+  /** dump = trade-file seed. similar = competitor of a confirmed importer. exa = open country search. */
+  seed?: LeadSeed
+  /** Exa and Firecrawl confirmation. A trade dump never sets this to confirmed. */
+  apiConfirm?: ApiConfirm
   exa: ExaHit
   extraction?: Extraction
   context?: LeadContext
@@ -497,6 +537,8 @@ export type Run = {
   stages: StageState[]
   logs: LogLine[]
   leads: Lead[]
+  /** Dump names Exa rejected. The APIs have to confirm; these did not. */
+  rejectedSeeds?: RejectedSeed[]
   market?: MarketContext
   competitors: Competitor[]
   /** Brazil export volume to each search country, last 3 years, from Comex Stat. */
