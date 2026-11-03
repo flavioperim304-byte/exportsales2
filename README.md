@@ -53,7 +53,7 @@ PARALLEL_API_KEY=
 COMPANY_ATLAS_TOKEN=
 ```
 
-`COMPANY_ATLAS_TOKEN` is optional. The desk can also store a Google OAuth session after **Fontes → Connect with Google**. In Cursor, add a remote MCP server with URL `https://thecompanyatlas.com/mcp` and sign in with Google — that is the same trial, for chat, not the live Render run.
+`COMPANY_ATLAS_TOKEN` is optional. The desk can also store a Google OAuth session after **Fontes → Connect with Google**. `.cursor/mcp.json` already points Cursor at `https://thecompanyatlas.com/mcp`; toggle **thecompanyatlas** on under Settings → Tools & MCP and sign in with Google. That chat MCP is the same trial; the live Render run still needs the desk login.
 
 A Dump + API run spends at most 12 Atlas credits: one HS 3305 rank per overlapping country (cap 4), a shipment search only when the rank missed dump names, then partner breakdown for matched registry ids. The free plan is 50 credits per calendar month, one credit per tool call, 10 shipment lines per call. Matching of party names to company ids is incomplete for 2026 lines. Limited markets (Panama, Kenya, Ethiopia, …) are thinner. Markets not in the 36 (UAE, Japan, Germany, Mexico, …) skip Atlas and stay on Exa + Firecrawl.
 
