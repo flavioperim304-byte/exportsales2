@@ -75,12 +75,76 @@ export type ActivitySnapshot = {
 
 export type CommerceKind = "customs" | "restock" | "trade_fair" | "open_book" | "hiring_buy"
 
+export type CommerceSignalSource = "exa" | "trade_record"
+
 export type CommerceSignal = {
   kind: CommerceKind
   title: string
   url: string
   publishedAt?: string
   quote: string
+  /** Exa is a web mention. Only trade_record is a filing. */
+  source?: CommerceSignalSource
+}
+
+export type TradeSource = "tradeindata" | "csv" | "paste"
+
+export type TradePartnerKind =
+  | "factory"
+  | "logistics"
+  | "retail_parcel"
+  | "unpublished"
+  | "zona_libre"
+  | "affiliate"
+  | "unknown"
+
+export type TradeCargoKind = "shampoo" | "sample" | "hotel_amenity" | "medicated" | "noise"
+
+export type TradeFilingQuality = "usable" | "occupied" | "logistics_only" | "parcel" | "sample"
+
+export type TradePartner = {
+  name: string
+  sharePct?: number
+  kind: TradePartnerKind
+  canonical?: string
+}
+
+export type TradeFiling = {
+  id: string
+  importer: string
+  country: string
+  lastTradeDate?: string
+  description: string
+  hs: string
+  hsShipments: number
+  totalShipments: number
+  partners: TradePartner[]
+  latestMonths: string[]
+  cargo: TradeCargoKind
+  occupiedBrands: string[]
+  occupiedShare: number
+  logisticsShare: number
+  brazilHint: boolean
+  quality: TradeFilingQuality
+  source: TradeSource
+}
+
+export type TradeFilingMatch = {
+  recordId: string
+  importer: string
+  hs: string
+  hsShipments: number
+  lastTradeDate?: string
+  cargo: TradeCargoKind
+  quality: TradeFilingQuality
+  occupiedBrands: string[]
+  occupiedShare: number
+  partners: TradePartner[]
+  description: string
+  latestMonths: string[]
+  brazilHint: boolean
+  logisticsShare: number
+  note: string
 }
 
 export type CommerceSnapshot = {
@@ -334,8 +398,12 @@ export type Lead = {
   openai?: FitJudgment
   /** News, launches, new brands, and social posts found after the company search. */
   activity?: ActivitySnapshot
-  /** Customs, restock, fair, open-book, and purchasing-hire hits. Fills the purchase/sales gap. */
+  /** Customs, restock, fair, open-book, and purchasing-hire hits. Exa customs is a mention, not a BL. */
   commerce?: CommerceSnapshot
+  /** Normalized TradeInData / customs CSV matched to this company. */
+  filing?: TradeFilingMatch
+  /** True after the desk tried to match stored filings, even when none hit. */
+  filingChecked?: boolean
   /** Desk-calculated fit probability from published buying facts. */
   fit?: FitProbability
   /** Chroma RAG check against previously ingested dashboard CSVs. */

@@ -36,6 +36,9 @@ export function Header() {
           <Button variant="ghost" className="h-11 shrink-0 px-4 sm:h-8" nativeButton={false} render={<Link href="/qualify" />}>
             Nova busca
           </Button>
+          <Button variant="ghost" className="h-11 shrink-0 px-4 sm:h-8" nativeButton={false} render={<Link href="/trade" />}>
+            Aduana
+          </Button>
           <Button
             variant={ready === 0 ? "default" : "outline"}
             className="h-11 shrink-0 px-4 sm:h-8"

@@ -1,5 +1,7 @@
 import { emptyActivity, searchActivity } from "./activity"
 import { emptyCommerce, searchCommerce } from "./commerce"
+import { applyFilingToLead } from "./trade-records"
+import { listFilings } from "./trade-store"
 import {
   brandKindOf,
   buildReport,
@@ -37,7 +39,7 @@ import {
 import { localizeCompetitors } from "./competitors"
 import { compareLeads, scoreLead } from "./score"
 import { requestJson } from "./http"
-import { getRun, insertRun, updateRun } from "./store"
+import { getRun, insertRun, listRuns, updateRun } from "./store"
 import type { Brief, DiligenceProbe, Extraction, Lead, LogLine, Run, StageId, StageState, TradeSnapshot } from "./types"
 import { SAMPLE_RUN_ID } from "./ids"
 
@@ -188,6 +190,44 @@ function tradeRetryDue(run: Run): boolean {
 }
 
 const tradeBusy = new Set<string>()
+
+async function attachCustomsRecords(id: string, force = false) {
+  const records = await listFilings()
+  if (records.length === 0) return
+  await updateRun(id, (run) => {
+    let hits = 0
+    let checked = 0
+    for (const lead of run.leads) {
+      if (!force && lead.filingChecked) continue
+      applyFilingToLead(lead, records, run.brief)
+      lead.fit = computeFitProbability(run.brief, lead, run.competitors)
+      lead.score = scoreLead(run.brief, lead, run.competitors)
+      if (run.also) lead.alsoScore = scoreLead(run.also, lead, run.competitors)
+      checked += 1
+      if (lead.filing) hits += 1
+    }
+    if (checked) {
+      log(
+        run,
+        "classify",
+        hits
+          ? `Trade filings matched ${hits} of ${checked} companies.`
+          : `Trade filings checked ${checked} companies. None matched a stored importer.`
+      )
+    }
+  })
+}
+
+export async function rematchFilingsOnRuns(): Promise<number> {
+  const runs = await listRuns()
+  let touched = 0
+  for (const run of runs) {
+    if (run.mode === "sample") continue
+    await attachCustomsRecords(run.id, true)
+    touched += 1
+  }
+  return touched
+}
 
 async function attachTrade(id: string) {
   if (tradeBusy.has(id)) return
@@ -885,6 +925,7 @@ async function doScore(id: string) {
   if (activity === "wait") return
   const commerce = await attachMissingCommerce(id)
   if (commerce === "wait") return
+  await attachCustomsRecords(id)
   await attachRag(id)
   const current = (await getRun(id)) ?? snapshot
   if (!keys.openai) {
@@ -978,6 +1019,7 @@ async function pump(id: string) {
       if (run.status === "failed") return
       if (run.status === "complete") {
         await attachTrade(id)
+        await attachCustomsRecords(id)
         await maybeAttachDeferred(id)
         return
       }
@@ -1116,6 +1158,7 @@ async function stepOnce(id: string) {
   if (!run || run.mode === "sample" || run.status === "failed") return
   if (run.status === "complete") {
     await attachTrade(id)
+    await attachCustomsRecords(id)
     await maybeAttachDeferred(id)
     return
   }
@@ -1152,8 +1195,9 @@ export async function ensurePump(id: string) {
     ragConfigured() &&
     run.leads.length > 0 &&
     (run.leads.some((lead) => ragNeedsRetry(lead)) || ragStale)
-  if (!active && !deferred && !tradePending && !ragPending) return
-  if (!active && ragPending && !deferred && !tradePending) {
+  const filingPending = run.status === "complete" && run.leads.some((lead) => !lead.filingChecked)
+  if (!active && !deferred && !tradePending && !ragPending && !filingPending) return
+  if (!active && ragPending && !deferred && !tradePending && !filingPending) {
     running.add(id)
     void attachRag(id, ragStale)
       .finally(() => {

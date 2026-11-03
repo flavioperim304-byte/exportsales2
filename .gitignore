@@ -38,6 +38,7 @@ yarn-error.log*
 /data/runs.json
 /data/prompts.json
 /data/secrets.json
+/data/trade-records.json
 /data/*.tmp
 /api-keys.env
 

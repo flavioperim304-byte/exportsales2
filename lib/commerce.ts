@@ -116,6 +116,7 @@ export function signalsFromSearch(results: unknown[], lead: Lead): CommerceSigna
     seen.add(key)
     signals.push({
       kind,
+      source: "exa",
       title,
       url,
       publishedAt: asString(row.publishedDate) || undefined,
@@ -137,9 +138,13 @@ export function hasCommerceSignals(lead: Lead): boolean {
   return recentCommerce(lead).length > 0
 }
 
-/** Customs filings and restock language fill the purchase/sales gap. A fair or a hiring post does not. */
+export function isTradeFilingSignal(signal: { kind: CommerceKind; source?: string }): boolean {
+  return signal.kind === "customs" && signal.source === "trade_record"
+}
+
+/** Restock on a public page. A trade dump and an Exa “aduana” mention are indications, not a purchase. */
 export function hasCommercialBuyFacts(lead: Lead): boolean {
-  return recentCommerce(lead).some((signal) => signal.kind === "customs" || signal.kind === "restock")
+  return recentCommerce(lead).some((signal) => signal.kind === "restock")
 }
 
 export function commerceLine(lead: Lead): string {
@@ -152,6 +157,14 @@ export function commerceLine(lead: Lead): string {
     return `No customs, restock, trade-fair, open-book, or purchasing-hire signal in the last ${COMMERCE_MONTHS} months.`
   }
   const kinds = [...new Set(recent.map((signal) => commerceKindLabel(signal.kind)))].join(", ")
+  const filing = recent.filter((signal) => isTradeFilingSignal(signal)).length
+  const mentions = recent.filter((signal) => signal.kind === "customs" && !isTradeFilingSignal(signal)).length
+  if (filing) {
+    return `${recent.length} commercial ${recent.length === 1 ? "signal" : "signals"} in the last ${COMMERCE_MONTHS} months: ${kinds}. Trade dump is an indication only — stale, with false records, not a confirmed BL.`
+  }
+  if (mentions) {
+    return `${recent.length} commercial ${recent.length === 1 ? "signal" : "signals"} in the last ${COMMERCE_MONTHS} months: ${kinds}. Exa customs hits are web mentions, not bills of lading.`
+  }
   return `${recent.length} commercial ${recent.length === 1 ? "signal" : "signals"} in the last ${COMMERCE_MONTHS} months: ${kinds}.`
 }
 

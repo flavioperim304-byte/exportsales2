@@ -304,7 +304,7 @@ test("OpenAI does not supply the opportunity score", () => {
 test("CSV keeps the old columns and adds due-diligence fields", () => {
   const run = sampleRun()
   const csv = resultsCsv(run)
-  assert.match(csv, /Company,Country,Role,ICP,Best fit,Activity,Commerce,Fit probability,Fit evidence,Email/)
+  assert.match(csv, /Company,Country,Role,ICP,Best fit,Activity,Commerce,Trade filing/)
   assert.match(csv, /DD Kanechom opportunity/)
   assert.match(csv, /DD LQ priority/)
 })

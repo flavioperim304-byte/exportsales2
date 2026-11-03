@@ -100,11 +100,9 @@ export function hasPublishedBuyFacts(lead: Lead): boolean {
 
 function factFromCommerce(kind: BuyingKind, lead: Lead): BuyingFact | null {
   const hit =
-    kind === "last_purchase"
-      ? recentCommerce(lead).find((signal) => signal.kind === "customs")
-      : kind === "stock"
-        ? recentCommerce(lead).find((signal) => signal.kind === "restock")
-        : undefined
+    kind === "stock"
+      ? recentCommerce(lead).find((signal) => signal.kind === "restock")
+      : undefined
   if (!hit) return null
   const quote = clip(hit.quote || hit.title, 220)
   if (!quote || looksUnpublished(quote)) return null

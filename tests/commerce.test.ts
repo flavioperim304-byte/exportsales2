@@ -148,13 +148,14 @@ test("a brochure-only Panama lead stays a low fit", () => {
   assert.equal(hasPublishedBuyFacts(quietLead()), false)
 })
 
-test("a customs hit fills last purchase and can unlock best fit", () => {
+test("an Exa customs mention does not unlock best fit", () => {
   const lead = quietLead()
   lead.commerce = {
     fetchedAt: "2026-11-02T00:00:00.000Z",
     signals: [
       {
         kind: "customs",
+        source: "exa",
         title: "Premium Cosmetics bill of lading",
         url: "https://trade.example/premium-bl",
         publishedAt: "2026-09-01T00:00:00.000Z",
@@ -169,15 +170,10 @@ test("a customs hit fills last purchase and can unlock best fit", () => {
     qualificationNeeded: "Send a price list.",
     rationale: "Looks like a distributor.",
   }
-  assert.equal(hasCommercialBuyFacts(lead), true)
-  assert.equal(hasPublishedBuyFacts(lead), true)
-  const fit = computeFitProbability(KANECHOM_BRIEF, lead)
-  assert.ok(fit.facts.some((fact) => fact.kind === "last_purchase" && fact.found))
-  assert.ok(fit.index >= 16)
-  assert.ok(fit.index > computeFitProbability(KANECHOM_BRIEF, quietLead()).index)
+  assert.equal(hasCommercialBuyFacts(lead), false)
+  assert.equal(hasPublishedBuyFacts(lead), false)
   const [row] = qualificationRows([lead], KANECHOM_BRIEF)
-  assert.equal(row.bestFit, "Kanechom")
-  assert.match(row.commerce, /aduana/)
+  assert.equal(row.bestFit, "neither")
 })
 
 test("a trade fair alone does not unlock best fit", () => {
@@ -205,7 +201,7 @@ test("a trade fair alone does not unlock best fit", () => {
   assert.equal(hasPublishedBuyFacts(lead), false)
   const [row] = qualificationRows([lead], KANECHOM_BRIEF)
   assert.equal(row.bestFit, "neither")
-  assert.match(row.qualificationNeeded, /Feira ou vaga de compras/)
+  assert.match(row.qualificationNeeded, /feira.*vaga de compras/i)
   const fit = computeFitProbability(KANECHOM_BRIEF, lead)
   assert.ok(fit.index <= 55)
   assert.notEqual(fit.level, "high")
@@ -232,7 +228,7 @@ test("Spanish importó un contenedor on the page counts as last purchase", () =>
   assert.ok(fit.facts.some((fact) => fact.kind === "last_purchase" && fact.found))
 })
 
-test("diligence import is confirmed from a customs signal without we-import language", () => {
+test("an Exa customs mention does not confirm diligence import", () => {
   const lead = quietLead()
   lead.exa = {
     ...lead.exa,
@@ -250,6 +246,7 @@ test("diligence import is confirmed from a customs signal without we-import lang
     signals: [
       {
         kind: "customs",
+        source: "exa",
         title: "SIGA filing",
         url: "https://trade.example/siga",
         publishedAt: "2026-08-01T00:00:00.000Z",
@@ -258,7 +255,7 @@ test("diligence import is confirmed from a customs signal without we-import lang
     ],
   }
   const states = classifyBlocks("lq", lead)
-  assert.equal(states.import, "strong")
+  assert.notEqual(states.import, "strong")
 })
 
 test("commerce line and CSV name the new column", () => {
@@ -267,5 +264,5 @@ test("commerce line and CSV name the new column", () => {
   lead.commerce = { fetchedAt: "2026-11-02T00:00:00.000Z", signals: [] }
   assert.match(commerceLine(lead), /No customs/)
   const csv = resultsCsv({ leads: [lead], brief: KANECHOM_BRIEF })
-  assert.match(csv, /Company,Country,Role,ICP,Best fit,Activity,Commerce,Fit probability/)
+  assert.match(csv, /Company,Country,Role,ICP,Best fit,Activity,Commerce,Trade filing/)
 })

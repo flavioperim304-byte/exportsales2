@@ -629,8 +629,8 @@ export function scoreLead(brief: Brief, lead: Lead, competitors: Competitor[] = 
         quote: clip(signal),
       })) ?? []),
       ...commercialHits.slice(0, 2).map((signal) => ({
-        source: "exa" as const,
-        label: signal.kind,
+        source: (signal.source === "trade_record" ? "rule" : "exa") as Evidence["source"],
+        label: signal.source === "trade_record" ? "customs filing" : signal.kind,
         quote: clip(signal.quote || signal.title),
         url: signal.url,
       })),

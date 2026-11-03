@@ -106,7 +106,13 @@ function guardFit(lead: Lead, row: QualificationRow): QualificationRow {
   if (!hasPublishedBuyIntent(lead) && next.bestFit && next.bestFit !== "neither") {
     next = { ...next, bestFit: "neither" }
     notes.push(
-      "Best fit foi retirado: não há última compra, estoque, vendas, aduana ou reposição. ICP de canal não é intenção de compra. Feira ou vaga de compras, sozinha, não basta."
+      "Best fit foi retirado: não há última compra, estoque, vendas ou reposição publicados. ICP de canal não é intenção de compra. Dump de aduana, feira, vaga de compras ou menção web, sozinha, não basta."
+    )
+  }
+  if (lead.filing) {
+    const brands = lead.filing.occupiedBrands.join(", ")
+    notes.push(
+      `Dump de aduana (indicação, há falsos): ${lead.filing.note}${brands ? ` Conferir livro (${brands}).` : ""} Não confirma compra.`
     )
   }
   if (notes.length) {

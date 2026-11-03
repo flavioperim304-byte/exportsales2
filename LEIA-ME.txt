@@ -35,6 +35,7 @@ Dois serviços Render, mesmo repositório:
    Não apague o disco. Não reenvie o CSV se o índice já está verde.
 
 Due diligence: Opportunity não entra no Fit.
-Importação só confirma com fato publicado (we import / importamos / última compra / aduana).
-Feira ou vaga de compras, sozinha, não desbloqueia best fit.
+Importação só confirma com fato publicado (we import / importamos / última compra).
+Dump de aduana (TradeInData etc.) é indicação, com falsos; não confirma compra.
+Feira, vaga de compras ou menção web de aduana, sozinha, não desbloqueia best fit.
 Não rode de novo a DD do Panamá até o dashboard Node estar neste código.

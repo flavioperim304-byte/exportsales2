@@ -402,12 +402,12 @@ export function classifyBlocks(
   } else if (hasBuying) {
     portfolio = "partial"
   }
-
   let imports: DiligenceEvidenceState = "absent"
   const publishedPurchase = facts.some((fact) => fact.kind === "last_purchase" && fact.found)
-  const customsHit = (lead.commerce?.signals ?? []).some((signal) => signal.kind === "customs")
-  if (IMPORT_NO.test(text) && !IMPORT_YES.test(text) && !publishedPurchase && !customsHit) imports = "negative"
-  else if (IMPORT_YES.test(text) || publishedPurchase || customsHit) imports = "strong"
+  const filingHint = Boolean(lead.filing && lead.filing.hsShipments > 0 && lead.filing.quality !== "parcel")
+  if (IMPORT_NO.test(text) && !IMPORT_YES.test(text) && !publishedPurchase) imports = "negative"
+  else if (IMPORT_YES.test(text) || publishedPurchase) imports = "strong"
+  else if (filingHint) imports = "partial"
   else if (IMPORT_HINT.test(role) || IMPORT_HINT.test(text)) imports = "partial"
   else if (ROUTINE_SOCIAL.test(text) && !IMPORT_HINT.test(text)) imports = "inadequate"
 

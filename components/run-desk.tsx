@@ -909,8 +909,8 @@ function CommercePanel({ lead }: { lead: Lead }) {
         <>
           <p className="mt-2 text-sm">
             {buy
-              ? "Há aduana ou reposição publicada. Isso entra no Fit como fato de compra — não é um pedido confirmado."
-              : "Há feira, livro aberto ou vaga de compras. Isso não desbloqueia best fit sozinho."}
+              ? "Há reposição publicada na página. Dump de aduana e menção web não confirmam compra."
+              : "Há feira, livro aberto, vaga de compras ou menção de aduana. Isso não desbloqueia best fit sozinho."}
           </p>
           <ul className="mt-2 flex flex-col gap-2">
             {signals.map((signal) => (
