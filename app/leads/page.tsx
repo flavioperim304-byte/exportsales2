@@ -32,11 +32,11 @@ async function LeadsLoader() {
         </p>
         <h1 className="mt-2 font-serif text-3xl sm:text-4xl">Leads</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Empresas das buscas Kanechom e LQ. Com <code>DATABASE_URL</code> no serviço Node (URI do
-          Supabase Session pooler) elas ficam no banco e voltam a ser lidas, cruzadas e atualizadas —
-          não só gravadas. Atualizar sinais relê Exa (24 meses: contratação de compras, crescimento em
-          rede, mudança de mix) e Firecrawl na página. A probabilidade de resposta cruza ICP, fit,
-          Comex Stat, concorrentes, mix e Aduana. Uma linha dump não confirma compra.
+          Empresas das buscas Kanechom e LQ. Cole a URI Session pooler em Fontes para gravar no
+          Supabase; sem isso o desk lê o arquivo local. Atualizar sinais relê Exa (24 meses:
+          contratação de compras, crescimento em rede, mudança de mix) e Firecrawl na página. A
+          probabilidade de resposta cruza ICP, fit, Comex Stat, concorrentes, mix e Aduana. Uma
+          linha dump não confirma compra.
         </p>
       </div>
       <LeadsBoard records={records} postgres={db.postgres && !db.error} error={db.error} />

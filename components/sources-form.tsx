@@ -31,6 +31,9 @@ export function SourcesForm() {
   const [saved, setSaved] = useState(false)
   const [atlasNote, setAtlasNote] = useState("")
   const [db, setDb] = useState<DbStatus | null>(null)
+  const [databaseUrl, setDatabaseUrl] = useState("")
+  const [dbBusy, setDbBusy] = useState(false)
+  const [dbNote, setDbNote] = useState("")
 
   async function refresh() {
     const response = await fetch("/api/keys")
@@ -213,29 +216,100 @@ export function SourcesForm() {
       </div>
       <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-4">
         <div className="flex items-center justify-between gap-3">
-          <Label>Postgres (leads)</Label>
+          <Label htmlFor="database-url">Postgres (Supabase)</Label>
           <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
             {db?.postgres && !db.error ? "Connected" : db?.error ? "Error" : "File"}
           </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Banco das empresas das buscas. Pode ser o Postgres do Supabase: no Render, serviço Node{" "}
-          <code>exportsales</code>, variável <code>DATABASE_URL</code> com a URI Session pooler
-          (porta 5432). Não cole a senha aqui. Sem a URL o desk continua em{" "}
-          <code>data/runs.json</code>. Aduana e Chroma ficam fora desta tabela.
+          Cole aqui a URI. Não precisa achar Environment Group no Render. Em Supabase: Project
+          Settings → Database → Connect → URI → <span className="font-medium text-foreground">Session pooler</span>{" "}
+          (porta <span className="font-medium text-foreground">5432</span>). Troque{" "}
+          <code>[YOUR-PASSWORD]</code> pela senha. Não cole a URL https://….supabase.co nem a anon key.
         </p>
         {db?.postgres && !db.error ? (
           <p className="text-sm">
-            {db.leadCount} lead{db.leadCount === 1 ? "" : "s"} em {db.runCount} busca
-            {db.runCount === 1 ? "" : "s"}.
+            Conectado em {db.host || "Supabase"}
+            {db.port ? `:${db.port}` : ""} · {db.leadCount} lead{db.leadCount === 1 ? "" : "s"} em{" "}
+            {db.runCount} busca{db.runCount === 1 ? "" : "s"}
+            {db.envLocked ? " · variável do Render" : " · gravado neste disco"}.
           </p>
         ) : db?.error ? (
           <p className="text-sm text-destructive">{db.error}</p>
         ) : (
           <p className="text-sm text-muted-foreground">
-            DATABASE_URL not set on this process. Leads stay on disk until you link Postgres.
+            Ainda no arquivo local. Cole a URI Session pooler abaixo e clique Conectar.
           </p>
         )}
+        {db?.envLocked ? (
+          <p className="text-sm">DATABASE_URL já está no ambiente deste serviço. Não precisa colar de novo.</p>
+        ) : (
+          <>
+            <Input
+              id="database-url"
+              type="password"
+              autoComplete="off"
+              value={databaseUrl}
+              placeholder="postgresql://postgres.REFERENCIA:SENHA@aws-…pooler.supabase.com:5432/postgres"
+              onChange={(event) => setDatabaseUrl(event.target.value)}
+              className="h-11 font-mono text-xs sm:h-10"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                className="h-11 sm:h-10"
+                disabled={dbBusy || !databaseUrl.trim()}
+                onClick={async () => {
+                  setDbBusy(true)
+                  setDbNote("")
+                  try {
+                    const response = await fetch("/api/db", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ url: databaseUrl.trim() }),
+                    })
+                    const data = (await response.json()) as DbStatus & { error?: string; note?: string }
+                    setDb(data)
+                    if (!response.ok || data.error) {
+                      setDbNote(data.error || "O Supabase não aceitou essa URI.")
+                      return
+                    }
+                    setDatabaseUrl("")
+                    setDbNote(data.note || "Supabase conectado. As próximas buscas gravam em desk_leads.")
+                  } catch {
+                    setDbNote("O desk não conseguiu testar o banco.")
+                  } finally {
+                    setDbBusy(false)
+                  }
+                }}
+              >
+                {dbBusy ? "Testando…" : "Conectar"}
+              </Button>
+              {db?.source === "file" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 sm:h-10"
+                  disabled={dbBusy}
+                  onClick={async () => {
+                    setDbBusy(true)
+                    try {
+                      const response = await fetch("/api/db", { method: "DELETE" })
+                      const data = (await response.json()) as DbStatus
+                      setDb(data)
+                      setDbNote("Supabase desconectado. Leads voltam para data/runs.json.")
+                    } finally {
+                      setDbBusy(false)
+                    }
+                  }}
+                >
+                  Desconectar
+                </Button>
+              ) : null}
+            </div>
+          </>
+        )}
+        {dbNote ? <p className="text-sm text-muted-foreground">{dbNote}</p> : null}
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {saved ? <p className="text-sm">Keys saved. A new qualification will use them.</p> : null}

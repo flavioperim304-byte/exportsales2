@@ -659,6 +659,12 @@ export type DbStatus = {
   leadCount: number
   runCount: number
   error?: string
+  source?: "env" | "file" | "none"
+  host?: string
+  port?: string
+  user?: string
+  envLocked?: boolean
+  note?: string
 }
 
 export type RunSummary = {

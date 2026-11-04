@@ -7,6 +7,7 @@ type SecretFile = {
   firecrawl?: string
   openai?: string
   parallel?: string
+  databaseUrl?: string
   atlasAccess?: string
   atlasRefresh?: string
   atlasClientId?: string
@@ -100,6 +101,28 @@ export function clearAtlasSession(): KeyFlags {
   delete next.atlasExpiresAt
   writeFile(next)
   return keyFlags()
+}
+
+export function envDatabaseUrl(): string {
+  return clean(process.env.DATABASE_URL)
+}
+
+export function storedDatabaseUrl(): string {
+  return clean(readFile().databaseUrl)
+}
+
+export function getDatabaseUrl(): string {
+  return envDatabaseUrl() || storedDatabaseUrl()
+}
+
+export function saveDatabaseUrl(value: string | undefined): { envLocked: boolean } {
+  if (envDatabaseUrl()) return { envLocked: true }
+  const next = readFile()
+  const trimmed = clean(value)
+  if (!trimmed) delete next.databaseUrl
+  else next.databaseUrl = trimmed
+  writeFile(next)
+  return { envLocked: false }
 }
 
 export function getKeys(): {

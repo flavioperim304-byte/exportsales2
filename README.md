@@ -30,7 +30,7 @@ O mesmo repositório alimenta **dois** Web Services no Render. Não apague o rep
 1. Extraia `export-desk.zip` na raiz de `exportsales2` e faça push de **um** commit em `main`.
 2. No Render, abra o serviço Node **`exportsales`** → **Manual Deploy → Deploy latest commit**.
 3. Espere Live. `/trade` tem de abrir; `/qualify` mostra Dump + API; Fontes → Connect with Google registra o callback `https://exportsales.onrender.com/api/atlas/callback`.
-4. No Render **não precisa** criar um Postgres. Use o banco do **Supabase**: Project Settings → Database → Connect → URI → **Session pooler** (porta 5432). Cole essa URI em `DATABASE_URL` no serviço Node `exportsales` (Environment). Troque `[YOUR-PASSWORD]` pela senha do banco. Não cole a senha no GitHub. Fontes mostra “Postgres (leads) Connected”. `/leads` lista as empresas. Sem essa variável o desk continua em `data/runs.json`.
+4. No Render **não precisa** criar um Postgres nem achar Environment Group. Abra **Fontes** no live, cole a URI **Session pooler** (Supabase → Database → Connect → URI, porta 5432, usuário `postgres.REFERENCIA`). Troque `[YOUR-PASSWORD]`. Não cole a URL `https://….supabase.co` nem a anon key. O desk testa na hora e grava em `data/secrets.json` no disco. Fontes mostra Connected. Sem URI o desk continua em `data/runs.json`.
 5. Aduana no live começa vazia (os dumps desta máquina não vão no zip). Cole de novo em `/trade`. Não reenvie o CSV do Panamá se `/enviar` no Python ainda está verde.
 
 ## Run locally

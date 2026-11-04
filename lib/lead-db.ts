@@ -1,4 +1,6 @@
 import { Pool, type PoolClient } from "pg"
+import { databaseHintFromUrl, explainPostgresError } from "./database-url"
+import { envDatabaseUrl, getDatabaseUrl } from "./keys"
 import { SAMPLE_RUN_ID } from "./ids"
 import type { DbStatus, Lead, LeadRecord, LeadSeed, Run } from "./types"
 
@@ -57,8 +59,20 @@ let schemaReady: Promise<void> | undefined
 let migrated = false
 let lastError: string | undefined
 
+let poolUrl = ""
+
 export function databaseUrl(): string {
-  return (process.env.DATABASE_URL || "").trim()
+  return getDatabaseUrl()
+}
+
+export function resetPostgresPool() {
+  const old = pool
+  pool = undefined
+  poolUrl = ""
+  schemaReady = undefined
+  migrated = false
+  lastError = undefined
+  void old?.end().catch(() => undefined)
 }
 
 export function postgresConfigured(): boolean {
@@ -80,14 +94,19 @@ export function postgresWantsSsl(url: string): boolean {
 function getPool(): Pool {
   const url = databaseUrl()
   if (!url) throw new Error("DATABASE_URL is not set.")
-  if (!pool) {
+  if (!pool || poolUrl !== url) {
+    const old = pool
     pool = new Pool({
       connectionString: url,
       max: 5,
       idleTimeoutMillis: 20_000,
-      connectionTimeoutMillis: 8_000,
+      connectionTimeoutMillis: 12_000,
       ssl: postgresWantsSsl(url) ? { rejectUnauthorized: false } : undefined,
     })
+    poolUrl = url
+    schemaReady = undefined
+    migrated = false
+    void old?.end().catch(() => undefined)
   }
   return pool
 }
@@ -176,7 +195,7 @@ export async function readyPostgres(jsonRuns: () => Run[]): Promise<boolean> {
     lastError = undefined
     return true
   } catch (error) {
-    lastError = error instanceof Error ? error.message : "Postgres connection failed."
+    lastError = explainPostgresError(error instanceof Error ? error.message : "Postgres connection failed.")
     return false
   }
 }
@@ -398,9 +417,19 @@ export async function pgListLeadRecords(): Promise<LeadRecord[]> {
   }))
 }
 
+function statusHint(url: string): Pick<DbStatus, "source" | "host" | "port" | "user" | "envLocked"> {
+  const source = envDatabaseUrl() ? "env" : url ? "file" : "none"
+  return {
+    ...databaseHintFromUrl(url, source),
+    envLocked: Boolean(envDatabaseUrl()),
+  }
+}
+
 export async function postgresStatus(): Promise<DbStatus> {
+  const url = databaseUrl()
+  const hint = statusHint(url)
   if (!postgresConfigured()) {
-    return { postgres: false, leadCount: 0, runCount: 0 }
+    return { postgres: false, leadCount: 0, runCount: 0, source: "none", ...hint }
   }
   try {
     await ensureLeadSchema()
@@ -411,9 +440,10 @@ export async function postgresStatus(): Promise<DbStatus> {
       postgres: true,
       runCount: runs.rows[0]?.n ?? 0,
       leadCount: leads.rows[0]?.n ?? 0,
+      ...hint,
     }
   } catch (error) {
-    lastError = error instanceof Error ? error.message : "Postgres connection failed."
-    return { postgres: true, leadCount: 0, runCount: 0, error: lastError }
+    lastError = explainPostgresError(error instanceof Error ? error.message : "Postgres connection failed.")
+    return { postgres: true, leadCount: 0, runCount: 0, error: lastError, ...hint }
   }
 }
