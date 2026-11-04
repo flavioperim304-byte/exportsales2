@@ -3,6 +3,7 @@ import { emptyCommerce, searchCommerce } from "./commerce"
 import { scrapeProfile } from "./firecrawl"
 import { stampIntelligence } from "./intelligence"
 import { getKeys } from "./keys"
+import { watchedLeadIds } from "./monitor-store"
 import { getRun, listRuns, updateRun } from "./store"
 import type { Lead, Run } from "./types"
 
@@ -22,10 +23,12 @@ function stale(lead: Lead, now = Date.now()): boolean {
 }
 
 export function leadsDueForRefresh(runs: Run[], now = Date.now()): { runId: string; leadId: string }[] {
+  const watched = watchedLeadIds()
   const due: { runId: string; leadId: string }[] = []
   for (const run of runs) {
     if (run.mode === "sample") continue
     for (const lead of run.leads ?? []) {
+      if (watched.has(lead.id)) continue
       if (stale(lead, now)) due.push({ runId: run.id, leadId: lead.id })
     }
   }

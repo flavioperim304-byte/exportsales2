@@ -16,6 +16,10 @@ const BRAND =
 const KIND_LABEL: Record<ActivityKind, string> = {
   news: "notícia",
   launch: "lançamento",
+  promotion: "promoção",
+  exhibition: "feira / exposição",
+  event: "evento",
+  mention: "menção",
   brand: "nova marca",
   social: "rede social",
   social_growth: "crescimento em rede",
@@ -26,6 +30,14 @@ const SOCIAL_GROWTH =
   /\b(seguidores|followers|follower count|crescimento|engajamento cresceu|growing (?:on|its) (?:instagram|facebook|tiktok|linkedin))\b/i
 const MIX_CHANGE =
   /\b(mudou o mix|mix de produtos|new (?:sku|line|range|collection)|dropped (?:the )?brand|tirou a marca|added .{0,40}(?:to|ao) (?:the )?(?:portfolio|portf[oó]lio)|discontinued|portf[oó]lio mudou|portfolio change|nova linha)\b/i
+const EXHIBITION =
+  /\b(cosmoprof|beautyworld|in-cosmetics|expocosmetica|exhibition|exhibitor|trade fair|feira|feria (?:de|internacional|beauty)|stand (?:n[úu]mero|no\.?))\b/i
+const PROMOTION =
+  /\b(promo(?:tion|ção|cion)|discount|desconto|campaign|campanha|oferta|sale(?:s)? event)\b/i
+const EVENT =
+  /\b(webinar|workshop|conference|congresso|summit|open day|evento|event(?:o)?s?)\b/i
+const MENTION =
+  /\b(mencion(?:ed|ou|ado)|mentioned|cita(?:do|tion)|featured in|aparece(?:u)? (?:em|na|no))\b/i
 
 export function activityKindLabel(kind: ActivityKind): string {
   return KIND_LABEL[kind]
@@ -55,7 +67,11 @@ export function classifyActivity(url: string, title: string, text: string): Acti
   if (SOCIAL.test(host) && SOCIAL_GROWTH.test(blob)) return "social_growth"
   if (SOCIAL.test(host)) return "social"
   if (LAUNCH.test(blob)) return "launch"
+  if (EXHIBITION.test(blob)) return "exhibition"
+  if (PROMOTION.test(blob)) return "promotion"
+  if (EVENT.test(blob)) return "event"
   if (BRAND.test(blob)) return "brand"
+  if (MENTION.test(blob)) return "mention"
   return "news"
 }
 

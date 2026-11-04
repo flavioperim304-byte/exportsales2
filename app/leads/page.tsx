@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import Link from "next/link"
 import { connection } from "next/server"
 import { LeadsBoard } from "@/components/leads-board"
+import { MonitorPanel } from "@/components/monitor-panel"
 import { postgresStatus } from "@/lib/lead-db"
 import { listLeadRecords } from "@/lib/store"
 
@@ -33,13 +34,13 @@ async function LeadsLoader() {
         <h1 className="mt-2 font-serif text-3xl sm:text-4xl">Leads</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Empresas das buscas Kanechom e LQ. No Supabase isso grava em desk_runs e desk_leads;
-          tabelas antigas (Leads, leads_master, tradeindata_*) não aparecem aqui. Sem
-          DATABASE_URL o desk lê o arquivo local. Atualizar sinais relê Exa (24 meses: contratação
-          de compras, crescimento em rede, mudança de mix) e Firecrawl na página. A probabilidade
-          de resposta cruza ICP, fit, Comex Stat, concorrentes, mix e Aduana. Uma linha dump não
-          confirma compra.
+          tabelas antigas (Leads, leads_master, tradeindata_*) não aparecem aqui. Os 3 melhores
+          ranks de cada país entram num monitor Exa semanal (lançamentos, promoção, feiras,
+          eventos, menções, notícias) via webhook no Render. O restante usa Atualizar sinais. Uma
+          linha dump não confirma compra.
         </p>
       </div>
+      <MonitorPanel />
       <LeadsBoard records={records} postgres={db.postgres && !db.error} error={db.error} />
     </main>
   )

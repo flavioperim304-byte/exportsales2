@@ -21,6 +21,7 @@ services:
         value: https://exportsales2.onrender.com
       # Set DATABASE_URL in the dashboard from the Supabase Session pooler URI.
       # Do not commit the password.
+      # Exa monitors POST https://exportsales.onrender.com/api/exa/webhook (HTTPS, no redirect).
     disk:
       name: export-desk-data
       mountPath: /opt/render/project/src/data

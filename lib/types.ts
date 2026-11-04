@@ -57,7 +57,17 @@ export type Evidence = {
   url?: string
 }
 
-export type ActivityKind = "news" | "launch" | "brand" | "social" | "social_growth" | "mix_change"
+export type ActivityKind =
+  | "news"
+  | "launch"
+  | "promotion"
+  | "exhibition"
+  | "event"
+  | "mention"
+  | "brand"
+  | "social"
+  | "social_growth"
+  | "mix_change"
 
 export type ActivitySignal = {
   kind: ActivityKind
