@@ -11,7 +11,7 @@ export default function SourcesPage() {
             Desk
           </Link>
         </p>
-        <h1 className="mt-2 font-serif text-3xl sm:text-4xl">Sources</h1>
+        <h1 className="mt-2 font-serif text-3xl sm:text-4xl">Fontes</h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
           The desk stays disconnected until these keys are saved. The same values can go in the file
           api-keys.env at the top of the project, next to API-KEYS.txt. Company Atlas is optional:

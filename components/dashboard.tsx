@@ -85,6 +85,12 @@ export function Dashboard({
             Baixar código (.zip)
           </a>
           <Link
+            href="/sources"
+            className="inline-flex h-11 items-center justify-center rounded-lg border border-border px-4 text-sm sm:h-10"
+          >
+            Fontes
+          </Link>
+          <Link
             href="/qualify"
             className="inline-flex h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm text-primary-foreground sm:h-10"
           >
@@ -93,15 +99,13 @@ export function Dashboard({
         </div>
       </div>
 
-      {sourcesReady < 4 ? (
-        <p className="text-sm text-muted-foreground">
-          {sourcesReady} de 4 fontes conectadas.{" "}
-          <Link href="/sources" className="underline-offset-2 hover:underline">
-            Abrir fontes
-          </Link>
-          .
-        </p>
-      ) : null}
+      <p className="text-sm text-muted-foreground">
+        {sourcesReady} de 4 APIs conectadas. Postgres e as chaves ficam em{" "}
+        <Link href="/sources" className="underline-offset-2 hover:underline">
+          Fontes
+        </Link>
+        .
+      </p>
       {refreshError ? <p className="text-sm text-destructive">{refreshError}</p> : null}
       <WebhookLine />
 

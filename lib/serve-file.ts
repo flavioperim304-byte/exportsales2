@@ -2,7 +2,7 @@ import { readFile, stat } from "node:fs/promises"
 import path from "node:path"
 
 export function fileDownloadHandlers(rel: string, filename: string, contentType: string) {
-  const filePath = () => path.join(process.cwd(), rel)
+  const filePath = () => path.join(/* turbopackIgnore: true */ process.cwd(), rel)
 
   function headers(length: number) {
     return {

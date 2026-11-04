@@ -29,7 +29,7 @@ export function Header() {
         <Link href="/" className="min-w-0">
           <span className="font-serif text-xl tracking-tight text-foreground">Export desk</span>
         </Link>
-        <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
+        <nav className="flex flex-wrap gap-2">
           <Button variant="ghost" className="h-11 shrink-0 px-4 sm:h-8" nativeButton={false} render={<Link href="/" />}>
             Painel
           </Button>
@@ -48,7 +48,7 @@ export function Header() {
             nativeButton={false}
             render={<Link href="/sources" />}
           >
-            Fontes {ready}/4
+            Fontes
           </Button>
         </nav>
       </div>
