@@ -12,12 +12,13 @@ type Payload = {
   signals: string[]
   queryExample: string
   topPerCountry: number
-  triggerMode: "interval" | "manual"
+  triggerMode: "interval"
   companiesPerMonitor: number
   numResults: number
   numResultsMax: number
   usdPerRun: number
   watch: WatchLead[]
+  skipped: { country: string; reason: "market" | "band" }[]
   monitors: { id: string; name: string; country: string; rank: number; query: string }[]
   exa: boolean
   createAllowed: boolean
@@ -53,7 +54,7 @@ export function MonitorPanel() {
           <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
             Monitor Exa · a cada {data?.days ?? 15} dias
           </p>
-          <h2 className="mt-1 font-serif text-2xl">Top 3 por país</h2>
+          <h2 className="mt-1 font-serif text-2xl">Best fits · um monitor cada</h2>
         </div>
         <Button
           type="button"
@@ -90,11 +91,10 @@ export function MonitorPanel() {
         </Button>
       </div>
       <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-        As leads antigas não entram nas tabelas CRM. O desk pega os 3 melhores ranks de cada país
-        (probabilidade de resposta, depois fit) e cria um monitor Exa por empresa. Cada monitor é
-        uma query só — a API não tem cota de empresas, mas misturar nomes divide os 10 resultados.
-        Frequência: 15 dias. Sinais na query: news, product launches, promotion, exhibitions,
-        events, mentions. Não é compra Kanechom/LQ.
+        Vários monitors: um por empresa, todos automáticos a cada 15 dias. Só entra Best fit em
+        mercado relevante (México, Centroamérica, Caribe, Chile, Colômbia, Peru, Equador, Argentina,
+        África do Sul, Magrebe, Golfo, Portugal, Espanha). Fora: restante da África, Ásia, Bolívia,
+        Paraguai, Uruguai, Venezuela. Strong e Possible não rastreiam. Não é compra Kanechom/LQ.
       </p>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <div>
@@ -104,10 +104,8 @@ export function MonitorPanel() {
         <div>
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">Trigger</dt>
           <dd className="mt-0.5">
-            {data?.triggerMode === "manual"
-              ? "manual · Render Cron GET /api/monitors/run a cada 15 dias"
-              : `interval · ${data?.period || "15d"}`}{" "}
-            · evento {data?.event || "monitor.run.completed"}
+            automático · interval · {data?.period || "15d"} · evento{" "}
+            {data?.event || "monitor.run.completed"}
           </dd>
         </div>
         <div>
@@ -155,8 +153,8 @@ export function MonitorPanel() {
       {note ? <p className="mt-3 text-sm">{note}</p> : null}
       {grouped.size === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">
-          Ainda não há busca live com score. Rode Nova busca; os 3 melhores de cada país aparecem
-          aqui.
+          Nenhum Best fit em país relevante. Strong não entra. Rode Nova busca ou espere o score
+          chegar a Best fit.
         </p>
       ) : (
         <ul className="mt-4 grid gap-3 md:grid-cols-2">
@@ -179,6 +177,16 @@ export function MonitorPanel() {
           ))}
         </ul>
       )}
+      {data?.skipped.length ? (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Fora:{" "}
+          {data.skipped
+            .map((row) =>
+              row.reason === "market" ? `${row.country} (país)` : `${row.country} (sem best fit)`
+            )
+            .join(" · ")}
+        </p>
+      ) : null}
       {data?.monitors.length ? (
         <p className="mt-4 text-sm text-muted-foreground">
           {data.monitors.length} monitor{data.monitors.length === 1 ? "" : "es"} ativo

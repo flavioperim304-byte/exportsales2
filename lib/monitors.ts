@@ -1,5 +1,6 @@
 import crypto from "node:crypto"
 import { classifyActivity, mentionsCompany } from "./activity"
+import { canonicalCountry, foldCountry, resolveCountry } from "./comexstat-map"
 import { stampIntelligence } from "./intelligence"
 import { clip } from "./text"
 import type { ActivityKind, ActivitySignal, Lead, Run } from "./types"
@@ -13,10 +14,50 @@ export const MONITOR_NUM_RESULTS_MAX = 100
 /** Published Exa rate: $2 / 1k monitor requests, first 10 results included. */
 export const MONITOR_USD_PER_RUN = 0.002
 
-export type MonitorTriggerMode = "interval" | "manual"
+/**
+ * Kanechom / LQ commercial geography. One monitor per best_fit company here.
+ * Skip Atlas-dump leftovers: rest of Africa, Asia, and small South America.
+ */
+export const MONITOR_MARKETS = new Set([
+  "mexico",
+  "guatemala",
+  "honduras",
+  "el salvador",
+  "nicaragua",
+  "costa rica",
+  "panama",
+  "dominican republic",
+  "cuba",
+  "jamaica",
+  "haiti",
+  "puerto rico",
+  "trinidad and tobago",
+  "chile",
+  "colombia",
+  "argentina",
+  "peru",
+  "ecuador",
+  "morocco",
+  "algeria",
+  "tunisia",
+  "egypt",
+  "united arab emirates",
+  "saudi arabia",
+  "qatar",
+  "kuwait",
+  "jordan",
+  "lebanon",
+  "oman",
+  "south africa",
+  "portugal",
+  "spain",
+])
 
-export function monitorTriggerMode(): MonitorTriggerMode {
-  return process.env.MONITOR_TRIGGER === "manual" ? "manual" : "interval"
+export function monitorMarketAllowed(country: string): boolean {
+  const key = canonicalCountry(country)
+  if (MONITOR_MARKETS.has(key)) return true
+  const resolved = resolveCountry(country)
+  return Boolean(resolved && MONITOR_MARKETS.has(foldCountry(resolved.name)))
 }
 
 /** Signal types written into the Exa monitor query. Not a purchase. */
@@ -112,14 +153,47 @@ function betterLead(left: Lead, right: Lead): Lead {
   return left.name.localeCompare(right.name) <= 0 ? left : right
 }
 
-export function topLeadsByCountry(runs: Run[], limit = TOP_PER_COUNTRY): WatchLead[] {
+function isMonitorBestFit(lead: Lead): boolean {
+  return lead.score?.band === "best_fit" && !lead.score.disqualified
+}
+
+export type SkippedMonitorCountry = {
+  country: string
+  reason: "market" | "band"
+}
+
+export function skippedMonitorCountries(runs: Run[]): SkippedMonitorCountry[] {
+  const present = new Map<string, { allowed: boolean; bestFit: boolean }>()
+  for (const run of runs) {
+    if (run.mode === "sample") continue
+    for (const lead of run.leads ?? []) {
+      const country = countryOf(lead)
+      if (!country) continue
+      const row = present.get(country) ?? {
+        allowed: monitorMarketAllowed(country),
+        bestFit: false,
+      }
+      if (isMonitorBestFit(lead)) row.bestFit = true
+      present.set(country, row)
+    }
+  }
+  return [...present.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .flatMap(([country, row]) => {
+      if (!row.allowed) return [{ country, reason: "market" as const }]
+      if (!row.bestFit) return [{ country, reason: "band" as const }]
+      return []
+    })
+}
+
+export function watchLeadsForMonitors(runs: Run[], limit = TOP_PER_COUNTRY): WatchLead[] {
   const buckets = new Map<string, Map<string, { run: Run; lead: Lead }>>()
   for (const run of runs) {
     if (run.mode === "sample") continue
     for (const lead of run.leads ?? []) {
-      if (lead.score?.disqualified) continue
+      if (!isMonitorBestFit(lead)) continue
       const country = countryOf(lead)
-      if (!country || !lead.name.trim()) continue
+      if (!country || !lead.name.trim() || !monitorMarketAllowed(country)) continue
       const key = watchKey(country, lead.domain || lead.url, lead.name)
       let byKey = buckets.get(country)
       if (!byKey) {
@@ -169,20 +243,14 @@ export function monitorQuery(name: string, country: string): string {
 }
 
 export function monitorCreateBody(watch: WatchLead, webhookUrl: string) {
-  const body: {
-    name: string
-    search: { query: string; numResults: number; contents: { highlights: boolean } }
-    trigger?: { type: "interval"; period: string }
-    metadata: { runId: string; leadId: string; country: string; domain: string }
-    webhook: { url: string; events: [typeof MONITOR_EVENT] }
-    outputSchema: typeof MONITOR_OUTPUT_SCHEMA
-  } = {
+  return {
     name: `Export Desk · ${watch.country} #${watch.rank} · ${watch.name}`.slice(0, 120),
     search: {
       query: monitorQuery(watch.name, watch.country),
       numResults: MONITOR_NUM_RESULTS,
       contents: { highlights: true },
     },
+    trigger: { type: "interval" as const, period: MONITOR_PERIOD },
     metadata: {
       runId: watch.runId,
       leadId: watch.leadId,
@@ -195,10 +263,6 @@ export function monitorCreateBody(watch: WatchLead, webhookUrl: string) {
     },
     outputSchema: MONITOR_OUTPUT_SCHEMA,
   }
-  if (monitorTriggerMode() === "interval") {
-    body.trigger = { type: "interval", period: MONITOR_PERIOD }
-  }
-  return body
 }
 
 export function verifyExaSignature(payload: string, signatureHeader: string, secret: string): boolean {

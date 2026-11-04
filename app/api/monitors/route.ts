@@ -10,9 +10,9 @@ import {
   MONITOR_USD_PER_RUN,
   TOP_PER_COUNTRY,
   monitorQuery,
-  monitorTriggerMode,
   monitorsCreateAllowed,
-  topLeadsByCountry,
+  skippedMonitorCountries,
+  watchLeadsForMonitors,
   webhookPublicUrl,
 } from "@/lib/monitors"
 import { publicMonitors, syncMonitors } from "@/lib/monitor-store"
@@ -23,9 +23,8 @@ export const maxDuration = 60
 export async function GET() {
   await connection()
   const runs = await listRuns()
-  const watch = topLeadsByCountry(runs)
+  const watch = watchLeadsForMonitors(runs)
   const example = watch[0]
-  const mode = monitorTriggerMode()
   return Response.json({
     webhookUrl: webhookPublicUrl(),
     period: MONITOR_PERIOD,
@@ -34,12 +33,13 @@ export async function GET() {
     signals: MONITOR_SIGNALS,
     queryExample: example ? monitorQuery(example.name, example.country) : monitorQuery("Premium Cosmetics", "Panama"),
     topPerCountry: TOP_PER_COUNTRY,
-    triggerMode: mode,
+    triggerMode: "interval",
     companiesPerMonitor: 1,
     numResults: MONITOR_NUM_RESULTS,
     numResultsMax: MONITOR_NUM_RESULTS_MAX,
     usdPerRun: MONITOR_USD_PER_RUN,
     watch,
+    skipped: skippedMonitorCountries(runs),
     monitors: publicMonitors(),
     exa: Boolean(getKeys().exa),
     createAllowed: monitorsCreateAllowed(),

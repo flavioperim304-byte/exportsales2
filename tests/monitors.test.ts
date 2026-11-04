@@ -8,14 +8,16 @@ import {
   MONITOR_SIGNALS,
   applyMonitorToRun,
   monitorCreateBody,
+  monitorMarketAllowed,
   monitorQuery,
   signalsFromMonitorOutput,
-  topLeadsByCountry,
+  skippedMonitorCountries,
   verifyExaSignature,
+  watchLeadsForMonitors,
   webhookPublicUrl,
 } from "../lib/monitors"
 import { createRun } from "../lib/pipeline"
-import type { Lead, Run } from "../lib/types"
+import type { Band, Lead, LeadScore, Run } from "../lib/types"
 
 function lead(partial: Partial<Lead> & Pick<Lead, "id" | "name" | "country">): Lead {
   return {
@@ -42,50 +44,68 @@ function liveRun(id: string, leads: Lead[]): Run {
   return run
 }
 
-test("top three per country prefer response score and skip the sample", () => {
+function score(band: Band, total = 82): LeadScore {
+  return { total, band, headline: "", nextAction: "", disqualified: false, dimensions: [] }
+}
+
+function scored(
+  partial: Partial<Lead> & Pick<Lead, "id" | "name" | "country">,
+  band: Band,
+  response: number
+): Lead {
+  return lead({
+    ...partial,
+    score: score(band, band === "best_fit" ? 82 : band === "strong" ? 70 : 48),
+    response: {
+      level: response >= 62 ? "high" : response >= 40 ? "medium" : "low",
+      score: response,
+      note: "",
+      layers: [],
+      hiring: false,
+      mixChange: false,
+      socialGrowth: false,
+      computedAt: "",
+    },
+  })
+}
+
+test("monitors only take best fits in relevant countries and skip sample runs", () => {
   const chile = [
-    lead({
-      id: "c1",
-      name: "Alfa Hair",
-      country: "Chile",
-      response: { level: "medium", score: 40, note: "", layers: [], hiring: false, mixChange: false, socialGrowth: false, computedAt: "" },
-    }),
-    lead({
-      id: "c2",
-      name: "Beta Hair",
-      country: "Chile",
-      response: { level: "high", score: 70, note: "", layers: [], hiring: false, mixChange: false, socialGrowth: false, computedAt: "" },
-    }),
-    lead({
-      id: "c3",
-      name: "Gama Hair",
-      country: "Chile",
-      response: { level: "medium", score: 50, note: "", layers: [], hiring: false, mixChange: false, socialGrowth: false, computedAt: "" },
-    }),
-    lead({
-      id: "c4",
-      name: "Delta Hair",
-      country: "Chile",
-      response: { level: "low", score: 20, note: "", layers: [], hiring: false, mixChange: false, socialGrowth: false, computedAt: "" },
-    }),
+    scored({ id: "c1", name: "Alfa Hair", country: "Chile" }, "best_fit", 40),
+    scored({ id: "c2", name: "Beta Hair", country: "Chile" }, "best_fit", 70),
+    scored({ id: "c3", name: "Gama Hair", country: "Chile" }, "strong", 80),
+    scored({ id: "c4", name: "Delta Hair", country: "Chile" }, "possible", 20),
   ]
-  const kenya = [
-    lead({
-      id: "k1",
-      name: "Nairobi Hair",
-      country: "Kenya",
-      response: { level: "medium", score: 44, note: "", layers: [], hiring: false, mixChange: false, socialGrowth: false, computedAt: "" },
-    }),
-  ]
+  const kenya = [scored({ id: "k1", name: "Nairobi Hair", country: "Kenya" }, "best_fit", 90)]
+  const uganda = [scored({ id: "u1", name: "Kampala Hair", country: "Uganda" }, "best_fit", 88)]
+  const bolivia = [scored({ id: "b1", name: "La Paz Hair", country: "Bolivia" }, "best_fit", 85)]
+  const costa = [scored({ id: "cr1", name: "Tico Hair", country: "Costa Rica" }, "strong", 75)]
   const sample = liveRun("sample-ish", chile)
   sample.mode = "sample"
-  const watched = topLeadsByCountry([sample, liveRun("chile", chile), liveRun("kenya", kenya)])
+  const runs = [
+    sample,
+    liveRun("chile", chile),
+    liveRun("kenya", kenya),
+    liveRun("uganda", uganda),
+    liveRun("bolivia", bolivia),
+    liveRun("costa", costa),
+  ]
+  const watched = watchLeadsForMonitors(runs)
   assert.deepEqual(
-    watched.filter((row) => row.country === "Chile").map((row) => row.name),
-    ["Beta Hair", "Gama Hair", "Alfa Hair"]
+    watched.map((row) => row.name),
+    ["Beta Hair", "Alfa Hair"]
   )
-  assert.equal(watched.filter((row) => row.country === "Kenya").length, 1)
   assert.equal(watched.find((row) => row.name === "Beta Hair")?.rank, 1)
+  assert.equal(watched.some((row) => row.name === "Gama Hair"), false)
+  assert.equal(monitorMarketAllowed("Republica Domincana"), true)
+  assert.equal(monitorMarketAllowed("Uganda"), false)
+  assert.equal(monitorMarketAllowed("India"), false)
+  assert.equal(monitorMarketAllowed("Bolivia"), false)
+  const skipped = skippedMonitorCountries(runs)
+  assert.deepEqual(
+    skipped.map((row) => `${row.country}:${row.reason}`),
+    ["Bolivia:market", "Costa Rica:band", "Kenya:market", "Uganda:market"]
+  )
 })
 
 test("the monitor query names the company and the six signal types", () => {
@@ -118,34 +138,10 @@ test("the monitor query names the company and the six signal types", () => {
     },
     "https://exportsales.onrender.com/api/exa/webhook"
   )
-  assert.equal(body.trigger?.period, "15d")
+  assert.equal(body.trigger.period, "15d")
+  assert.equal(body.trigger.type, "interval")
   assert.deepEqual(body.webhook.events, ["monitor.run.completed"])
   assert.equal(body.metadata.leadId, "c2")
-})
-
-test("manual mode omits the interval so a Render Cron can POST trigger", () => {
-  const previous = process.env.MONITOR_TRIGGER
-  process.env.MONITOR_TRIGGER = "manual"
-  try {
-    const body = monitorCreateBody(
-      {
-        runId: "r1",
-        leadId: "c2",
-        name: "Premium Cosmetics",
-        domain: "premium.example",
-        url: "https://premium.example",
-        country: "Panama",
-        rank: 1,
-        responseScore: 70,
-        fitIndex: 40,
-      },
-      "https://exportsales.onrender.com/api/exa/webhook"
-    )
-    assert.equal(body.trigger, undefined)
-  } finally {
-    if (previous === undefined) delete process.env.MONITOR_TRIGGER
-    else process.env.MONITOR_TRIGGER = previous
-  }
 })
 
 test("webhook HMAC follows Exa's t.payload scheme", () => {

@@ -5,7 +5,7 @@ import { getKeys } from "./keys"
 import {
   monitorCreateBody,
   monitorsCreateAllowed,
-  topLeadsByCountry,
+  watchLeadsForMonitors,
   verifyExaSignature,
   watchKey,
   webhookPublicUrl,
@@ -117,7 +117,7 @@ export async function syncMonitors(): Promise<MonitorSyncResult> {
   const keys = getKeys()
   const webhookUrl = webhookPublicUrl()
   const runs = await listRuns()
-  const watch = topLeadsByCountry(runs)
+  const watch = watchLeadsForMonitors(runs)
   const result: MonitorSyncResult = {
     webhookUrl,
     watched: watch.length,
@@ -168,32 +168,5 @@ export async function syncMonitors(): Promise<MonitorSyncResult> {
     }
   }
   writeStore({ monitors: next })
-  return result
-}
-
-export type MonitorRunResult = {
-  triggered: number
-  errors: string[]
-}
-
-export async function triggerStoredMonitors(): Promise<MonitorRunResult> {
-  const keys = getKeys()
-  const result: MonitorRunResult = { triggered: 0, errors: [] }
-  if (!keys.exa) {
-    result.errors.push("EXA_API_KEY missing. Manual runs were not started.")
-    return result
-  }
-  for (const row of listStoredMonitors()) {
-    try {
-      await requestJson(`https://api.exa.ai/monitors/${row.id}/trigger`, {
-        method: "POST",
-        timeoutMs: 20000,
-        headers: { Authorization: `Bearer ${keys.exa}`, "x-api-key": keys.exa },
-      })
-      result.triggered += 1
-    } catch (error) {
-      result.errors.push(`${row.name}: ${error instanceof Error ? error.message : "trigger failed"}`)
-    }
-  }
   return result
 }
