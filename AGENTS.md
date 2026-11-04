@@ -19,5 +19,5 @@ This desk forbids invention. The same rule binds every agent editing this repo a
 - A trade dump, Atlas customs line, or RAG neighbor is never a Kanechom or LQ purchase.
 - A RAG neighbor is a different company. Do not copy its contacts, brands, or purchases onto this lead.
 
-`evidenceRule()` in `lib/prompts.ts` must stay the first sentence of every model instruction. `ragLine()` in `lib/rag.ts` must stay on every OpenAI and Parallel candidate card.
+`evidenceRule()` in `lib/prompts.ts` must stay the first sentence of every Exa, Firecrawl, dump-similar, and diligence instruction. OpenAI and Parallel start with a ROLE heading and must still include `EVIDENCE RULE (mandatory): Never invent.` in a dedicated evidence section. `ragLine()` in `lib/rag.ts` must stay on every OpenAI and Parallel candidate card.
 

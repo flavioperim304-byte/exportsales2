@@ -71,6 +71,23 @@ export function anchorPromptBlock(): string {
   ].join(" ")
 }
 
+export function anchorPromptMarkdown(markets = "the search country"): string {
+  const rows = ANCHOR_DISTRIBUTORS.map(
+    (anchor) => `| **${anchor.name}** | ${anchor.country} | ${anchor.url} | ${anchor.note} |`
+  ).join("\n")
+  return [
+    "### REFERENCE ANCHOR DISTRIBUTORS (CHANNEL FIT BENCHMARK ONLY)",
+    "Use these benchmark distributors as a reference for company scale/type to evaluate `icp` (channel fit):",
+    "",
+    "| Anchor | Country | URL | Shape |",
+    "| --- | --- | --- | --- |",
+    rows,
+    "",
+    "*Note on Anchors:* High similarity to these anchors raises icp (channel fit). It does NOT grant a high `best_fit` and it does not confirm a Kanechom or LQ purchase. Last purchase, stock, or sales on the page are still required for `best_fit`. Do NOT return the anchor companies themselves unless they operate in the search country and buy this category there.",
+    `Search country for that exception: ${markets}.`,
+  ].join("\n")
+}
+
 export function firecrawlAnchorLine(brief: Brief): string {
   if (!briefUsesAnchorDistributors(brief)) return ""
   return "Record the published brand portfolio and any salon, retailer, or client-count language so the desk can compare the company with Nazih Trading, Gem Import & Export, and SSIZ. Leave those fields empty when unpublished."

@@ -153,28 +153,30 @@ function cards(brief: Brief, leads: Lead[]): string {
     .map((lead, index) => {
       const extraction = lead.extraction
       return [
-        `${index + 1}. ${lead.name}`,
-        lead.market ? `searched for ${lead.market}` : "",
-        lead.buyerType ? `searched as ${lead.buyerType}` : "",
-        lead.url,
-        extraction?.role,
-        extraction?.country || lead.country,
+        `<candidate index="${index + 1}">`,
+        `- **Name:** ${lead.name}`,
+        lead.market ? `- **Market:** searched for ${lead.market}` : "",
+        lead.buyerType ? `- **Buyer type:** searched as ${lead.buyerType}` : "",
+        `- **URL:** ${lead.url}`,
+        extraction?.role ? `- **Role:** ${extraction.role}` : "",
+        `- **Country:** ${extraction?.country || lead.country || "unpublished"}`,
         extraction?.keyPerson
-          ? `key person ${extraction.keyPerson}${extraction.keyPersonRole ? ` (${extraction.keyPersonRole})` : ""}`
+          ? `- **Key person:** ${extraction.keyPerson}${extraction.keyPersonRole ? ` (${extraction.keyPersonRole})` : ""}`
           : "",
-        extraction?.email ? `email ${extraction.email}` : "",
-        extraction?.phone ? `phone ${extraction.phone}` : "",
-        extraction?.whatsapp ? `whatsapp ${extraction.whatsapp}` : "",
-        extraction?.latestHires?.length ? `latest hires ${extraction.latestHires.slice(0, 3).join("; ")}` : "",
-        extraction?.buys?.slice(0, 4).join("; "),
-        activityLine(lead),
-        buyingEvidenceLine(lead),
-        ragLine(lead),
-        fitProbabilityLine(lead.fit ?? computeFitProbability(brief, lead)),
-        clip(extraction?.summary || lead.exa.summary || lead.exa.text, 320),
+        extraction?.email ? `- **Email:** ${extraction.email}` : "",
+        extraction?.phone ? `- **Phone:** ${extraction.phone}` : "",
+        extraction?.whatsapp ? `- **WhatsApp:** ${extraction.whatsapp}` : "",
+        extraction?.latestHires?.length ? `- **Latest hires:** ${extraction.latestHires.slice(0, 3).join("; ")}` : "",
+        extraction?.buys?.length ? `- **Buys:** ${extraction.buys.slice(0, 4).join("; ")}` : "",
+        activityLine(lead) ? `- **Activity:** ${activityLine(lead)}` : "",
+        buyingEvidenceLine(lead) ? `- **Buying evidence:** ${buyingEvidenceLine(lead)}` : "",
+        ragLine(lead) ? `- **RAG:** ${ragLine(lead)}` : "",
+        `- **Fit-probability:** ${fitProbabilityLine(lead.fit ?? computeFitProbability(brief, lead))}`,
+        `- **Excerpt:** ${clip(extraction?.summary || lead.exa.summary || lead.exa.text, 320)}`,
+        `</candidate>`,
       ]
         .filter(Boolean)
-        .join(" — ")
+        .join("\n")
     })
     .join("\n")
 }
@@ -191,7 +193,10 @@ export async function scoreLeads(
   const body = {
     messages: [
       { role: "system", content: openaiInstructions(brief, also) },
-      { role: "user", content: `Candidates:\n${cards(brief, leads)}` },
+      {
+        role: "user",
+        content: ["<candidate_cards>", cards(brief, leads), "</candidate_cards>"].join("\n"),
+      },
     ],
     response_format: {
       type: "json_schema",
