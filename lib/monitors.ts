@@ -179,9 +179,9 @@ export function skippedMonitorCountries(runs: Run[]): SkippedMonitorCountry[] {
   }
   return [...present.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
-    .flatMap(([country, row]) => {
-      if (!row.allowed) return [{ country, reason: "market" as const }]
-      if (!row.bestFit) return [{ country, reason: "band" as const }]
+    .flatMap(([country, row]): SkippedMonitorCountry[] => {
+      if (!row.allowed) return [{ country, reason: "market" }]
+      if (!row.bestFit) return [{ country, reason: "band" }]
       return []
     })
 }
