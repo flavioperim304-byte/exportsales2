@@ -46,8 +46,20 @@ export async function GET() {
   })
 }
 
-export async function POST() {
+function fromDesk(request: Request): boolean {
+  const origin = request.headers.get("origin") || ""
+  const referer = request.headers.get("referer") || ""
+  return /exportsales\.onrender\.com|127\.0\.0\.1|localhost/i.test(`${origin} ${referer}`)
+}
+
+export async function POST(request: Request) {
   await connection()
+  if (!fromDesk(request)) {
+    return Response.json(
+      { error: "Crie os monitors pelo botão em /leads, não por POST solto." },
+      { status: 403 }
+    )
+  }
   const result = await syncMonitors()
   const status = result.errors.length && result.created === 0 && result.kept === 0 ? 400 : 200
   return Response.json(result, { status })

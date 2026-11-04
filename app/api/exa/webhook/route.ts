@@ -5,6 +5,18 @@ import { updateRun } from "@/lib/store"
 
 export const maxDuration = 30
 
+export async function GET() {
+  await connection()
+  return Response.json({
+    ok: true,
+    service: "exa-monitor-webhook",
+    method: "POST",
+    event: MONITOR_EVENT,
+    url: "https://exportsales.onrender.com/api/exa/webhook",
+    note: "This is the Exa destination on the Render service exportsales. It is not a page. Exa POSTs monitor.run.completed here. Opening it in a browser used to return 405.",
+  })
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined
 }
