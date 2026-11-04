@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { CompetitorMap } from "@/components/competitor-map"
+import { WebhookLine } from "@/components/webhook-line"
 import { TradeLines } from "@/components/trade-volume"
 import { isHttpUrl, mailtoHref, telHref } from "@/lib/format"
 import { qualificationRows } from "@/lib/qualify"
@@ -102,6 +103,7 @@ export function Dashboard({
         </p>
       ) : null}
       {refreshError ? <p className="text-sm text-destructive">{refreshError}</p> : null}
+      <WebhookLine />
 
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
         <button

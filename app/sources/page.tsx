@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { SourcesForm } from "@/components/sources-form"
+import { WebhookLine } from "@/components/webhook-line"
 
 export default function SourcesPage() {
   return (
@@ -21,6 +22,7 @@ export default function SourcesPage() {
           not need them.
         </p>
       </div>
+      <WebhookLine />
       <SourcesForm />
     </main>
   )

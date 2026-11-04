@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { WebhookLine } from "@/components/webhook-line"
 import type { WatchLead } from "@/lib/monitors"
 
 type Payload = {
@@ -96,14 +97,10 @@ export function MonitorPanel() {
         África do Sul, Magrebe, Golfo, Portugal, Espanha). Fora: restante da África, Ásia, Bolívia,
         Paraguai, Uruguai, Venezuela. Strong e Possible não rastreiam. Não é compra Kanechom/LQ.
       </p>
+      <div className="mt-4">
+        <WebhookLine compact />
+      </div>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Webhook (POST no Render)</dt>
-          <dd className="mt-0.5 break-all font-mono text-xs">{data?.webhookUrl || "…"}</dd>
-          <dd className="mt-1 text-xs text-muted-foreground">
-            Já está no serviço exportsales. Não é página: o browser abre GET; a Exa envia POST.
-          </dd>
-        </div>
         <div>
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">Trigger</dt>
           <dd className="mt-0.5">
