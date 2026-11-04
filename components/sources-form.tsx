@@ -222,10 +222,11 @@ export function SourcesForm() {
           </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Cole aqui a URI. Não precisa achar Environment Group no Render. Em Supabase: Project
-          Settings → Database → Connect → URI → <span className="font-medium text-foreground">Session pooler</span>{" "}
-          (porta <span className="font-medium text-foreground">5432</span>). Troque{" "}
-          <code>[YOUR-PASSWORD]</code> pela senha. Não cole a URL https://….supabase.co nem a anon key.
+          Opcional — a inteligência já roda sem isso. No Supabase o botão é{" "}
+          <span className="font-medium text-foreground">Connect</span> no topo do projeto (não em
+          Settings). Escolha <span className="font-medium text-foreground">Session pooler</span>,
+          porta 5432. Troque <code>[YOUR-PASSWORD]</code>. Não cole a URL https://….supabase.co nem
+          a anon key.
         </p>
         {db?.postgres && !db.error ? (
           <p className="text-sm">
