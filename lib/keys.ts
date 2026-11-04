@@ -163,6 +163,7 @@ export function keyFlags(): KeyFlags {
     openaiEnv: Boolean(clean(process.env.OPENAI_API_KEY)),
     parallelEnv: Boolean(clean(process.env.PARALLEL_API_KEY)),
     atlasEnv: Boolean(clean(process.env.COMPANY_ATLAS_TOKEN)),
+    ragEnv: Boolean(clean(process.env.RAG_API_URL)),
   }
 }
 

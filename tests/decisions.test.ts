@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { presentBrief, validateBrief } from "../lib/example"
 import { KANECHOM_BRIEF } from "../lib/example"
-import { buildDecisionRequests, parseDecisions } from "../lib/parallel"
+import { buildDecisionRequests, decisionOutline, parseDecisions } from "../lib/parallel"
 import type { Lead } from "../lib/types"
 
 function lead(name: string, index: number): Lead {
@@ -49,6 +49,23 @@ test("a Decisions request stays inside Parallel's limits", () => {
     }
   }
   assert.equal(requests[0].questions.purchase_probability.type, "choice")
+})
+
+test("Decisions state carries the evidence rule and a RAG line per company", () => {
+  const brief = presentBrief({ ...KANECHOM_BRIEF, parallelMode: "decisions", markets: "Bolivia" })
+  const miss = lead("Ormate", 0)
+  miss.rag = {
+    checked: true,
+    match: false,
+    neighbor: "Adela's Beauty Shop",
+    note: "Não parece uma empresa já confirmada no índice.",
+  }
+  const requests = buildDecisionRequests(brief, [miss])
+  assert.match(String(requests[0].state.evidence ?? ""), /Never invent/)
+  const first = (requests[0].state.candidates as { rag?: string }[])[0]
+  assert.match(first.rag ?? "", /Adela's Beauty Shop/)
+  assert.match(first.rag ?? "", /different company/)
+  assert.match(decisionOutline(brief), /EVIDENCE RULE/)
 })
 
 test("a refusal leaves the OpenAI score in place and a choice sets the fit", () => {

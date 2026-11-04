@@ -1,6 +1,7 @@
 import type { Brief, Competitor, Lead, MarketContext } from "./types"
 import { ApiError, requestJson } from "./http"
-import { researchPrompt } from "./prompts"
+import { evidenceRule, researchPrompt } from "./prompts"
+import { ragLine } from "./rag"
 import { asString, asStringArray } from "./text"
 
 export { researchPrompt }
@@ -78,7 +79,12 @@ const OUTPUT_SCHEMA = {
           properties: {
             company: { type: "string" },
             fit_narrative: { type: "string" },
-            known_suppliers: { type: "array", items: { type: "string" } },
+            known_suppliers: {
+              type: "array",
+              items: { type: "string" },
+              description:
+                "Brands a cited URL names for this company. Empty when unpublished. Do not invent from training memory or from a RAG neighbor.",
+            },
             risks: { type: "array", items: { type: "string" } },
             citations: { type: "array", items: { type: "string" } },
             icp: {
@@ -347,19 +353,28 @@ function probabilityNote(choice: string, probability?: number): string {
 
 function clipState(state: Record<string, unknown>): Record<string, unknown> {
   let prompt = asString(state.prompt)
+  let evidence = asString(state.evidence)
   const candidates = Array.isArray(state.candidates)
-    ? (state.candidates as { note?: string }[])
+    ? (state.candidates as { note?: string; rag?: string }[])
     : []
-  const sized = () => JSON.stringify({ ...state, prompt, candidates }).length
+  const sized = () => JSON.stringify({ ...state, prompt, evidence, candidates }).length
   while (sized() > DECISION_STATE_CHARS && candidates.some((item) => (item.note ?? "").length > 40)) {
     for (const item of candidates) {
       if ((item.note ?? "").length > 40) item.note = (item.note ?? "").slice(0, 40)
     }
   }
+  while (sized() > DECISION_STATE_CHARS && candidates.some((item) => (item.rag ?? "").length > 40)) {
+    for (const item of candidates) {
+      if ((item.rag ?? "").length > 40) item.rag = (item.rag ?? "").slice(0, 40)
+    }
+  }
+  while (sized() > DECISION_STATE_CHARS && evidence.length > 200) {
+    evidence = evidence.slice(0, Math.floor(evidence.length * 0.7))
+  }
   while (sized() > DECISION_STATE_CHARS && prompt.length > 400) {
     prompt = prompt.slice(0, Math.floor(prompt.length * 0.7))
   }
-  return { ...state, prompt, candidates }
+  return { ...state, prompt, evidence, candidates }
 }
 
 function fitQuestion(kind: Brief["searchKind"]): DecisionQuestion {
@@ -367,8 +382,8 @@ function fitQuestion(kind: Brief["searchKind"]): DecisionQuestion {
     type: "choice",
     instructions:
       kind === "competitors"
-        ? "Is this company the brand’s distributor or a direct competitor distributor in the searched country? Select unknown when the evidence is insufficient."
-        : "Does this company fit the buyer role in the prompt, in the searched country? Select unknown when the evidence is insufficient.",
+        ? "Is this company the brand’s distributor or a direct competitor distributor in the searched country? Select unknown when the evidence is insufficient. Never invent a role."
+        : "Does this company fit the buyer role in the prompt, in the searched country? Select unknown when the evidence is insufficient. Never invent a role.",
     criteria: {
       high: "A source shows the role in the searched country.",
       medium: "The role is plausible, but a source does not prove it.",
@@ -435,6 +450,7 @@ export function buildDecisionRequests(brief: Brief, leads: Lead[], also?: Brief)
     excluded: brief.excludedMarkets ?? "",
     kind: brief.searchKind === "competitors" ? "competitors" : "buyers",
     otherSupplier: also?.supplierName ?? "",
+    evidence: evidenceRule(),
     prompt: (brief.instructions ?? "").slice(0, 4000),
     candidates: leads.map((lead, index) => ({
       key: `c${index}`,
@@ -444,6 +460,7 @@ export function buildDecisionRequests(brief: Brief, leads: Lead[], also?: Brief)
       role: lead.extraction?.role ?? "",
       preliminary: lead.openai?.icp ?? "",
       note: (lead.extraction?.summary || lead.exa.summary || lead.exa.text || "").slice(0, 180),
+      rag: ragLine(lead),
     })),
   })
   const questions: [string, DecisionQuestion][] = Object.entries(marketQuestions())
@@ -565,6 +582,7 @@ export function parseDecisions(
 
 export function decisionOutline(brief: Brief): string {
   return [
+    evidenceRule(),
     "Parallel Decisions, mode fast. Used only on this run. The default remains the Task API.",
     "One request holds at most 100 questions. A longer shortlist is split, and each call shares the same state.",
     "Questions: purchase probability (high, medium, low, unknown), entry practice (one importer, non-exclusive trial, train the channel, or unknown), then each company’s fit and who to pursue.",

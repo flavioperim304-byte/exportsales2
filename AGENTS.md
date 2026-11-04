@@ -7,3 +7,17 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Never invent
+
+This desk forbids invention. The same rule binds every agent editing this repo and every model call (Exa, Firecrawl, OpenAI, Parallel).
+
+- Use only published evidence in the candidate cards, cited URLs, page extracts, and the RAG line.
+- If a contact, volume, brand in the book, last purchase, stock, sales figure, exclusivity, import, employee count, or intent to buy is not in that evidence, leave it empty or write unpublished.
+- Do not fill gaps from training memory, typical distributors, similar countries, or what a company like this would usually do.
+- Absence is not the opposite fact.
+- A trade dump, Atlas customs line, or RAG neighbor is never a Kanechom or LQ purchase.
+- A RAG neighbor is a different company. Do not copy its contacts, brands, or purchases onto this lead.
+
+`evidenceRule()` in `lib/prompts.ts` must stay the first sentence of every model instruction. `ragLine()` in `lib/rag.ts` must stay on every OpenAI and Parallel candidate card.
+

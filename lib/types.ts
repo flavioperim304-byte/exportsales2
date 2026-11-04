@@ -507,6 +507,16 @@ export type RagMatch = {
   note: string
 }
 
+/** Live ping of the Python Chroma service. Shown on Fontes. */
+export type RagStatus = {
+  configured: boolean
+  reachable: boolean
+  url: string
+  chromaCount?: number
+  chromaPath?: string
+  note: string
+}
+
 export type MarketContext = {
   outlook: string
   buyerDynamics: string
@@ -622,6 +632,8 @@ export type KeyFlags = {
   openaiEnv: boolean
   parallelEnv: boolean
   atlasEnv: boolean
+  /** True when RAG_API_URL is set on this Node process. Not a pasteable key. */
+  ragEnv: boolean
 }
 
 /** Flattened buyer row for the Postgres leads table (and the /leads page). */

@@ -14,7 +14,7 @@ import {
 } from "./diligence"
 import { stampIntelligence } from "./intelligence"
 import { brazilExports, countriesForTrade, tradeCooldownActive } from "./comexstat"
-import { matchLeads, ragConfigured, ragNeedsRetry } from "./rag"
+import { matchLeads, ragConfigured, ragNeedsRetry, ragNotConfiguredMatch } from "./rag"
 import { apiConfirmNote, dumpCountries, firecrawlConfirms } from "./confirm"
 import { searchDumpFlow } from "./dump-search"
 import { advanceExa, searchLeads } from "./exa"
@@ -994,11 +994,19 @@ async function attachRag(id: string, refreshAll = false) {
   const snapshot = await getRun(id)
   if (!snapshot) return
   if (!ragConfigured()) {
-    if (snapshot.leads.some((lead) => ragNeedsRetry(lead))) {
-      await updateRun(id, (run) => {
-        log(run, "classify", "RAG skipped: RAG_API_URL is not set.")
-      })
-    }
+    await updateRun(id, (run) => {
+      let stamped = 0
+      for (const lead of run.leads) {
+        if (!lead.rag || ragNeedsRetry(lead)) {
+          lead.rag = ragNotConfiguredMatch()
+          stampIntelligence(run, lead)
+          stamped += 1
+        }
+      }
+      if (stamped > 0) {
+        log(run, "classify", "RAG skipped: RAG_API_URL is not set. Cards will say unpublished — do not invent a match.")
+      }
+    })
     return
   }
   const pending = refreshAll

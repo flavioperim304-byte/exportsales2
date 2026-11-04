@@ -16,7 +16,8 @@ export default function SourcesPage() {
           api-keys.env at the top of the project, next to API-KEYS.txt. Company Atlas is optional:
           Connect with Google here, or add the remote MCP URL in Cursor. O Postgres do Supabase
           cola nesta página (URI Session pooler, porta 5432) — o desk testa na hora e grava no
-          disco. Não use a URL https do projeto nem a anon key. The worked example on the desk does
+          disco. Não use a URL https do projeto nem a anon key. Fontes também pinga o RAG Python.
+          Inventar contato, volume, marca ou compra é proibido. The worked example on the desk does
           not need them.
         </p>
       </div>

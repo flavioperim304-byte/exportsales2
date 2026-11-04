@@ -8,6 +8,7 @@ import {
   candidatesForBrief,
   dumpConfirmQuery,
   dumpSimilarQuery,
+  dumpSimilarSystemPrompt,
   firecrawlConfirms,
   pickExaConfirmation,
   similarHitAllowed,
@@ -139,6 +140,10 @@ test("similar-importer search drops logistics and global brands", () => {
   assert.match(query, /gemegypt\.com/)
   assert.match(query, /ssiz\.in/)
   assert.match(dumpConfirmQuery("Agencia y Mercadeo", "Panama", "shampoo"), /Official company website/)
+  assert.match(dumpConfirmQuery("Agencia y Mercadeo", "Panama", "shampoo"), /Do not invent/)
+  assert.match(dumpSimilarQuery(["Agencia y Mercadeo"], "Panama", KANECHOM_BRIEF), /Do not invent a company/)
+  assert.match(dumpSimilarSystemPrompt(), /EVIDENCE RULE/)
+  assert.match(dumpSimilarSystemPrompt(), /Never invent/)
 })
 
 test("even after the APIs confirm the company, the dump still does not confirm a purchase", () => {

@@ -1,0 +1,18 @@
+---
+description: Never invent facts in Export Desk. Applies to this agent and to every model prompt.
+alwaysApply: true
+---
+
+# Never invent
+
+This project forbids invention. Absence is unpublished, never a filled-in fact.
+
+Do not invent contacts, volumes, brands in the book, last purchase, stock, sales, exclusivity, import, employee count, or intent to buy.
+
+Do not fill gaps from training memory, typical distributors, similar countries, or what a company like this would usually do.
+
+A trade dump, Atlas line, or RAG neighbor is never a Kanechom or LQ purchase. RAG similarity is a past dashboard profile. A RAG neighbor is a different company — do not copy its contacts, brands, or purchases onto this lead.
+
+If a field is not in the candidate cards, cited URLs, page extracts, or the RAG line, leave it empty or write unpublished.
+
+When editing prompts, keep `evidenceRule()` as the first sentence of every Exa, Firecrawl, OpenAI, Parallel, dump-similar, and diligence instruction. Put `ragLine(lead)` on every OpenAI and Parallel candidate card.

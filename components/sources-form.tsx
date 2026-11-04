@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { DbStatus, KeyFlags } from "@/lib/types"
+import type { DbStatus, KeyFlags, RagStatus } from "@/lib/types"
 
 const EMPTY_FLAGS: KeyFlags = {
   exa: false,
@@ -17,6 +17,7 @@ const EMPTY_FLAGS: KeyFlags = {
   openaiEnv: false,
   parallelEnv: false,
   atlasEnv: false,
+  ragEnv: false,
 }
 
 export function SourcesForm() {
@@ -34,6 +35,8 @@ export function SourcesForm() {
   const [databaseUrl, setDatabaseUrl] = useState("")
   const [dbBusy, setDbBusy] = useState(false)
   const [dbNote, setDbNote] = useState("")
+  const [rag, setRag] = useState<RagStatus | null>(null)
+  const [ragError, setRagError] = useState("")
 
   async function refresh() {
     const response = await fetch("/api/keys")
@@ -62,6 +65,16 @@ export function SourcesForm() {
         if (!cancelled && data) setDb(data)
       })
       .catch(() => undefined)
+    fetch("/api/rag")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: RagStatus | null) => {
+        if (cancelled) return
+        if (data) setRag(data)
+        else setRagError("O desk não conseguiu pingar o índice RAG.")
+      })
+      .catch(() => {
+        if (!cancelled) setRagError("O desk não conseguiu pingar o índice RAG.")
+      })
     return () => {
       cancelled = true
     }
@@ -311,6 +324,54 @@ export function SourcesForm() {
           </>
         )}
         {dbNote ? <p className="text-sm text-muted-foreground">{dbNote}</p> : null}
+      </div>
+      <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between gap-3">
+          <Label>RAG (Chroma)</Label>
+          <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+            {rag?.reachable
+              ? "Connected"
+              : rag && !rag.configured
+                ? "Missing"
+                : ragError || (rag && !rag.reachable)
+                  ? "Unreachable"
+                  : rag
+                    ? "Missing"
+                    : "Checking"}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Índice Python em{" "}
+          <a
+            href="https://exportsales2.onrender.com"
+            target="_blank"
+            rel="noreferrer"
+            className="underline-offset-2 hover:underline"
+          >
+            exportsales2.onrender.com
+          </a>
+          . O Node só chama se <span className="font-medium text-foreground">RAG_API_URL</span> estiver
+          no Environment do serviço <span className="font-medium text-foreground">exportsales</span>{" "}
+          (não no Python). Match é nome exato já no CSV do dashboard. Vizinho é outra empresa — nunca
+          compra Kanechom/LQ. Sem match o modelo deixa o campo vazio.
+        </p>
+        {!rag && !ragError ? (
+          <p className="text-sm text-muted-foreground">Conferindo o índice…</p>
+        ) : ragError ? (
+          <p className="text-sm text-destructive">{ragError}</p>
+        ) : rag?.reachable ? (
+          <p className="text-sm">
+            Python no ar · {rag.chromaCount ?? 0} perfil{rag.chromaCount === 1 ? "" : "s"} no Chroma
+            {rag.chromaPath ? ` · ${rag.chromaPath}` : ""}. {rag.note}
+          </p>
+        ) : (
+          <p className="text-sm">{rag?.note}</p>
+        )}
+        {flags.ragEnv && !rag?.reachable ? (
+          <p className="text-sm text-muted-foreground">
+            RAG_API_URL está neste processo, mas o ping ao Python falhou.
+          </p>
+        ) : null}
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {saved ? <p className="text-sm">Keys saved. A new qualification will use them.</p> : null}

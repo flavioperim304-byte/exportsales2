@@ -5,6 +5,9 @@ import {
   LEADS_PER_COUNTRY,
   buyerTypes,
   competitorQuery,
+  competitorSystemPrompt,
+  diligenceInstructions,
+  evidenceRule,
   exaQuery,
   isPromptOnly,
   exaSystemPrompt,
@@ -14,6 +17,7 @@ import {
   researchPrompt,
   targetCountries,
 } from "../lib/prompts"
+import { dumpSimilarSystemPrompt } from "../lib/confirm"
 import type { Lead } from "../lib/types"
 
 test("each country gets its own prompt and ten leads", () => {
@@ -169,6 +173,26 @@ test("a long prompt still leaves room for the purchase probability", () => {
   assert.match(prompt, /Andes Beauty/)
   assert.ok(prompt.length <= 20000)
   assert.match(openaiInstructions(brief), /purchase_probability/)
+})
+
+test("every model instruction starts with the evidence rule and forbids invention", () => {
+  const rule = evidenceRule()
+  assert.match(rule, /Never invent/)
+  assert.match(rule, /Do not fill gaps from training memory/)
+  assert.match(rule, /A RAG neighbor is a different company/)
+  assert.ok(exaSystemPrompt().startsWith("EVIDENCE RULE"))
+  assert.ok(competitorSystemPrompt().startsWith("EVIDENCE RULE"))
+  assert.ok(firecrawlPrompt(KANECHOM_BRIEF, "Chile").startsWith("EVIDENCE RULE"))
+  assert.ok(firecrawlPrompt({ ...KANECHOM_BRIEF, searchKind: "dump" }, "Panama").startsWith("EVIDENCE RULE"))
+  assert.ok(firecrawlPrompt(CADIVEU_COMPETITOR_BRIEF, "Colombia").startsWith("EVIDENCE RULE"))
+  assert.ok(openaiInstructions(KANECHOM_BRIEF).startsWith("EVIDENCE RULE"))
+  assert.ok(openaiInstructions(CADIVEU_COMPETITOR_BRIEF).startsWith("EVIDENCE RULE"))
+  assert.ok(parallelInstructions(LQ_BRIEF).startsWith("EVIDENCE RULE"))
+  assert.ok(parallelInstructions(CADIVEU_COMPETITOR_BRIEF).startsWith("EVIDENCE RULE"))
+  assert.ok(dumpSimilarSystemPrompt().startsWith("EVIDENCE RULE"))
+  assert.ok(diligenceInstructions(KANECHOM_BRIEF, "Kanechom").startsWith("EVIDENCE RULE"))
+  assert.match(openaiInstructions(LQ_BRIEF), /the RAG line/)
+  assert.match(parallelInstructions(LQ_BRIEF), /the RAG line/)
 })
 
 test("parallel prompt names the country each candidate was searched for", () => {

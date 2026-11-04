@@ -3,6 +3,7 @@ import { buyingEvidenceLine, computeFitProbability, fitProbabilityLine } from ".
 import type { Brief, DiligenceFinding, DiligenceProbe, FitJudgment, Lead } from "./types"
 import { ApiError, requestJson } from "./http"
 import { diligenceInstructions, openaiInstructions } from "./prompts"
+import { ragLine } from "./rag"
 import { asString, clip } from "./text"
 
 export type OpenAIJudgment = FitJudgment & { company: string }
@@ -102,7 +103,11 @@ function schema(suppliers: string[]) {
           properties: {
             company: { type: "string" },
             icp: { type: "string", enum: ["high", "medium", "low"] },
-            rationale: { type: "string" },
+            rationale: {
+              type: "string",
+              description:
+                "Only facts present on the candidate card, cited URLs, or the RAG line. Empty fields stay unpublished. Do not invent.",
+            },
             supplier_fits: {
               type: "array",
               items: {
@@ -160,6 +165,7 @@ function cards(brief: Brief, leads: Lead[]): string {
         extraction?.buys?.slice(0, 4).join("; "),
         activityLine(lead),
         buyingEvidenceLine(lead),
+        ragLine(lead),
         fitProbabilityLine(lead.fit ?? computeFitProbability(brief, lead)),
         clip(extraction?.summary || lead.exa.summary || lead.exa.text, 320),
       ]
@@ -351,6 +357,7 @@ export async function draftDiligence(
     extraction?.buys?.slice(0, 6).join("; "),
     activityLine(lead),
     buyingEvidenceLine(lead),
+    ragLine(lead),
     fitProbabilityLine(lead.fit ?? computeFitProbability(brief, lead)),
     probes.length
       ? `Complementary probes:\n${probes

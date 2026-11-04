@@ -417,13 +417,15 @@ function Dossier({ lead }: { lead: Lead }) {
       <FitPanel lead={lead} />
       <CommercePanel lead={lead} />
       <ActivityPanel lead={lead} />
-      {lead.rag?.checked ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          {lead.rag.match
-            ? `RAG · combina com o índice${lead.rag.neighbor ? ` · ${lead.rag.neighbor}` : ""}. ${lead.rag.note}`
-            : `RAG · não combina com o índice. ${lead.rag.note}`}
-        </p>
-      ) : null}
+      <p className="mt-3 text-sm text-muted-foreground">
+        {lead.rag?.checked
+          ? lead.rag.match
+            ? `RAG · nome exato no índice${lead.rag.neighbor ? ` · ${lead.rag.neighbor}` : ""}. Perfil antigo, não é compra Kanechom/LQ. ${lead.rag.note}`
+            : `RAG · não está no índice${lead.rag.neighbor ? ` · vizinho ${lead.rag.neighbor} é outra empresa` : ""}. Não copiar marcas nem compras do vizinho. ${lead.rag.note}`
+          : lead.rag
+            ? `RAG · não conferido. ${lead.rag.note} Sem evidência publicada o campo fica vazio — é proibido inventar.`
+            : "RAG · ainda não conferido. Sem match no índice não inventar compra, contato ou marcas."}
+      </p>
       {score?.disqualified ? (
         <p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">
           {score.disqualifyReason}

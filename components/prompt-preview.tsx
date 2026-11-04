@@ -1,4 +1,4 @@
-import { dumpConfirmQuery, dumpSimilarQuery } from "@/lib/confirm"
+import { dumpConfirmQuery, dumpSimilarQuery, dumpSimilarSystemPrompt } from "@/lib/confirm"
 import {
   buyerTypes,
   competitorQuery,
@@ -30,6 +30,7 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
           </p>
         </div>
         <PromptBlock label="Exa · confirma o nome do dump" text={dumpConfirmQuery("AGENCIA Y. MERCADEO S.A.", sample, brief.products)} />
+        <PromptBlock label="Exa · concorrentes similares (system)" text={dumpSimilarSystemPrompt()} />
         <PromptBlock label="Exa · concorrentes similares" text={dumpSimilarQuery(["confirmed importer"], sample, brief)} />
         <PromptBlock label="Firecrawl Agent" text={firecrawlPrompt(brief, sample)} />
         <PromptBlock label="Como a busca trata o dump" text={dumpConfirmQueryLine(brief, sample)} />

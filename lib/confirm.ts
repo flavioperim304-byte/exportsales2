@@ -4,6 +4,7 @@ import {
   isSearchCandidate,
   namesAlign,
 } from "./trade-records"
+import { evidenceRule } from "./prompts"
 import type { ApiConfirm, Brief, Extraction, Lead, RejectedSeed, TradeFiling } from "./types"
 import { clip, splitList } from "./text"
 
@@ -200,7 +201,7 @@ export function dumpConfirmQuery(name: string, country: string, products: string
   const category = products.trim() || "hair care, shampoo, cosmetics"
   return [
     `"${name}" ${country} ${category} importer OR distributor OR importador OR distribuidor`,
-    "Official company website only.",
+    "Official company website only. Do not invent a company, a website, or a purchase.",
     "Skip logistics, freight forwarders, Amazon, and global brand subsidiaries (Unilever, P&G, L'Oréal, Avon, Genomma, PriceSmart, Alfaparf, Belcorp, Mesoestetic, Arabela, Feduro, Henkel).",
   ].join(" ")
 }
@@ -213,6 +214,7 @@ export function dumpSimilarQuery(names: string[], country: string, brief: Brief)
     `They should buy or import ${products}.`,
     "Similar means a diversified hair or beauty brand book and a large salon or retail client base, in the range of Nazih Trading (nazih.com, Dubai), Gem Import & Export (gemegypt.com), and SSIZ (ssiz.in).",
     "Return official company websites of local importers or distributors.",
+    "Do not invent a company that is not on the public web.",
     "Do not return logistics companies, freight forwarders, couriers, Amazon, or global-brand subsidiaries: Unilever, P&G, L'Oréal, Avon, Genomma, PriceSmart, Alfaparf, Belcorp, Mesoestetic, Arabela, Feduro, Henkel.",
     `These are buyers for ${brief.supplierName}, from ${brief.originCountry}. Do not return ${brief.supplierName} itself.`,
     brief.exclusions ? `Do not return: ${brief.exclusions}.` : "",
@@ -223,6 +225,7 @@ export function dumpSimilarQuery(names: string[], country: string, brief: Brief)
 
 export function dumpSimilarSystemPrompt(): string {
   return [
+    evidenceRule(),
     "You are in search mode.",
     "Return real local importers or distributors and their official websites.",
     "They must be similar competitor importers of the named companies, in the same country.",

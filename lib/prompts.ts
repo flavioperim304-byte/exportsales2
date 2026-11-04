@@ -1,6 +1,7 @@
 import { activityLine } from "./activity"
 import { anchorPromptBlock, briefUsesAnchorDistributors, firecrawlAnchorLine } from "./anchors"
 import { buyingEvidenceLine, computeFitProbability, fitProbabilityLine } from "./fit-probability"
+import { ragLine } from "./rag"
 import type { Brief, Lead } from "./types"
 import { clip, splitList } from "./text"
 
@@ -29,6 +30,29 @@ function buyingAsk(): string {
 function extra(brief: Brief): string {
   const note = brief.instructions?.trim()
   return note ? `Additional instructions: ${note}` : ""
+}
+
+/** Hard rule for every model call. Absence is unpublished, never a filled-in fact. */
+export function evidenceRule(): string {
+  return [
+    "EVIDENCE RULE (mandatory): Never invent.",
+    "Use only published evidence in the candidate cards, cited URLs, page extracts, and the RAG line.",
+    "If a contact, volume, brand in the book, last purchase, stock level, sales figure, exclusivity, import, employee count, or intent to buy is not in that evidence, leave it empty or write unpublished.",
+    "Do not fill gaps from training memory, typical distributors, similar countries, or what a company like this would usually do.",
+    "Absence is not the opposite fact.",
+    "RAG similarity is a past dashboard profile, never a Kanechom or LQ purchase.",
+    "A RAG neighbor is a different company. Do not copy its contacts, brands, or purchases onto this lead.",
+  ].join(" ")
+}
+
+function cardAsk(target: "a brand" | "a supplier", keep = false): string {
+  const verb = keep ? "keep" : "set"
+  return [
+    "Use the public activity line, the RAG line, and the fit-probability line on each card.",
+    `Do not ${verb} icp high or best_fit to ${target} when last purchase, stock, and sales are unpublished.`,
+    "Hiring, social posts, and ICP fit are not purchase intent.",
+    "A RAG neighbor is not purchase intent either.",
+  ].join(" ")
 }
 
 /** The salesperson wrote one prompt. The split buyer fields are empty. */
@@ -70,6 +94,7 @@ export function competitorQuery(brief: Brief): string {
 
 export function competitorSystemPrompt(): string {
   return [
+    evidenceRule(),
     "You are in search mode.",
     "Return real distributor companies and their official websites.",
     "For every country, include the distributor of the named brand and the direct competitor distributors in that country.",
@@ -120,6 +145,7 @@ export function exaBackupQuery(brief: Brief, country: string, buyerType?: string
 
 export function dumpConfirmQueryLine(brief: Brief, country: string): string {
   return [
+    evidenceRule(),
     `Confirm whether named importers in ${country} exist as ${brief.products || "hair care"} importers or distributors.`,
     "Exa looks up each dump name. Firecrawl then reads the official page.",
     "A trade dump never confirms a purchase. Logistics and global brand subsidiaries stay out.",
@@ -132,6 +158,7 @@ export function dumpConfirmQueryLine(brief: Brief, country: string): string {
 export function firecrawlPrompt(brief: Brief, country: string, buyerType?: string): string {
   if (brief.searchKind === "dump") {
     return [
+      evidenceRule(),
       "Extract a buyer profile for an export salesperson.",
       `Supplier: ${brief.supplierName} (${brief.originCountry}).`,
       country
@@ -153,6 +180,7 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
   }
   if (brief.searchKind === "competitors") {
     return [
+      evidenceRule(),
       "Extract a buyer profile for an export salesperson.",
       `Brand: ${brief.supplierName} (${brief.originCountry}).`,
       country
@@ -170,6 +198,7 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
   }
   if (isPromptOnly(brief)) {
     return [
+      evidenceRule(),
       "Extract a buyer profile for an export salesperson.",
       `Supplier: ${brief.supplierName} (${brief.originCountry}).`,
       country
@@ -186,6 +215,7 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
   }
   const type = buyerType?.trim()
   return [
+    evidenceRule(),
     "Extract a buyer profile for an export salesperson.",
     `Supplier: ${brief.supplierName} (${brief.originCountry}). Products: ${brief.products}.`,
     country
@@ -225,6 +255,7 @@ export function searchBrief(brief: Brief, also?: Brief): Brief {
 
 export function exaSystemPrompt(): string {
   return [
+    evidenceRule(),
     "You are in search mode.",
     `Return at most ${LEADS_PER_COUNTRY} real companies of the single buyer type named in the query.`,
     "Every company must be in the one country named in the query. Omit a company from any other country.",
@@ -239,12 +270,13 @@ export function exaSystemPrompt(): string {
 export function openaiInstructions(brief: Brief, also?: Brief): string {
   if (brief.searchKind === "competitors" && !also) {
     return [
+      evidenceRule(),
       "You classify distributor leads. Use only the evidence in the candidate cards. Do not browse and do not invent brands or countries.",
       `Brand: ${brief.supplierName}, from ${brief.originCountry}.`,
       brief.excludedMarkets ? `Excluded countries: ${brief.excludedMarkets}.` : "",
       "A high score means the company distributes this brand, or it is a direct competitor distributor of a rival brand in the same country. Low means a retailer, a salon, or an unrelated company.",
       "Set best_fit to the brand name when they distribute it, direct competitor when they import a rival, or neither.",
-      "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a brand when last purchase, stock, and sales are unpublished. Hiring, social posts, and ICP fit are not purchase intent.",
+      cardAsk("a brand"),
       buyingAsk(),
       brief.instructions?.trim() ?? "",
       "qualification_needed is what a salesperson still has to confirm. icp is not the purchase probability.",
@@ -256,13 +288,14 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
   }
   if (isPromptOnly(brief) && !also) {
     return [
+      evidenceRule(),
       "You score export leads. Use only the evidence in the candidate cards. Do not browse and do not invent contacts, volumes, or brands.",
       `Supplier: ${brief.supplierName}, from ${brief.originCountry}.`,
       brief.website ? `Do not treat ${brief.website} as a buyer.` : "",
       "Score against the prompt below. Do not add must-haves or exclusions that the prompt does not state.",
       brief.instructions?.trim() ?? "",
       "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
-      "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a supplier when last purchase, stock, and sales are unpublished. Hiring, social posts, and ICP fit are not purchase intent.",
+      cardAsk("a supplier"),
       buyingAsk(),
       "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
       marketAsk(),
@@ -275,6 +308,7 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
     ? `${brief.supplierName} and ${also.supplierName}`
     : brief.supplierName
   return [
+    evidenceRule(),
     "You score export leads. Use only the evidence in the candidate cards. Do not browse and do not invent contacts, volumes, or brands.",
     `Suppliers: ${suppliers}, from ${brief.originCountry}.`,
     `${brief.supplierName}: ${brief.products}. Buyer types: ${brief.buyerTypes || "unpublished"}. A company fits the channel when it matches any one of these types. Must-haves: ${brief.mustHaves || "none"}.`,
@@ -283,7 +317,7 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       : "",
     "Score the company against the buyer type it was searched as, and against the other types in the brief. Do not lower the score only because it is a wholesaler or a trading company rather than a distributor.",
     "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
-    "Use the public activity line and the fit-probability line on each card. Do not set icp high or best_fit to a supplier when last purchase, stock, and sales are unpublished. Hiring, social posts, and ICP fit are not purchase intent.",
+    cardAsk("a supplier"),
     buyingAsk(),
     "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
     marketAsk(),
@@ -299,6 +333,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
   if (brief.searchKind === "competitors" && !also) {
     const count = brief.countryCount && brief.countryCount > 0 ? brief.countryCount : 5
     return [
+      evidenceRule(),
       "You are mapping local distributors of one brand and their direct competitors. Cite URLs. Do not invent companies, countries, or brands.",
       `Brand: ${brief.supplierName}, from ${brief.originCountry}.`,
       countries.length
@@ -319,6 +354,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
   }
   if (isPromptOnly(brief) && !also) {
     return [
+      evidenceRule(),
       "You are supporting an export salesperson. OpenAI already assigned a preliminary high, medium, or low and a best fit. Those levels are not confirmed purchasing intent. Refine them with current web sources. Cite URLs. Do not invent companies, contacts, or figures. You may change icp, each supplier fit, and best_fit when the sources disagree with the preliminary score, and say what changed.",
       `Supplier to place: ${brief.supplierName}, from ${brief.originCountry}.`,
       brief.website ? `Website to exclude as a buyer: ${brief.website}.` : "",
@@ -328,7 +364,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
       "Refine the score against this prompt only. Do not add must-haves or exclusions that the prompt does not state.",
       brief.instructions?.trim() ?? "",
       "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
-      "Use the public activity line and the fit-probability line on each card. Do not keep icp high or best_fit on a supplier when last purchase, stock, and sales are unpublished. Hiring, social posts, and ICP fit are not purchase intent.",
+      cardAsk("a supplier", true),
       buyingAsk(),
       "Say who to approach first, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and the supplier fit to high, medium, or low. Set best_fit to the supplier to pursue or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
       marketAsk(),
@@ -343,6 +379,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
     ? `${brief.supplierName} and ${also.supplierName}`
     : brief.supplierName
   return [
+    evidenceRule(),
     "You are supporting an export salesperson. OpenAI already assigned a preliminary high, medium, or low and a best fit. Those levels are not confirmed purchasing intent. Refine them with current web sources. Cite URLs. Do not invent companies, contacts, or figures. You may change icp, each supplier fit, and best_fit when the sources disagree with the preliminary score, and say what changed.",
     `Suppliers to place: ${suppliers}, from ${brief.originCountry}.`,
     `${brief.supplierName}: ${brief.products}. Buyer types: ${brief.buyerTypes || "unpublished"}. A company fits the channel when it matches any one of these types. Must-haves: ${brief.mustHaves || "none"}. ${brief.differentiators || ""}`,
@@ -359,7 +396,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
     extra(brief),
     also?.instructions ? `Additional instructions: ${also.instructions.trim()}` : "",
     "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
-    "Use the public activity line and the fit-probability line on each card. Do not keep icp high or best_fit on a supplier when last purchase, stock, and sales are unpublished. Hiring, social posts, and ICP fit are not purchase intent.",
+    cardAsk("a supplier", true),
     buyingAsk(),
     "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
     marketAsk(),
@@ -402,6 +439,7 @@ export function researchPrompt(brief: Brief, leads: Lead[], also?: Brief): strin
           : "OpenAI preliminary: unscored.",
         activityLine(lead),
         buyingEvidenceLine(lead),
+        ragLine(lead),
         fitProbabilityLine(lead.fit ?? computeFitProbability(brief, lead)),
         clip(extraction?.summary || lead.exa.summary || lead.exa.text, 180),
       ]
@@ -423,6 +461,7 @@ export function diligenceInstructions(brief: Brief, brand: string): string {
       ? "LQ Professional is salon hair care, including straightening. The buyer must reach salons and be able to train hairdressers. A grocery-only Skala book is a conflict."
       : `${brand} is the supplier being placed. Judge channel and portfolio only against this brief: ${brief.products}.`
   return [
+    evidenceRule(),
     "You write a commercial due diligence note for one company and one brand. Use only the dossier and complementary-search notes. Do not invent contacts, imports, volumes, exclusivities, or intent to buy.",
     kind,
     "Do not return an opportunity score or a confidence level. The desk calculates those from the facts.",
