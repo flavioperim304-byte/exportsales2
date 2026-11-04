@@ -29,6 +29,13 @@ CREATE TABLE IF NOT EXISTS desk_leads (
   phone TEXT,
   website TEXT,
   last_purchase TEXT,
+  response_level TEXT,
+  response_score INTEGER,
+  response_note TEXT,
+  signals_at TIMESTAMPTZ,
+  hiring BOOLEAN,
+  mix_change BOOLEAN,
+  social_growth BOOLEAN,
   payload JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (run_id, id)
@@ -36,6 +43,13 @@ CREATE TABLE IF NOT EXISTS desk_leads (
 CREATE INDEX IF NOT EXISTS desk_leads_domain_idx ON desk_leads (lower(domain));
 CREATE INDEX IF NOT EXISTS desk_leads_country_idx ON desk_leads (country);
 CREATE INDEX IF NOT EXISTS desk_leads_name_idx ON desk_leads (lower(name));
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS response_level TEXT;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS response_score INTEGER;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS response_note TEXT;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS signals_at TIMESTAMPTZ;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS hiring BOOLEAN;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS mix_change BOOLEAN;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS social_growth BOOLEAN;
 `
 
 let pool: Pool | undefined
@@ -97,6 +111,13 @@ export function toLeadRecord(run: Run, lead: Lead): LeadRecord {
     phone: lead.extraction?.phone || lead.extraction?.whatsapp || undefined,
     website: lead.extraction?.website || lead.url || undefined,
     lastPurchase: lead.extraction?.lastPurchase || undefined,
+    responseLevel: lead.response?.level,
+    responseScore: lead.response?.score,
+    responseNote: lead.response?.note,
+    signalsAt: lead.signalsAt || lead.response?.computedAt,
+    hiring: lead.response?.hiring,
+    mixChange: lead.response?.mixChange,
+    socialGrowth: lead.response?.socialGrowth,
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
   }
@@ -237,9 +258,11 @@ export async function pgSaveRun(run: Run): Promise<void> {
       await client.query(
         `INSERT INTO desk_leads (
            id, run_id, name, domain, url, country, market, seed, band, score, fit,
-           email, phone, website, last_purchase, payload, updated_at
+           email, phone, website, last_purchase, response_level, response_score, response_note,
+           signals_at, hiring, mix_change, social_growth, payload, updated_at
          ) VALUES (
-           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+           $19, $20, $21, $22, $23::jsonb, $24
          )
          ON CONFLICT (run_id, id) DO UPDATE SET
            name = EXCLUDED.name,
@@ -255,6 +278,13 @@ export async function pgSaveRun(run: Run): Promise<void> {
            phone = EXCLUDED.phone,
            website = EXCLUDED.website,
            last_purchase = EXCLUDED.last_purchase,
+           response_level = EXCLUDED.response_level,
+           response_score = EXCLUDED.response_score,
+           response_note = EXCLUDED.response_note,
+           signals_at = EXCLUDED.signals_at,
+           hiring = EXCLUDED.hiring,
+           mix_change = EXCLUDED.mix_change,
+           social_growth = EXCLUDED.social_growth,
            payload = EXCLUDED.payload,
            updated_at = EXCLUDED.updated_at`,
         [
@@ -273,6 +303,13 @@ export async function pgSaveRun(run: Run): Promise<void> {
           row.phone ?? null,
           row.website ?? null,
           row.lastPurchase ?? null,
+          row.responseLevel ?? null,
+          row.responseScore ?? null,
+          row.responseNote ?? null,
+          row.signalsAt ?? null,
+          row.hiring ?? null,
+          row.mixChange ?? null,
+          row.socialGrowth ?? null,
           JSON.stringify(lead),
           row.updatedAt,
         ]
@@ -302,6 +339,13 @@ type LeadSqlRow = {
   phone: string | null
   website: string | null
   last_purchase: string | null
+  response_level: LeadRecord["responseLevel"] | null
+  response_score: number | null
+  response_note: string | null
+  signals_at: Date | string | null
+  hiring: boolean | null
+  mix_change: boolean | null
+  social_growth: boolean | null
   updated_at: Date | string
   supplier: string
   status: LeadRecord["status"]
@@ -317,6 +361,8 @@ export async function pgListLeadRecords(): Promise<LeadRecord[]> {
   const { rows } = await getPool().query<LeadSqlRow>(
     `SELECT l.id, l.run_id, l.name, l.domain, l.url, l.country, l.market, l.seed,
             l.band, l.score, l.fit, l.email, l.phone, l.website, l.last_purchase,
+            l.response_level, l.response_score, l.response_note, l.signals_at,
+            l.hiring, l.mix_change, l.social_growth,
             l.updated_at, r.supplier, r.status, r.created_at
      FROM desk_leads l
      JOIN desk_runs r ON r.id = l.run_id
@@ -340,6 +386,13 @@ export async function pgListLeadRecords(): Promise<LeadRecord[]> {
     phone: row.phone || undefined,
     website: row.website || undefined,
     lastPurchase: row.last_purchase || undefined,
+    responseLevel: row.response_level || undefined,
+    responseScore: row.response_score ?? undefined,
+    responseNote: row.response_note || undefined,
+    signalsAt: row.signals_at ? iso(row.signals_at) : undefined,
+    hiring: row.hiring ?? undefined,
+    mixChange: row.mix_change ?? undefined,
+    socialGrowth: row.social_growth ?? undefined,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
   }))

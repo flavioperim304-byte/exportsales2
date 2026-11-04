@@ -57,7 +57,7 @@ export type Evidence = {
   url?: string
 }
 
-export type ActivityKind = "news" | "launch" | "brand" | "social"
+export type ActivityKind = "news" | "launch" | "brand" | "social" | "social_growth" | "mix_change"
 
 export type ActivitySignal = {
   kind: ActivityKind
@@ -256,6 +256,18 @@ export type FitProbability = {
   note: string
   missing: BuyingKind[]
   facts: BuyingFact[]
+}
+
+/** Likelihood the account answers outreach. Not a purchase or order rate. */
+export type ResponseProbability = {
+  level: "high" | "medium" | "low"
+  score: number
+  note: string
+  layers: string[]
+  hiring: boolean
+  mixChange: boolean
+  socialGrowth: boolean
+  computedAt: string
 }
 
 export type FitJudgment = {
@@ -476,6 +488,10 @@ export type Lead = {
   filingChecked?: boolean
   /** Desk-calculated fit probability from published buying facts. */
   fit?: FitProbability
+  /** Cross of ICP, fit, Comex Stat, competitors, mix, Aduana, and 24-month signals. */
+  response?: ResponseProbability
+  /** Last Exa/Firecrawl signal refresh. Weekly monitors skip leads fresher than six days. */
+  signalsAt?: string
   /** Chroma RAG check against previously ingested dashboard CSVs. */
   rag?: RagMatch
   /** Commercial due diligence reports, newest last. One brand per report. */
@@ -627,6 +643,13 @@ export type LeadRecord = {
   phone?: string
   website?: string
   lastPurchase?: string
+  responseLevel?: ResponseProbability["level"]
+  responseScore?: number
+  responseNote?: string
+  signalsAt?: string
+  hiring?: boolean
+  mixChange?: boolean
+  socialGrowth?: boolean
   createdAt: string
   updatedAt: string
 }

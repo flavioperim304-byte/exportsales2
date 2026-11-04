@@ -2,7 +2,8 @@ import { activityLine, hasRecentActivity } from "./activity"
 import { commerceLine } from "./commerce"
 import { apisConfirmed } from "./confirm"
 import { computeFitProbability, fitProbabilityLine, hasPublishedBuyFacts } from "./fit-probability"
-import type { Brief, FitJudgment, Lead, LeadScore } from "./types"
+import { computeResponseProbability } from "./response-probability"
+import type { Brief, FitJudgment, Lead, LeadScore, ResponseProbability } from "./types"
 
 export type IcpLevel = "high" | "medium" | "low"
 
@@ -22,6 +23,9 @@ export type QualificationRow = {
   fitLevel: IcpLevel
   fitIndex: number
   fitNote: string
+  responseLevel: IcpLevel
+  responseScore: number
+  responseNote: string
 }
 
 export function icpLevel(score: LeadScore | undefined): IcpLevel {
@@ -49,6 +53,11 @@ function fitTotal(score: LeadScore | undefined): number {
   return score.total
 }
 
+function responseOf(lead: Lead, brief: Brief): ResponseProbability {
+  if (lead.response) return lead.response
+  return computeResponseProbability({ brief, competitors: [] }, lead)
+}
+
 function fromJudgment(
   lead: Lead,
   judgment: FitJudgment,
@@ -57,6 +66,7 @@ function fromJudgment(
   brief: Brief
 ): QualificationRow {
   const fit = lead.fit ?? computeFitProbability(brief, lead)
+  const response = responseOf(lead, brief)
   return {
     company: lead.name,
     country: lead.market || lead.extraction?.country || lead.country || "",
@@ -73,6 +83,9 @@ function fromJudgment(
     fitLevel: fit.level,
     fitIndex: fit.index,
     fitNote: fitProbabilityLine(fit),
+    responseLevel: response.level,
+    responseScore: response.score,
+    responseNote: response.note,
   }
 }
 
@@ -198,6 +211,7 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
       .replace(/\s+/g, " ")
       .slice(0, 280)
     const fit = lead.fit ?? computeFitProbability(brief, lead)
+    const response = responseOf(lead, brief)
     return guardFit(lead, {
       company: lead.name,
       country: lead.market || lead.extraction?.country || lead.country || "",
@@ -214,6 +228,9 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
       fitLevel: fit.level,
       fitIndex: fit.index,
       fitNote: fitProbabilityLine(fit),
+      responseLevel: response.level,
+      responseScore: response.score,
+      responseNote: response.note,
     })
   })
 }

@@ -12,7 +12,7 @@ import {
   latestReport,
   probeFromSearch,
 } from "./diligence"
-import { computeFitProbability } from "./fit-probability"
+import { stampIntelligence } from "./intelligence"
 import { brazilExports, countriesForTrade, tradeCooldownActive } from "./comexstat"
 import { matchLeads, ragConfigured, ragNeedsRetry } from "./rag"
 import { apiConfirmNote, dumpCountries, firecrawlConfirms } from "./confirm"
@@ -39,7 +39,7 @@ import {
   researchStatus,
 } from "./parallel"
 import { localizeCompetitors } from "./competitors"
-import { compareLeads, scoreLead } from "./score"
+import { compareLeads } from "./score"
 import { requestJson } from "./http"
 import { getRun, insertRun, listRuns, updateRun } from "./store"
 import type { Brief, DiligenceProbe, Extraction, Lead, LogLine, Run, StageId, StageState, TradeSnapshot } from "./types"
@@ -212,9 +212,7 @@ async function attachCustomsRecords(id: string, force = false) {
     for (const lead of run.leads) {
       if (!force && lead.filingChecked) continue
       applyFilingToLead(lead, records, run.brief)
-      lead.fit = computeFitProbability(run.brief, lead, run.competitors)
-      lead.score = scoreLead(run.brief, lead, run.competitors)
-      if (run.also) lead.alsoScore = scoreLead(run.also, lead, run.competitors)
+      stampIntelligence(run, lead)
       checked += 1
       if (lead.filing) hits += 1
     }
@@ -275,9 +273,7 @@ function fitRank(lead: Lead): number {
 
 function fileChecklist(run: Run) {
   for (const lead of run.leads) {
-    lead.fit = computeFitProbability(run.brief, lead, run.competitors)
-    lead.score = scoreLead(run.brief, lead, run.competitors)
-    lead.alsoScore = run.also ? scoreLead(run.also, lead, run.competitors) : undefined
+    stampIntelligence(run, lead)
   }
   run.leads.sort((left, right) => fitRank(right) - fitRank(left) || compareLeads(left, right))
 }
@@ -911,16 +907,14 @@ async function attachMissingActivity(id: string): Promise<"wait" | "ready"> {
       const lead = run.leads.find((item) => item.id === pending.id)
       if (!lead) return
       lead.activity = snapshotActivity
-      lead.fit = computeFitProbability(run.brief, lead, run.competitors)
-      lead.score = scoreLead(run.brief, lead, run.competitors)
-      if (run.also) lead.alsoScore = scoreLead(run.also, lead, run.competitors)
+      stampIntelligence(run, lead)
       const recent = snapshotActivity.signals.length
       log(
         run,
         "classify",
         recent
           ? `Activity for ${lead.name}: ${recent} ${recent === 1 ? "signal" : "signals"}.`
-          : `Activity for ${lead.name}: no news, launch, new brand, or social post in the last 18 months.`
+          : `Activity for ${lead.name}: no news, launch, new brand, or social post in the last 24 months.`
       )
     })
   } catch (error) {
@@ -971,9 +965,7 @@ async function attachMissingCommerce(id: string): Promise<"wait" | "ready"> {
       const lead = run.leads.find((item) => item.id === pending.id)
       if (!lead) return
       lead.commerce = snapshotCommerce
-      lead.fit = computeFitProbability(run.brief, lead, run.competitors)
-      lead.score = scoreLead(run.brief, lead, run.competitors)
-      if (run.also) lead.alsoScore = scoreLead(run.also, lead, run.competitors)
+      stampIntelligence(run, lead)
       const recent = snapshotCommerce.signals.length
       log(
         run,
@@ -1029,7 +1021,7 @@ async function attachRag(id: string, refreshAll = false) {
       const rag = matches.get(lead.id)
       if (!rag) continue
       lead.rag = rag
-      lead.fit = computeFitProbability(run.brief, lead, run.competitors)
+      stampIntelligence(run, lead)
       if (rag.match) hits += 1
     }
     log(

@@ -2,7 +2,7 @@ import type { ActivityKind, ActivitySignal, ActivitySnapshot, Brief, Lead } from
 import { ApiError, requestJson } from "./http"
 import { asString, clip, domainOf, sameSite } from "./text"
 
-export const ACTIVITY_MONTHS = 18
+export const ACTIVITY_MONTHS = 24
 
 const SOCIAL =
   /(?:^|\.)(?:instagram|facebook|linkedin|tiktok|youtube|x|twitter)\.com$/i
@@ -18,7 +18,14 @@ const KIND_LABEL: Record<ActivityKind, string> = {
   launch: "lançamento",
   brand: "nova marca",
   social: "rede social",
+  social_growth: "crescimento em rede",
+  mix_change: "mudança de mix",
 }
+
+const SOCIAL_GROWTH =
+  /\b(seguidores|followers|follower count|crescimento|engajamento cresceu|growing (?:on|its) (?:instagram|facebook|tiktok|linkedin))\b/i
+const MIX_CHANGE =
+  /\b(mudou o mix|mix de produtos|new (?:sku|line|range|collection)|dropped (?:the )?brand|tirou a marca|added .{0,40}(?:to|ao) (?:the )?(?:portfolio|portf[oó]lio)|discontinued|portf[oó]lio mudou|portfolio change|nova linha)\b/i
 
 export function activityKindLabel(kind: ActivityKind): string {
   return KIND_LABEL[kind]
@@ -35,7 +42,7 @@ export function activityQuery(lead: Lead, brief: Brief): string {
   return [
     `"${lead.name}"`,
     market,
-    '(news OR launch OR launched OR "new product" OR "new line" OR "new brand" OR lançamento OR "nova marca" OR Instagram OR LinkedIn OR Facebook)',
+    '(news OR launch OR launched OR "new product" OR "new line" OR "new brand" OR lançamento OR "nova marca" OR Instagram OR LinkedIn OR Facebook OR followers OR seguidores OR "product mix" OR "dropped brand")',
   ]
     .filter((part) => part.trim())
     .join(" ")
@@ -43,8 +50,10 @@ export function activityQuery(lead: Lead, brief: Brief): string {
 
 export function classifyActivity(url: string, title: string, text: string): ActivityKind {
   const host = domainOf(url)
-  if (SOCIAL.test(host)) return "social"
   const blob = `${title} ${text}`
+  if (MIX_CHANGE.test(blob)) return "mix_change"
+  if (SOCIAL.test(host) && SOCIAL_GROWTH.test(blob)) return "social_growth"
+  if (SOCIAL.test(host)) return "social"
   if (LAUNCH.test(blob)) return "launch"
   if (BRAND.test(blob)) return "brand"
   return "news"
@@ -89,7 +98,7 @@ export function signalsFromSearch(results: unknown[], lead: Lead): ActivitySigna
     if (!url || !title) continue
     if (!mentionsCompany(lead, title, url, text)) continue
     const kind = classifyActivity(url, title, text)
-    if (kind !== "social" && sameSite(url, lead.url)) continue
+    if (kind !== "social" && kind !== "social_growth" && kind !== "mix_change" && sameSite(url, lead.url)) continue
     const key = `${kind}|${url.toLowerCase()}`
     if (seen.has(key)) continue
     seen.add(key)

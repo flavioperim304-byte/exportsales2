@@ -301,12 +301,13 @@ test("OpenAI does not supply the opportunity score", () => {
   assert.equal(local.opportunityScore, withModelNoise.opportunityScore)
 })
 
-test("CSV keeps the old columns and adds due-diligence fields", () => {
+test("CSV keeps the old columns and adds response-probability fields", () => {
   const run = sampleRun()
   const csv = resultsCsv(run)
   assert.match(csv, /Company,Country,Role,ICP,Best fit,Activity,Commerce,Trade filing/)
-  assert.match(csv, /DD Kanechom opportunity/)
-  assert.match(csv, /DD LQ priority/)
+  assert.match(csv, /Response probability/)
+  assert.match(csv, /Hiring/)
+  assert.doesNotMatch(csv, /DD Kanechom opportunity/)
 })
 
 test("brand names map to the Kanechom and LQ scorebooks", () => {

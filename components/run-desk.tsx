@@ -14,8 +14,7 @@ import { BAND_LABEL, STATUS_LABEL, formatWhen, isHttpUrl, leadPlace, mailtoHref,
 import { activityKindLabel, hasRecentActivity } from "@/lib/activity"
 import { commerceKindLabel, hasCommercialBuyFacts, hasCommerceSignals } from "@/lib/commerce"
 import { buyingKindLabel } from "@/lib/fit-probability"
-import { diligenceBrands, latestReport } from "@/lib/diligence"
-import type { Band, DiligenceReport, Evidence, Lead, Run, StageState } from "@/lib/types"
+import type { Band, Evidence, Lead, Run, StageState } from "@/lib/types"
 import type { IcpLevel } from "@/lib/qualify"
 
 const STAGE_META = {
@@ -23,20 +22,15 @@ const STAGE_META = {
   extract: { n: "02", source: "Firecrawl Agent", title: "ICP and contacts" },
   classify: { n: "03", source: "Exa + OpenAI", title: "Activity, commerce, and best fit" },
   context: { n: "04", source: "Parallel", title: "Refine and context" },
-  diligence: { n: "05", source: "Desk + OpenAI", title: "Commercial due diligence" },
+  diligence: { n: "05", source: "Desk", title: "Not used" },
 } as const
 
 export function RunDesk({ initial }: { initial: Run }) {
   const router = useRouter()
   const [run, setRun] = useState(initial)
   const [selectedId, setSelectedId] = useState(initial.leads[0]?.id ?? "")
-  const [picked, setPicked] = useState<string[]>([])
-  const [ddBrands, setDdBrands] = useState<string[]>(() =>
-    initial.also ? [initial.brief.supplierName, initial.also.supplierName] : [initial.brief.supplierName]
-  )
   const [refreshError, setRefreshError] = useState("")
   const [restarting, setRestarting] = useState(false)
-  const [diligenceBusy, setDiligenceBusy] = useState(false)
 
   useEffect(() => {
     if (initial.mode !== "live") return
@@ -236,7 +230,7 @@ export function RunDesk({ initial }: { initial: Run }) {
                 ? "Só entram nomes que o Exa confirmou. Company Atlas pode ter cruzado a declaração HS. Firecrawl confirma a página. O dump não confirma compra. Logística e marcas globais ficam fora."
                 : "Os nomes do dump aparecem aqui só depois que o Exa confirmar."
               : run.leads.length
-                ? "Ranked for this supplier. Disqualified accounts stay on the list so the reason is visible. Mark companies for commercial due diligence."
+                ? "Ranked for this supplier. Disqualified accounts stay on the list so the reason is visible. Response probability crosses ICP, fit, Comex Stat, mix, Aduana, and 24-month signals."
                 : "Companies appear here as soon as Exa returns them."}
           </p>
           {run.rejectedSeeds && run.rejectedSeeds.length > 0 ? (
@@ -253,54 +247,9 @@ export function RunDesk({ initial }: { initial: Run }) {
               </ul>
             </details>
           ) : null}
-          {run.leads.length > 0 ? (
-            <DiligenceBar
-              run={run}
-              picked={picked}
-              brands={ddBrands}
-              busy={diligenceBusy}
-              onBrands={setDdBrands}
-              onToggleAll={() =>
-                setPicked((current) =>
-                  current.length === run.leads.length ? [] : run.leads.map((item) => item.id)
-                )
-              }
-              onRun={async () => {
-                setDiligenceBusy(true)
-                try {
-                  const response = await fetch(`/api/runs/${run.id}/diligence`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ leadIds: picked, brands: ddBrands }),
-                  })
-                  const data = (await response.json()) as { run?: Run; error?: string }
-                  if (!response.ok) {
-                    setRefreshError(data.error || "Due diligence could not start.")
-                    return
-                  }
-                  if (data.run) setRun(data.run)
-                } catch {
-                  setRefreshError("Due diligence could not start.")
-                } finally {
-                  setDiligenceBusy(false)
-                }
-              }}
-            />
-          ) : null}
           <ul className="mt-3 flex flex-col gap-2">
             {run.leads.map((item, index) => (
-              <li key={item.id} className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  className="mt-4 h-4 w-4 shrink-0"
-                  checked={picked.includes(item.id)}
-                  onChange={() =>
-                    setPicked((current) =>
-                      current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id]
-                    )
-                  }
-                  aria-label={`Selecionar ${item.name} para due diligence`}
-                />
+              <li key={item.id}>
                 <button
                   type="button"
                   onClick={() => {
@@ -375,189 +324,7 @@ export function RunDesk({ initial }: { initial: Run }) {
 }
 
 function visibleStages(run: Run): StageState[] {
-  if (run.stages.some((item) => item.id === "diligence")) return run.stages
-  return [
-    ...run.stages,
-    {
-      id: "diligence",
-      status: "pending",
-      detail: "Commercial due diligence waits until you select companies and a brand.",
-    },
-  ]
-}
-
-function DiligenceBar({
-  run,
-  picked,
-  brands,
-  busy,
-  onBrands,
-  onToggleAll,
-  onRun,
-}: {
-  run: Run
-  picked: string[]
-  brands: string[]
-  busy: boolean
-  onBrands: (next: string[]) => void
-  onToggleAll: () => void
-  onRun: () => void
-}) {
-  const options = diligenceBrands(run.brief, run.also)
-  return (
-    <div className="mt-3 rounded-lg border border-border px-3 py-3">
-      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Due diligence comercial</p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Só as empresas marcadas. Cada marca gera um relatório próprio. Pursue é prioridade de abordagem, não intenção de compra.
-      </p>
-      <div className="mt-2 flex flex-wrap gap-3 text-sm">
-        {options.map((name) => (
-          <label key={name} className="inline-flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={brands.includes(name)}
-              onChange={() =>
-                onBrands(
-                  brands.includes(name) ? brands.filter((item) => item !== name) : [...brands, name]
-                )
-              }
-            />
-            {name}
-          </label>
-        ))}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button type="button" variant="outline" className="h-9" onClick={onToggleAll}>
-          {picked.length === run.leads.length ? "Limpar seleção" : "Marcar todas"}
-        </Button>
-        <Button type="button" className="h-9" onClick={onRun} disabled={busy || picked.length === 0 || brands.length === 0}>
-          {busy ? "Na fila…" : `Rodar due diligence (${picked.length})`}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-function DiligencePanel({ lead }: { lead: Lead }) {
-  const reports = lead.diligence ?? []
-  const brands = [...new Set(reports.map((item) => item.brand))]
-  const [brand, setBrand] = useState(brands[0] ?? "")
-  const current = brand ? latestReport(reports, brand) : reports.at(-1)
-  const history = reports.filter((item) => item.brand === (current?.brand ?? brand) && item.status === "done")
-  if (reports.length === 0) {
-    return (
-      <div className="mt-4 rounded-lg border border-dashed border-border px-3 py-3">
-        <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Due diligence comercial</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Ainda não há relatório. Marque esta empresa e uma marca acima.
-        </p>
-      </div>
-    )
-  }
-  return (
-    <div className="mt-4 rounded-lg border border-border px-3 py-3">
-      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Due diligence comercial</p>
-      {brands.length > 1 ? (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {brands.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => setBrand(name)}
-              className={`rounded-full border px-3 py-1 text-sm ${
-                name === (current?.brand ?? brand) ? "border-primary" : "border-border"
-              }`}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-      ) : null}
-      {current ? <DiligenceReportView report={current} history={history.length} /> : null}
-    </div>
-  )
-}
-
-function DiligenceReportView({ report, history }: { report: DiligenceReport; history: number }) {
-  return (
-    <div className="mt-3">
-      <p className="text-sm font-medium">
-        Opportunity {report.opportunityScore}/100 · confiança {report.confidence} · {report.priority}
-      </p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Opportunity não entra no Fit. Canal e portfólio de folheto não confirmam intenção de compra; pursue só com
-        confiança alta e fato publicado de importação, última compra, estoque ou vendas.
-      </p>
-      <p className="mt-1 text-sm text-muted-foreground">{report.priorityNote}</p>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Investigado em {report.investigatedAt.slice(0, 10)}
-        {report.evidenceTo ? ` · evidências até ${report.evidenceTo.slice(0, 10)}` : ""}
-        {report.staleSections.length ? ` · seções velhas: ${report.staleSections.join(", ")}` : ""}
-      </p>
-      <p className="mt-2 text-sm">{report.importNote}</p>
-      <p className="mt-2 text-sm text-muted-foreground">{report.confidenceNote}</p>
-      <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-        {report.blocks.map((block) => (
-          <li key={block.key}>
-            <span className="font-medium">{block.label}</span>
-            <span className="text-muted-foreground">
-              {" "}
-              · {block.state} · {block.points}/{block.max}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {[report.structure, report.portfolio, report.import, report.recentActivity, report.opportunity, report.approach].map(
-        (section) => (
-          <div key={section.title} className="mt-3">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              {section.title}
-              {section.stale ? " · desatualizado" : ""}
-            </p>
-            <p className="mt-1 text-sm leading-relaxed">{section.text}</p>
-          </div>
-        )
-      )}
-      {report.probes.length ? (
-        <div className="mt-3">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Buscas complementares</p>
-          <ul className="mt-1 space-y-1 text-sm">
-            {report.probes.map((probe) => (
-              <li key={`${probe.questionId}:${probe.ranAt}`}>
-                {probe.questionId} · {probe.result} · {probe.question}
-                <span className="text-muted-foreground"> — {probe.note}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-muted-foreground">{report.complementary.reason}</p>
-      )}
-      {report.diff ? (
-        <div className="mt-3">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            O que mudou desde {report.diff.previousInvestigatedAt.slice(0, 10)}
-          </p>
-          <p className="mt-1 text-sm">
-            Opportunity {report.diff.opportunity.before} → {report.diff.opportunity.after}. Confiança{" "}
-            {report.diff.confidence.before} → {report.diff.confidence.after}. Importação{" "}
-            {report.diff.importCapacity.before} → {report.diff.importCapacity.after}.
-          </p>
-          {report.diff.changes.length ? (
-            <ul className="mt-1 list-disc pl-5 text-sm text-muted-foreground">
-              {report.diff.changes.map((change) => (
-                <li key={change.field}>
-                  {change.field}: {change.before} → {change.after}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : history <= 1 ? (
-        <p className="mt-3 text-sm text-muted-foreground">Sem relatório anterior desta marca.</p>
-      ) : null}
-    </div>
-  )
+  return run.stages.filter((item) => item.id !== "diligence")
 }
 
 function StageCard({ stage }: { stage: StageState }) {
@@ -646,6 +413,7 @@ function Dossier({ lead }: { lead: Lead }) {
         {score ? <ScoreMark score={score.total} band={score.band} /> : null}
       </div>
 
+      <ResponsePanel lead={lead} />
       <FitPanel lead={lead} />
       <CommercePanel lead={lead} />
       <ActivityPanel lead={lead} />
@@ -656,8 +424,6 @@ function Dossier({ lead }: { lead: Lead }) {
             : `RAG · não combina com o índice. ${lead.rag.note}`}
         </p>
       ) : null}
-      <DiligencePanel lead={lead} />
-
       {score?.disqualified ? (
         <p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">
           {score.disqualifyReason}
@@ -793,6 +559,10 @@ function QualificationTable({ run }: { run: Run }) {
               </div>
             </dl>
             <p className="mt-3 text-sm text-muted-foreground">
+              Resposta · {row.responseLevel} · {row.responseScore}/100
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{row.responseNote}</p>
+            <p className="mt-3 text-sm text-muted-foreground">
               Probabilidade de fit · {row.fitLevel} · {row.fitIndex}/100
             </p>
             <p className="mt-1 text-sm text-muted-foreground">{row.fitNote}</p>
@@ -816,6 +586,7 @@ function QualificationTable({ run }: { run: Run }) {
                 </th>
               ))}
               <th className="py-2 pr-3 font-medium">Best fit</th>
+              <th className="py-2 pr-3 font-medium">Resposta</th>
               <th className="py-2 pr-3 font-medium">Fit</th>
               <th className="py-2 pr-3 font-medium">Atividade</th>
               <th className="py-2 pr-3 font-medium">Comércio</th>
@@ -838,6 +609,9 @@ function QualificationTable({ run }: { run: Run }) {
                 <td className="py-3 pr-3">
                   {row.bestFit}
                   {row.activityLive ? "" : " · sem atividade recente"}
+                </td>
+                <td className="py-3 pr-3 text-muted-foreground">
+                  {row.responseLevel} · {row.responseScore}/100
                 </td>
                 <td className="py-3 pr-3 text-muted-foreground">
                   {row.fitLevel} · {row.fitIndex}/100
@@ -889,6 +663,29 @@ function Fact({
           value
         )}
       </dd>
+    </div>
+  )
+}
+
+function ResponsePanel({ lead }: { lead: Lead }) {
+  const response = lead.response
+  if (!response) return null
+  return (
+    <div className="mt-4 rounded-lg border border-border px-3 py-3">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+        Probabilidade de resposta · {response.score}/100
+      </p>
+      <p className="mt-2 text-sm font-medium uppercase">{response.level}</p>
+      <p className="mt-1 text-sm leading-relaxed">{response.note}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {[
+          response.hiring ? "vaga de compras" : "",
+          response.mixChange ? "mudança de mix" : "",
+          response.socialGrowth ? "crescimento em rede" : "",
+        ]
+          .filter(Boolean)
+          .join(" · ") || "Sem sinal novo de contratação, mix ou rede neste recálculo."}
+      </p>
     </div>
   )
 }
@@ -1000,7 +797,7 @@ function ActivityPanel({ lead }: { lead: Lead }) {
         </ul>
       ) : (
         <p className="mt-2 text-sm">
-          Nenhuma notícia, lançamento, marca nova ou rede social nos últimos 18 meses. Não trate como best fit
+          Nenhuma notícia, lançamento, marca nova ou rede social nos últimos 24 meses. Não trate como best fit
           confirmado — empresas quietas quase não respondem.
         </p>
       )}

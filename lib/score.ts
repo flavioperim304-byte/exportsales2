@@ -816,7 +816,7 @@ export function scoreLead(brief: Brief, lead: Lead, competitors: Competitor[] = 
     nextAction: disqualified
       ? `Leave this account off the outreach list. ${disqualifyReason}`
       : lead.activity && !hasRecentActivity(lead)
-        ? `Do not treat this as a confirmed best fit. No news, launch, new brand, or social activity was found in the last 18 months. Ask one question before a full offer.`
+        ? `Do not treat this as a confirmed best fit. No news, launch, new brand, or social activity was found in the last 24 months. Ask one question before a full offer.`
         : fit.level === "low"
           ? `Do not treat this as a confirmed best fit. Last purchase, stock, and sales were not published. Companies without those facts almost never answer outreach.`
           : nextAction(band, matched.slice(0, 3).join(", "), place, roleLabel),

@@ -1,6 +1,6 @@
 import { EXAMPLE_BRIEF } from "./example"
 import { buildReport } from "./diligence"
-import { computeFitProbability } from "./fit-probability"
+import { stampIntelligence } from "./intelligence"
 import { SAMPLE_RUN_ID } from "./ids"
 import { compareLeads, scoreLead } from "./score"
 import type { Competitor, Lead, Run, StageState } from "./types"
@@ -347,8 +347,7 @@ export function sampleRun(): Run {
   const competitors = sampleCompetitors()
   const ranked = leads()
     .map((lead) => {
-      const fit = computeFitProbability(brief, lead, competitors)
-      const scored = { ...lead, fit, score: scoreLead(brief, lead, competitors) }
+      const scored = { ...lead, score: scoreLead(brief, lead, competitors) }
       if (scored.id !== "lead-nordlicht") return scored
       return {
         ...scored,
@@ -365,7 +364,7 @@ export function sampleRun(): Run {
     })
     .sort(compareLeads)
 
-  return {
+  const run: Run = {
     id: SAMPLE_RUN_ID,
     createdAt: WHEN,
     updatedAt: "2026-10-27T15:06:20.000Z",
@@ -415,4 +414,6 @@ export function sampleRun(): Run {
     leads: ranked,
     error: undefined,
   }
+  for (const lead of run.leads) stampIntelligence(run, lead)
+  return run
 }

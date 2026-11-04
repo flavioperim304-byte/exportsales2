@@ -5,7 +5,6 @@ import { useEffect, useState } from "react"
 import { CompetitorMap } from "@/components/competitor-map"
 import { TradeLines } from "@/components/trade-volume"
 import { isHttpUrl, mailtoHref, telHref } from "@/lib/format"
-import { latestReport } from "@/lib/diligence"
 import { qualificationRows } from "@/lib/qualify"
 import { localizeCompetitors } from "@/lib/competitors"
 import { summarize } from "@/lib/summary"
@@ -171,9 +170,9 @@ type Buyer = {
   suppliers: string[]
   risks: string[]
   trade?: TradeSnapshot
-  ddScore?: number
-  ddConfidence?: string
-  ddPriority?: string
+  responseLevel?: string
+  responseScore?: number
+  responseNote?: string
 }
 
 function competitorRows(runs: Run[], focusId: string): Competitor[] {
@@ -217,9 +216,9 @@ function buyerRows(runs: Run[]): Buyer[] {
         suppliers: lead?.context?.knownSuppliers ?? [],
         risks: lead?.context?.risks ?? [],
         trade: run.trade,
-        ddScore: latestReport(lead?.diligence, run.brief.supplierName)?.opportunityScore,
-        ddConfidence: latestReport(lead?.diligence, run.brief.supplierName)?.confidence,
-        ddPriority: latestReport(lead?.diligence, run.brief.supplierName)?.priority,
+        responseLevel: row.responseLevel,
+        responseScore: row.responseScore,
+        responseNote: row.responseNote,
       })
     }
   }
@@ -255,14 +254,12 @@ function BuyerBoard({ buyers }: { buyers: Buyer[] }) {
           <p className="mt-3 text-sm leading-relaxed">
             {buyer.note || "Esta empresa não tem nota de análise gravada."}
           </p>
-          {buyer.ddScore != null ? (
+          {buyer.responseScore != null ? (
             <div className="mt-3">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Due diligence · opportunity {buyer.ddScore}/100 · {buyer.ddConfidence} · {buyer.ddPriority}
+                Probabilidade de resposta · {buyer.responseLevel} · {buyer.responseScore}/100
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Pursue é prioridade de abordagem, não intenção de compra.
-              </p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{buyer.responseNote}</p>
             </div>
           ) : null}
           {buyer.fitNote ? (

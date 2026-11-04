@@ -81,6 +81,25 @@ test("Instagram is social and a press note is news", () => {
   )
 })
 
+test("follower growth and a dropped brand are mapped as 24-month signals", () => {
+  assert.equal(
+    classifyActivity(
+      "https://www.instagram.com/skalante.co",
+      "Skalante",
+      "Crescimento de seguidores no Instagram."
+    ),
+    "social_growth"
+  )
+  assert.equal(
+    classifyActivity(
+      "https://news.example/skalante-mix",
+      "Skalante dropped the brand",
+      "The distributor dropped the brand and mudou o mix de produtos."
+    ),
+    "mix_change"
+  )
+})
+
 test("the activity query names the company and the search country", () => {
   const query = activityQuery(lead(), { ...KANECHOM_BRIEF, markets: "Colombia" })
   assert.match(query, /Skalante/)
