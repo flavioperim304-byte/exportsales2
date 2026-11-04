@@ -49,6 +49,19 @@ const SCHEMA = {
     phone: { type: "string", description: "Published phone. Empty when none is published." },
     whatsapp: { type: "string", description: "Published WhatsApp number. Empty when none is published." },
     website: { type: "string", description: "Company website." },
+    keyPerson: {
+      type: "string",
+      description: "Published key person (purchasing, owner, or export contact). Empty when unpublished.",
+    },
+    keyPersonRole: {
+      type: "string",
+      description: "Role of that key person. Empty when unpublished.",
+    },
+    latestHires: {
+      type: "array",
+      items: { type: "string" },
+      description: "Latest published hires or job ads. Empty when unpublished.",
+    },
   },
 }
 
@@ -76,6 +89,9 @@ function empty(error: string): Extraction {
     phone: "",
     whatsapp: "",
     website: "",
+    keyPerson: "",
+    keyPersonRole: "",
+    latestHires: [],
   }
 }
 
@@ -89,6 +105,9 @@ function contacts(json: Record<string, unknown>) {
     phone: asString(json.phone),
     whatsapp: asString(json.whatsapp || json.whatsApp),
     website: asString(json.website),
+    keyPerson: asString(json.keyPerson || json.contactName || json.person),
+    keyPersonRole: asString(json.keyPersonRole || json.contactRole),
+    latestHires: asStringArray(json.latestHires || json.hiring).slice(0, 6),
   }
 }
 
@@ -138,30 +157,50 @@ export function stageTimedOut(startedAt: string | undefined, now = Date.now()): 
   return jobTimedOut(startedAt, now, EXTRACT_STAGE_MS)
 }
 
-function agentStatus(data: unknown): string {
+function extractStatus(data: unknown): string {
   return String(((data ?? {}) as { status?: string }).status ?? "").toLowerCase()
 }
 
-function agentSettled(data: unknown): boolean {
-  const status = agentStatus(data)
+function extractSettled(data: unknown): boolean {
+  const status = extractStatus(data)
   return status === "completed" || status === "failed" || status === "cancelled" || status === "canceled"
 }
 
-async function agentResult(key: string, started: unknown): Promise<unknown> {
+function crawlUrls(pageUrl: string): string[] {
+  try {
+    const origin = new URL(pageUrl).origin
+    return origin === pageUrl || pageUrl === `${origin}/` ? [`${origin}/*`] : [pageUrl, `${origin}/*`]
+  } catch {
+    return [pageUrl]
+  }
+}
+
+function extractBody(url: string, brief: Brief, country: string, buyerType: string) {
+  return {
+    urls: crawlUrls(url),
+    prompt: firecrawlPrompt(brief, country, buyerType),
+    schema: SCHEMA,
+    enableWebSearch: true,
+    ignoreSitemap: false,
+    scrapeOptions: { onlyMainContent: true },
+  }
+}
+
+async function extractResult(key: string, started: unknown): Promise<unknown> {
   const record = (started ?? {}) as { id?: string; status?: string; data?: unknown }
-  if (record.status === "completed" && record.data) return started
+  if ((record.status === "completed" || !record.id) && record.data) return started
   const id = record.id
   if (!id) return started
   const deadline = Date.now() + 55_000
   let latest: unknown = started
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, EXTRACT_POLL_MS))
-    latest = await requestJson(`https://api.firecrawl.dev/v2/agent/${id}`, {
+    latest = await requestJson(`https://api.firecrawl.dev/v2/extract/${id}`, {
       method: "GET",
       timeoutMs: 20000,
       headers: { Authorization: `Bearer ${key}` },
     })
-    if (agentSettled(latest)) return latest
+    if (extractSettled(latest)) return latest
   }
   return latest
 }
@@ -188,42 +227,35 @@ export async function extractPage(
     return empty("The lead has no http(s) page to read.")
   }
 
-  const prompt = firecrawlPrompt(brief, country, buyerType)
-
-  const started = await requestJson("https://api.firecrawl.dev/v2/agent", {
+  const started = await requestJson("https://api.firecrawl.dev/v2/extract", {
     method: "POST",
     timeoutMs: 25000,
     headers: { Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      urls: [url],
-      prompt,
-      model: "spark-2",
-      maxCredits: 20,
-      schema: SCHEMA,
-    }),
+    body: JSON.stringify(extractBody(url, brief, country, buyerType)),
   })
 
-  const data = await agentResult(key, started)
-  const fromAgent = extractionFromAgent(data, url)
-  if (fromAgent.ok || (fromAgent.error && !fromAgent.error.includes("neither a profile"))) {
-    if (fromAgent.ok) return fromAgent
-    if (agentSettled(data)) return fromAgent
+  const data = await extractResult(key, started)
+  const fromExtract = extractionFromExtract(data, url)
+  if (fromExtract.ok || (fromExtract.error && !fromExtract.error.includes("neither a profile"))) {
+    if (fromExtract.ok) return fromExtract
+    if (extractSettled(data)) return fromExtract
   }
   const scraped = await scrapeProfile(url, brief, key, country, buyerType)
   if (scraped.ok) return scraped
-  if (!agentSettled(data)) return empty(TIMEOUT_MESSAGE)
-  return fromAgent.error ? fromAgent : scraped
+  if (!extractSettled(data)) return empty(TIMEOUT_MESSAGE)
+  return fromExtract.error ? fromExtract : scraped
 }
 
-function extractionFromAgent(data: unknown, pageUrl: string): Extraction {
-  if (!data || typeof data !== "object") return empty("Firecrawl Agent returned an empty body.")
+function extractionFromExtract(data: unknown, pageUrl: string): Extraction {
+  if (!data || typeof data !== "object") return empty("Firecrawl extract returned an empty body.")
   const record = data as { success?: boolean; status?: string; error?: string; data?: unknown }
-  const status = agentStatus(data)
+  const status = extractStatus(data)
   if (record.success === false || status === "failed" || status === "cancelled" || status === "canceled") {
-    return empty(record.error || "Firecrawl Agent could not read this company.")
+    return empty(record.error || "Firecrawl could not scrape or crawl this company.")
   }
-  const profile = profileFromAgent(record.data ? { data: record.data } : data)
-  if (!profile) return empty("Firecrawl Agent returned neither a profile nor contacts.")
+  const payload = Array.isArray(record.data) ? record.data[0] : record.data
+  const profile = profileFromAgent(payload ? { data: payload } : data)
+  if (!profile) return empty("Firecrawl scrape/crawl returned neither a profile nor contacts.")
   if (!profile.website) profile.website = pageUrl
   return profile
 }
@@ -270,20 +302,14 @@ export async function startExtractJob(
   country = "",
   buyerType = ""
 ): Promise<string> {
-  const started = await requestJson("https://api.firecrawl.dev/v2/agent", {
+  const started = await requestJson("https://api.firecrawl.dev/v2/extract", {
     method: "POST",
     timeoutMs: 20000,
     headers: { Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      urls: [url],
-      prompt: firecrawlPrompt(brief, country, buyerType),
-      model: "spark-2",
-      maxCredits: 20,
-      schema: SCHEMA,
-    }),
+    body: JSON.stringify(extractBody(url, brief, country, buyerType)),
   })
   const id = asString((started as { id?: unknown } | null)?.id)
-  if (!id) throw new Error("Firecrawl Agent did not return an id.")
+  if (!id) throw new Error("Firecrawl extract did not return an id.")
   return id
 }
 
@@ -292,13 +318,13 @@ export async function pollExtractJob(
   id: string,
   pageUrl: string
 ): Promise<{ pending: true } | { pending: false; extraction: Extraction }> {
-  const latest = await requestJson(`https://api.firecrawl.dev/v2/agent/${id}`, {
+  const latest = await requestJson(`https://api.firecrawl.dev/v2/extract/${id}`, {
     method: "GET",
     timeoutMs: 20000,
     headers: { Authorization: `Bearer ${key}` },
   })
-  if (!agentSettled(latest)) return { pending: true }
-  return { pending: false, extraction: extractionFromAgent(latest, pageUrl) }
+  if (!extractSettled(latest)) return { pending: true }
+  return { pending: false, extraction: extractionFromExtract(latest, pageUrl) }
 }
 
 export function timedOutExtraction(): Extraction {

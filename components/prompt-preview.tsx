@@ -32,7 +32,7 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
         <PromptBlock label="Exa · confirma o nome do dump" text={dumpConfirmQuery("AGENCIA Y. MERCADEO S.A.", sample, brief.products)} />
         <PromptBlock label="Exa · concorrentes similares (system)" text={dumpSimilarSystemPrompt()} />
         <PromptBlock label="Exa · concorrentes similares" text={dumpSimilarQuery(["confirmed importer"], sample, brief)} />
-        <PromptBlock label="Firecrawl Agent" text={firecrawlPrompt(brief, sample)} />
+        <PromptBlock label="Firecrawl scrape + crawl" text={firecrawlPrompt(brief, sample)} />
         <PromptBlock label="Como a busca trata o dump" text={dumpConfirmQueryLine(brief, sample)} />
         <PromptBlock label="OpenAI" text={openaiInstructions(brief)} />
         <PromptBlock
@@ -61,7 +61,7 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
               : `${competitorSystemPrompt()}\n\n${competitorQuery(brief)}`
           }
         />
-        <PromptBlock label="Firecrawl Agent" text={firecrawlPrompt(brief, "")} />
+        <PromptBlock label="Firecrawl scrape + crawl" text={firecrawlPrompt(brief, "")} />
         <PromptBlock label="OpenAI" text={openaiInstructions(brief)} />
         <PromptBlock
           label={brief.parallelMode === "decisions" ? "Parallel · Decisions" : "Parallel · deep research"}
@@ -78,7 +78,8 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
         <h2 className="font-serif text-2xl">Prompts</h2>
         <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
           These are rebuilt from the brief as you type. Exa Agent stays in search mode and runs one search per buyer type,{" "}
-          {LEADS_PER_COUNTRY} companies per country. Firecrawl, OpenAI, and Parallel receive that same type.
+          {LEADS_PER_COUNTRY} companies per country. Firecrawl scrapes and crawls the site and the web for contacts. OpenAI
+          and Parallel receive that same type.
           {countries.length > 0
             ? ` This run would read ${reads} ${reads === 1 ? "page" : "pages"}.`
             : ""}
@@ -96,13 +97,13 @@ export function PromptPreview({ brief, bare = false }: { brief: Brief; bare?: bo
               <PromptBlock
                 key={`${country}:${type || "buyer"}`}
                 label={type ? `Exa Agent · ${type}` : "Exa Agent · search"}
-                text={`${exaSystemPrompt()}\n\n${exaQuery(brief, country, type || undefined)}`}
+                text={`${exaSystemPrompt(brief)}\n\n${exaQuery(brief, country, type || undefined)}`}
               />
             ))}
             {typesFor(brief).map((type) => (
               <PromptBlock
                 key={`${country}:firecrawl:${type || "buyer"}`}
-                label={type ? `Firecrawl Agent · ${type}` : "Firecrawl Agent"}
+                label={type ? `Firecrawl scrape + crawl · ${type}` : "Firecrawl scrape + crawl"}
                 text={firecrawlPrompt(brief, country, type)}
               />
             ))}

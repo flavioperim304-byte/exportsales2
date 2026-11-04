@@ -32,6 +32,9 @@ const COMPANY_SCHEMA = {
           country: { type: "string" },
           role: { type: "string" },
           why: { type: "string" },
+          buyerSignals: { type: "array", items: { type: "string" } },
+          brandPortfolio: { type: "string" },
+          clientScale: { type: "string" },
         },
         required: ["name", "website", "country", "why"],
       },
@@ -44,7 +47,16 @@ function exaHeaders(key: string): HeadersInit {
   return { Authorization: `Bearer ${key}`, "x-api-key": key }
 }
 
-export type AgentCompany = { name: string; website: string; country: string; why: string; role: string }
+export type AgentCompany = {
+  name: string
+  website: string
+  country: string
+  why: string
+  role: string
+  buyerSignals: string[]
+  brandPortfolio: string
+  clientScale: string
+}
 
 export function companiesFromAgent(data: unknown): AgentCompany[] {
   if (!data || typeof data !== "object") return []
@@ -68,6 +80,11 @@ export function companiesFromAgent(data: unknown): AgentCompany[] {
         country: asString(row.country),
         why: asString(row.why),
         role: asString(row.role),
+        buyerSignals: Array.isArray(row.buyerSignals)
+          ? row.buyerSignals.filter((item): item is string => typeof item === "string" && item.trim().length > 0).slice(0, 4)
+          : [],
+        brandPortfolio: asString(row.brandPortfolio),
+        clientScale: asString(row.clientScale),
       }
     })
     .filter((item) => item.name && item.website)
@@ -166,8 +183,8 @@ function companyToLead(company: AgentCompany): Lead | null {
       title: name,
       url,
       domain,
-      text: "",
-      highlights: [],
+      text: [company.brandPortfolio, company.clientScale].filter(Boolean).join(" "),
+      highlights: company.buyerSignals,
       summary: company.why,
     },
   }
@@ -249,7 +266,8 @@ async function searchCountry(
     const companies = await runAgentSearch(
       key,
       type ? exaQuery(brief, country, type) : exaQuery(brief, country),
-      websites
+      websites,
+      { systemPrompt: exaSystemPrompt(brief) }
     )
     const accepted = acceptCompanies(companies, country, found, websites, type, suppliers)
     outside += accepted.outside
@@ -264,7 +282,8 @@ async function searchCountry(
       const extra = await runAgentSearch(
         key,
         exaBackupQuery(brief, country, type || undefined),
-        websites
+        websites,
+        { systemPrompt: exaSystemPrompt(brief) }
       ).catch(() => [] as AgentCompany[])
       const more = acceptCompanies(extra, country, taken, websites, type, suppliers)
       outside += more.outside
@@ -316,6 +335,9 @@ async function runDeepSearch(key: string, query: string): Promise<AgentCompany[]
         country: "",
         why: highlights[0] || asString(row.text),
         role: "",
+        buyerSignals: highlights.slice(0, 4),
+        brandPortfolio: "",
+        clientScale: "",
       }
     })
     .filter((item) => item.name && item.website)
@@ -534,7 +556,7 @@ function queryFor(
     : task.buyerType
       ? exaQuery(brief, task.country, task.buyerType)
       : exaQuery(brief, task.country)
-  return { query }
+  return { query, options: { systemPrompt: exaSystemPrompt(brief) } }
 }
 
 function mergeCompanies(

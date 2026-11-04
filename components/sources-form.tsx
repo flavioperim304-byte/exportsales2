@@ -168,7 +168,7 @@ export function SourcesForm() {
       <KeyField
         id="firecrawl-key"
         label="Firecrawl"
-        hint="Agent that collects ICP fields plus email, website, phone, and WhatsApp."
+        hint="Scrape and crawl of the company site and the web. Key person, email, WhatsApp, phone, website, latest hires."
         env={flags.firecrawlEnv}
         saved={flags.firecrawl}
         value={firecrawl}

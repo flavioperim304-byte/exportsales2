@@ -88,7 +88,7 @@ export function blankStages(kind?: Brief["searchKind"]): StageState[] {
     {
       id: "extract",
       status: "pending",
-      detail: "Waiting for Firecrawl Agent to collect ICP fields and published contacts.",
+      detail: "Waiting for Firecrawl to scrape and crawl the company site and the web for contacts.",
     },
     {
       id: "classify",
@@ -481,7 +481,7 @@ function finishExtractStage(run: Run, detail?: string) {
       ? `Firecrawl confirmou ${confirmed} de ${run.leads.length} páginas.${failed ? ` ${failed} sem leitura.` : ""} O dump não confirma compra.`
       : failed > 0
         ? `Pages read. ${failed} ${failed === 1 ? "page" : "pages"} could not be extracted.`
-        : `Firecrawl Agent collected ICP fields and contacts for ${run.leads.length} companies.`)
+        : `Firecrawl scraped and crawled contacts for ${run.leads.length} companies.`)
   run.extractJobId = undefined
   run.extractLeadId = undefined
   run.extractJobStartedAt = undefined
@@ -506,6 +506,9 @@ function stampFirecrawl(lead: Lead) {
 function fileExtraction(run: Run, leadId: string, extraction: Extraction) {
   const lead = run.leads.find((item) => item.id === leadId)
   if (!lead) return
+  if (!extraction.buyerSignals.length && lead.exa.highlights.length) {
+    extraction.buyerSignals = lead.exa.highlights.slice(0, 4)
+  }
   lead.extraction = extraction
   if (!lead.country && extraction.country) lead.country = extraction.country
   stampFirecrawl(lead)

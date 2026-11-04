@@ -15,6 +15,9 @@ test("Exa Agent search output becomes companies", () => {
             website: "https://dissol.example",
             country: "Ecuador",
             why: "Imports hair care.",
+            buyerSignals: ["Buys keratin kits for salon accounts."],
+            brandPortfolio: "Professional hair lines",
+            clientScale: "200 salons",
           },
         ],
       },
@@ -22,9 +25,11 @@ test("Exa Agent search output becomes companies", () => {
   })
   assert.equal(companies.length, 1)
   assert.equal(companies[0].website, "https://dissol.example")
+  assert.equal(companies[0].buyerSignals[0], "Buys keratin kits for salon accounts.")
+  assert.equal(companies[0].brandPortfolio, "Professional hair lines")
 })
 
-test("Firecrawl Agent output keeps published contacts and leaves the rest blank", () => {
+test("Firecrawl scrape output keeps published contacts and leaves the rest blank", () => {
   const profile = profileFromAgent({
     data: {
       companyName: "Dissol",
@@ -34,12 +39,18 @@ test("Firecrawl Agent output keeps published contacts and leaves the rest blank"
       phone: "",
       whatsapp: "+593 99 000 0000",
       website: "https://dissol.example",
+      keyPerson: "Ana Compras",
+      keyPersonRole: "Purchasing",
+      latestHires: ["Sales executive, 2026"],
     },
   })
   assert.equal(profile?.email, "compras@dissol.example")
   assert.equal(profile?.phone, "")
   assert.equal(profile?.whatsapp, "+593 99 000 0000")
   assert.equal(profile?.role, "importer")
+  assert.equal(profile?.keyPerson, "Ana Compras")
+  assert.equal(profile?.keyPersonRole, "Purchasing")
+  assert.deepEqual(profile?.latestHires, ["Sales executive, 2026"])
 })
 
 test("a Firecrawl job older than 70 seconds is treated as timed out", () => {

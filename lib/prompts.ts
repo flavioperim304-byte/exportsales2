@@ -36,6 +36,23 @@ function extra(brief: Brief): string {
   return note ? `Additional instructions: ${note}` : ""
 }
 
+function firecrawlContactAsk(): string {
+  return [
+    "Scrape and crawl this company's website (home, contact, about, team, careers) and search the web for the same company.",
+    "Bring primarily: the key person in the company, published email, WhatsApp, phone, and the website, with details from the crawled content, and any latest hires.",
+    "Leave a field empty when it is not published. Do not guess a name, email, address, or number.",
+  ].join(" ")
+}
+
+function exaBuyerSignalAsk(brief?: Brief): string {
+  return [
+    "buyerSignals must be short phrases taken from the page about how this company buys or sells.",
+    brief ? firecrawlAnchorLine(brief) : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+}
+
 /** Hard rule for every model call. Absence is unpublished, never a filled-in fact. */
 export function evidenceRule(): string {
   return [
@@ -125,6 +142,7 @@ export function exaQuery(brief: Brief, country: string, buyerType?: string): str
     brief.certifications ? `Relevant certifications: ${brief.certifications}.` : "",
     brief.differentiators ? `What the supplier offers: ${brief.differentiators}.` : "",
     `Return ${type} even when the additional instructions mention a narrower buyer type.`,
+    exaBuyerSignalAsk(brief),
     extra(brief),
   ]
     .filter(Boolean)
@@ -142,6 +160,7 @@ export function exaBackupQuery(brief: Brief, country: string, buyerType?: string
     brief.mustHaves ? `Must show: ${brief.mustHaves}.` : "",
     brief.exclusions ? `Do not return: ${brief.exclusions}.` : "",
     extra(brief),
+    exaBuyerSignalAsk(brief),
   ]
     .filter(Boolean)
     .join(" ")
@@ -151,7 +170,7 @@ export function dumpConfirmQueryLine(brief: Brief, country: string): string {
   return [
     evidenceRule(),
     `Confirm whether named importers in ${country} exist as ${brief.products || "hair care"} importers or distributors.`,
-    "Exa looks up each dump name. Firecrawl then reads the official page.",
+    "Exa looks up each dump name. Firecrawl then scrapes and crawls the official site and the web.",
     "A trade dump never confirms a purchase. Logistics and global brand subsidiaries stay out.",
     extra(brief),
   ]
@@ -163,21 +182,16 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
   if (brief.searchKind === "dump") {
     return [
       evidenceRule(),
-      "Extract a buyer profile for an export salesperson.",
+      firecrawlContactAsk(),
       `Supplier: ${brief.supplierName} (${brief.originCountry}).`,
       country
-        ? `This name came from a trade dump for ${country}. Confirm or reject it from the page.`
-        : "This name came from a trade dump. Confirm or reject it from the page.",
-      "Confirm whether the page shows a local importer or distributor of hair care, shampoo, or cosmetics.",
+        ? `This name came from a trade dump for ${country}. Confirm or reject it from the crawled pages.`
+        : "This name came from a trade dump. Confirm or reject it from the crawled pages.",
+      "Confirm whether the pages show a local importer or distributor of hair care, shampoo, or cosmetics.",
       "Reject logistics, freight forwarders, Amazon, salons with no wholesale, and global brand subsidiaries (Unilever, P&G, L'Oréal, Avon, Genomma, PriceSmart, Alfaparf, Belcorp, Mesoestetic, Arabela, Feduro, Henkel).",
-      "The dump is not evidence. Only facts on the page count.",
+      "The dump is not evidence. Only facts on the crawled pages and the web search count.",
       buyerType ? `The search labeled this company as: ${buyerType}.` : "",
       brief.instructions?.trim() ?? "",
-      "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
-      "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
-      "buyerSignals must be short phrases from the page about importing or distributing hair care.",
-      firecrawlAnchorLine(brief),
-      "Also extract lastPurchase, stock, brandPerformance, salesNote, and competitorMoves when the page states them. Leave each empty when unpublished.",
     ]
       .filter(Boolean)
       .join("\n")
@@ -185,17 +199,14 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
   if (brief.searchKind === "competitors") {
     return [
       evidenceRule(),
-      "Extract a buyer profile for an export salesperson.",
+      firecrawlContactAsk(),
       `Brand: ${brief.supplierName} (${brief.originCountry}).`,
       country
         ? `This company was retrieved in ${country}.`
         : "The country is whatever the page states.",
       buyerType ? `The search labeled this company as: ${buyerType}.` : "",
-      "Confirm whether the page shows this company distributing the brand, or distributing a rival brand in the same country.",
+      "Confirm whether the crawled pages show this company distributing the brand, or distributing a rival brand in the same country.",
       brief.instructions?.trim() ?? "",
-      "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
-      "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
-      firecrawlAnchorLine(brief),
     ]
       .filter(Boolean)
       .join("\n")
@@ -203,40 +214,30 @@ export function firecrawlPrompt(brief: Brief, country: string, buyerType?: strin
   if (isPromptOnly(brief)) {
     return [
       evidenceRule(),
-      "Extract a buyer profile for an export salesperson.",
+      firecrawlContactAsk(),
       `Supplier: ${brief.supplierName} (${brief.originCountry}).`,
       country
         ? `This company was retrieved as a candidate for ${country}.`
         : `Target markets: ${brief.markets}.`,
-      "Judge the page only against this prompt:",
+      "Judge the crawled pages only against this prompt:",
       brief.instructions?.trim() ?? "",
-      "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
-      "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
-    "buyerSignals must be short phrases taken from the page about how this company buys or sells.",
-    firecrawlAnchorLine(brief),
-    "Also extract lastPurchase, stock, brandPerformance, salesNote, and competitorMoves when the page states them. Leave each empty when unpublished.",
     ].join("\n")
   }
   const type = buyerType?.trim()
   return [
     evidenceRule(),
-    "Extract a buyer profile for an export salesperson.",
+    firecrawlContactAsk(),
     `Supplier: ${brief.supplierName} (${brief.originCountry}). Products: ${brief.products}.`,
     country
       ? `This company was retrieved as a candidate for ${country}.`
       : `Target markets: ${brief.markets}.`,
-    type ? `This company was searched as this buyer type: ${type}. Record whether the page shows that type.` : "",
+    type ? `This company was searched as this buyer type: ${type}. Record whether the pages show that type.` : "",
     brief.buyerTypes ? `Buyer types in this brief: ${brief.buyerTypes}.` : "",
     brief.mustHaves ? `Look for evidence of these must-haves: ${brief.mustHaves}.` : "",
     brief.exclusions ? `Note if the page matches an exclusion: ${brief.exclusions}.` : "",
     brief.certifications
       ? `Certifications that matter to the supplier: ${brief.certifications}.`
       : "",
-    "Use only facts stated on the page or on pages it links to. Unknown fields stay empty.",
-    "Collect published contact details: email, phone, WhatsApp, and the company website. Leave a contact blank when it is not published. Do not guess an address or a number.",
-    "buyerSignals must be short phrases about the buyer type named above, including importing, wholesale coverage, or trading.",
-    firecrawlAnchorLine(brief),
-    "Also extract lastPurchase, stock, brandPerformance, salesNote, and competitorMoves when the page states them. Leave each empty when unpublished.",
     extra(brief),
   ]
     .filter(Boolean)
@@ -257,7 +258,7 @@ export function searchBrief(brief: Brief, also?: Brief): Brief {
   }
 }
 
-export function exaSystemPrompt(): string {
+export function exaSystemPrompt(brief?: Brief): string {
   return [
     evidenceRule(),
     "You are in search mode.",
@@ -265,9 +266,12 @@ export function exaSystemPrompt(): string {
     "Every company must be in the one country named in the query. Omit a company from any other country.",
     "Return buyers for the supplier named in the query. Do not return that supplier, and do not return a different supplier.",
     "Each company needs its official website.",
+    exaBuyerSignalAsk(brief),
     "Do not score the companies, do not write a market report, and do not invent email addresses or phone numbers.",
     "Skip the supplier’s own website. Prefer a company site over a social profile.",
-  ].join(" ")
+  ]
+    .filter(Boolean)
+    .join(" ")
 }
 
 export function openaiInstructions(brief: Brief, also?: Brief): string {
@@ -438,9 +442,13 @@ export function researchPrompt(brief: Brief, leads: Lead[], also?: Brief): strin
         extraction?.country || lead.country,
         extraction?.role,
         extraction?.buys?.slice(0, 4).join("; "),
+        extraction?.keyPerson
+          ? `key person ${extraction.keyPerson}${extraction.keyPersonRole ? ` (${extraction.keyPersonRole})` : ""}`
+          : "",
         extraction?.email ? `email ${extraction.email}` : "",
         extraction?.phone ? `phone ${extraction.phone}` : "",
         extraction?.whatsapp ? `whatsapp ${extraction.whatsapp}` : "",
+        extraction?.latestHires?.length ? `latest hires ${extraction.latestHires.slice(0, 3).join("; ")}` : "",
         lead.openai
           ? `OpenAI preliminary: ${lead.openai.icp}, best fit ${lead.openai.bestFit}. ${clip(lead.openai.rationale, 180)}`
           : "OpenAI preliminary: unscored.",

@@ -237,6 +237,11 @@ export type Extraction = {
   phone?: string
   whatsapp?: string
   website?: string
+  /** Purchasing, owner, or export contact named on the crawled pages. */
+  keyPerson?: string
+  keyPersonRole?: string
+  /** Latest published hires or job ads. Empty when unpublished. */
+  latestHires?: string[]
   /** Last inbound purchase or shipment, only when the page states it. */
   lastPurchase?: string
   /** Stock or restock language, only when the page states it. */

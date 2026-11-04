@@ -159,9 +159,13 @@ function cards(brief: Brief, leads: Lead[]): string {
         lead.url,
         extraction?.role,
         extraction?.country || lead.country,
+        extraction?.keyPerson
+          ? `key person ${extraction.keyPerson}${extraction.keyPersonRole ? ` (${extraction.keyPersonRole})` : ""}`
+          : "",
         extraction?.email ? `email ${extraction.email}` : "",
         extraction?.phone ? `phone ${extraction.phone}` : "",
         extraction?.whatsapp ? `whatsapp ${extraction.whatsapp}` : "",
+        extraction?.latestHires?.length ? `latest hires ${extraction.latestHires.slice(0, 3).join("; ")}` : "",
         extraction?.buys?.slice(0, 4).join("; "),
         activityLine(lead),
         buyingEvidenceLine(lead),

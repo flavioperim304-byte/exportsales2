@@ -19,7 +19,7 @@ import type { IcpLevel } from "@/lib/qualify"
 
 const STAGE_META = {
   search: { n: "01", source: "Exa", title: "Search" },
-  extract: { n: "02", source: "Firecrawl Agent", title: "ICP and contacts" },
+  extract: { n: "02", source: "Firecrawl scrape + crawl", title: "Contacts and key person" },
   classify: { n: "03", source: "Exa + OpenAI", title: "Activity, commerce, and best fit" },
   context: { n: "04", source: "Parallel", title: "Refine and context" },
   diligence: { n: "05", source: "Desk", title: "Not used" },
@@ -467,6 +467,11 @@ function Dossier({ lead }: { lead: Lead }) {
           <Fact term="Sells" value={lead.extraction.sells.join(", ")} />
           <Fact term="Markets" value={lead.extraction.markets.join(", ")} />
           <Fact term="Certifications" value={lead.extraction.certifications.join(", ")} />
+          <Fact
+            term="Key person"
+            value={[lead.extraction.keyPerson, lead.extraction.keyPersonRole].filter(Boolean).join(" · ")}
+          />
+          <Fact term="Latest hires" value={(lead.extraction.latestHires ?? []).join("; ")} />
           <Fact term="Email" value={lead.extraction.email ?? ""} href={mailtoHref(lead.extraction.email ?? "")} />
           <Fact term="Phone" value={lead.extraction.phone ?? ""} href={telHref(lead.extraction.phone ?? "")} />
           <Fact term="WhatsApp" value={lead.extraction.whatsapp ?? ""} href={telHref(lead.extraction.whatsapp ?? "")} />
