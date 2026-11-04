@@ -3,6 +3,7 @@ import test from "node:test"
 import { classifyActivity, ACTIVITY_MONTHS } from "../lib/activity"
 import { KANECHOM_BRIEF } from "../lib/example"
 import { leadsDueForRefresh } from "../lib/lead-refresh"
+import { listLeadRecordsFromRuns } from "../lib/lead-db"
 import { computeResponseProbability, mixOverlap } from "../lib/response-probability"
 import { sampleRun } from "../lib/sample"
 import type { Lead, Run, TradeFilingMatch, TradeSnapshot } from "../lib/types"
@@ -100,6 +101,27 @@ test("Instagram follower growth and a mix change are distinct signals", () => {
     ),
     "mix_change"
   )
+})
+
+test("listing old leads fills a missing response instead of leaving it at zero", () => {
+  const item = lead({
+    id: "old-1",
+    openai: {
+      icp: "high",
+      supplierFits: [{ supplier: "Kanechom", level: "high" }],
+      bestFit: "Kanechom",
+      qualificationNeeded: "Confirm a first order.",
+      rationale: "Looks like a distributor.",
+    },
+  })
+  const run = runOf(item, { trade: trade() })
+  run.mode = "live"
+  run.id = "live-old"
+  const rows = listLeadRecordsFromRuns([run])
+  assert.equal(rows.length, 1)
+  assert.ok((rows[0].responseScore ?? 0) > 0)
+  assert.notEqual(rows[0].responseLevel, undefined)
+  assert.match(rows[0].responseNote || "", /sem fato publicado de compra/i)
 })
 
 test("a dump filing never makes response probability high", () => {

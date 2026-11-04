@@ -1,5 +1,6 @@
 import { Pool, type PoolClient } from "pg"
 import { databaseHintFromUrl, explainPostgresError } from "./database-url"
+import { stampIntelligence } from "./intelligence"
 import { envDatabaseUrl, getDatabaseUrl } from "./keys"
 import { SAMPLE_RUN_ID } from "./ids"
 import type { DbStatus, Lead, LeadRecord, LeadSeed, Run } from "./types"
@@ -205,6 +206,7 @@ export function listLeadRecordsFromRuns(runs: Run[]): LeadRecord[] {
   for (const run of runs) {
     if (run.mode === "sample") continue
     for (const lead of run.leads ?? []) {
+      if (!lead.response || !lead.fit) stampIntelligence(run, lead)
       rows.push(toLeadRecord(run, lead))
     }
   }
