@@ -6,6 +6,19 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { DbStatus, KeyFlags, RagStatus } from "@/lib/types"
 
+function atlasFailNote(reason: string): string {
+  const code = reason.trim()
+  if (code === "missing_oauth") {
+    return "O Google não voltou para o desk a tempo. Clique Connect with Google nesta página, complete o login e espere cair de novo em Fontes. Login só no site thecompanyatlas.com não liga o Dump + API."
+  }
+  if (/recusou o registro|não devolveu o token|state mismatch/i.test(code)) {
+    return `A Atlas recusou o retorno OAuth (${code}). Tente Connect with Google outra vez nesta página.`
+  }
+  return code
+    ? `O login Google da Company Atlas não completou: ${code}`
+    : "O login Google da Company Atlas não completou. Comece de novo em Fontes → Connect with Google."
+}
+
 const EMPTY_FLAGS: KeyFlags = {
   exa: false,
   firecrawl: false,
@@ -50,7 +63,7 @@ export function SourcesForm() {
     if (params.get("atlas") === "connected") {
       setAtlasNote("Company Atlas conectado com Google. Dump + API usa até 12 créditos por rodada.")
     } else if (params.get("atlas") === "error") {
-      setAtlasNote(params.get("reason") || "O login Google da Company Atlas não completou.")
+      setAtlasNote(atlasFailNote(params.get("reason") || ""))
     }
     let cancelled = false
     fetch("/api/keys")
@@ -199,9 +212,9 @@ export function SourcesForm() {
           >
             thecompanyatlas.com/mcp
           </a>
-          . Trial gratuito em 36 países, 50 créditos/mês (1 por chamada). Login Google. No Cursor,
-          Settings → MCP → URL. Aqui o desk chama rank HS 3305 e o livro de parceiros no Dump + API.
-          Linha Atlas não confirma compra Kanechom/LQ e não substitui Exa/Firecrawl.
+          . Trial gratuito em 36 países, 50 créditos/mês. O botão abaixo abre o Google pela Atlas e
+          tem que voltar para esta página. Login só no site da Atlas, ou no MCP do Cursor, não liga
+          o Dump + API. Linha Atlas não confirma compra Kanechom/LQ e não substitui Exa/Firecrawl.
         </p>
         {flags.atlasEnv ? (
           <p className="text-sm">Using COMPANY_ATLAS_TOKEN from the environment.</p>
@@ -225,7 +238,11 @@ export function SourcesForm() {
             Connect with Google
           </Button>
         )}
-        {atlasNote ? <p className="text-sm text-muted-foreground">{atlasNote}</p> : null}
+        {atlasNote ? (
+          <p className={`text-sm ${atlasNote.startsWith("Company Atlas conectado") ? "text-muted-foreground" : "text-destructive"}`}>
+            {atlasNote}
+          </p>
+        ) : null}
       </div>
       <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-card p-4">
         <div className="flex items-center justify-between gap-3">
