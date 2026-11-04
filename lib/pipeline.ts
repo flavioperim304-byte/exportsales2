@@ -16,6 +16,7 @@ import { stampIntelligence } from "./intelligence"
 import { brazilExports, countriesForTrade, tradeCooldownActive } from "./comexstat"
 import { matchLeads, ragConfigured, ragNeedsRetry, ragNotConfiguredMatch } from "./rag"
 import { apiConfirmNote, dumpCountries, firecrawlConfirms } from "./confirm"
+import { shouldClassifyLead } from "./dump-signal"
 import { searchDumpFlow } from "./dump-search"
 import { advanceExa, searchLeads } from "./exa"
 import {
@@ -724,7 +725,12 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
         context.detail = "Parallel Decisions (fast) is answering this run. The default Task call is not used."
         log(run, "context", context.detail)
       })
-      const decided = await decideResearch(snapshot.brief, snapshot.leads, keys.parallel, snapshot.also)
+      const decided = await decideResearch(
+        snapshot.brief,
+        snapshot.leads.filter(shouldClassifyLead),
+        keys.parallel,
+        snapshot.also
+      )
       await updateRun(id, (run) => {
         run.parallelDecisionId = decided.decisionId
         applyResearch(run, decided.research)
@@ -751,10 +757,26 @@ async function doResearch(id: string): Promise<"wait" | "next"> {
     return "next"
   }
   if (!snapshot.parallelRunId) {
+    const classifyLeads = snapshot.leads.filter(shouldClassifyLead)
+    if (classifyLeads.length === 0) {
+      await updateRun(id, (run) => {
+        const context = stage(run, "context")
+        context.status = "done"
+        context.finishedAt = now()
+        context.detail =
+          run.brief.searchKind === "dump"
+            ? "Parallel skipped: no dump lead confirmed by Exa and Firecrawl."
+            : "Parallel skipped: no companies to classify."
+        run.contextState = "skipped"
+        finish(run)
+        log(run, "context", context.detail)
+      })
+      return "next"
+    }
     try {
       const created = await createResearch(
         snapshot.brief,
-        snapshot.leads,
+        classifyLeads,
         keys.parallel,
         snapshot.also
       )
@@ -1062,8 +1084,23 @@ async function doScore(id: string) {
     })
     return
   }
-  if (current.leads.length > 0 && current.leads.every((lead) => lead.openai)) {
+  const classifyLeads = current.leads.filter(shouldClassifyLead)
+  if (current.leads.length > 0 && classifyLeads.every((lead) => lead.openai) && classifyLeads.length > 0) {
     await updateRun(id, (run) => {
+      run.status = "researching"
+    })
+    return
+  }
+  if (classifyLeads.length === 0) {
+    await updateRun(id, (run) => {
+      const classify = stage(run, "classify")
+      classify.status = "done"
+      classify.finishedAt = now()
+      classify.detail =
+        run.brief.searchKind === "dump"
+          ? "Nenhuma lead do dump passou Exa + Firecrawl. OpenAI e Parallel não classificam nome só do arquivo."
+          : "No companies were ready for OpenAI."
+      log(run, "classify", classify.detail)
       run.status = "researching"
     })
     return
@@ -1072,10 +1109,13 @@ async function doScore(id: string) {
     const classify = stage(run, "classify")
     classify.status = "running"
     classify.startedAt = classify.startedAt ?? now()
-    classify.detail = "OpenAI is scoring product fit against the activity evidence."
+    classify.detail =
+      current.brief.searchKind === "dump"
+        ? `OpenAI classifica ${classifyLeads.length} importadores confirmados por Exa e Firecrawl. Embarque é sinal forte, não pedido Kanechom/LQ.`
+        : "OpenAI is scoring product fit against the activity evidence."
   })
   try {
-    const scored = await scoreLeads(current.brief, current.leads, keys.openai, current.also)
+    const scored = await scoreLeads(current.brief, classifyLeads, keys.openai, current.also)
     await updateRun(id, (run) => {
       applyOpenAI(run, scored.leads)
       if (scored.entry.purchaseProbability || scored.entry.strategy) run.entry = scored.entry

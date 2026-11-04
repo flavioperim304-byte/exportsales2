@@ -193,9 +193,7 @@ export function apiConfirmNote(confirm: ApiConfirm): string {
   return clip([...new Set(bits)].join(" "), 280)
 }
 
-export function apisConfirmed(lead: Lead): boolean {
-  return lead.apiConfirm?.exa === "confirmed" && lead.apiConfirm?.firecrawl === "confirmed"
-}
+export { dumpApisConfirmed as apisConfirmed, shouldClassifyLead } from "./dump-signal"
 
 export function dumpConfirmQuery(name: string, country: string, products: string): string {
   const category = products.trim() || "hair care, shampoo, cosmetics"

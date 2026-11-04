@@ -1,5 +1,6 @@
 import { activityKinds, hasRecentActivity } from "./activity"
 import { hasCommercialBuyFacts, recentCommerce } from "./commerce"
+import { dumpApisConfirmed, dumpShipmentPoints, dumpShipmentsAreRecent } from "./dump-signal"
 import { tradeForCountry } from "./comexstat-map"
 import { computeFitProbability, hasPublishedBuyFacts } from "./fit-probability"
 import { splitList } from "./text"
@@ -69,9 +70,7 @@ function competitorPoints(run: ResponseContext, lead: Lead): number {
 }
 
 function filingPoints(lead: Lead): number {
-  const quality = lead.filing?.quality
-  if (quality === "usable" || quality === "occupied") return 8
-  return 0
+  return dumpShipmentPoints(lead)
 }
 
 export function computeResponseProbability(run: ResponseContext, lead: Lead): ResponseProbability {
@@ -110,7 +109,11 @@ export function computeResponseProbability(run: ResponseContext, lead: Lead): Re
   const dump = filingPoints(lead)
   if (dump) {
     score += dump
-    layers.push("Aduana/TradeInData (indicação, não compra)")
+    layers.push(
+      dumpApisConfirmed(lead)
+        ? `embarques de aduana confirmados (${lead.filing?.hsShipments ?? 0} HS) — sinal forte, não é compra Kanechom/LQ`
+        : "Aduana/TradeInData (indicação, não compra)"
+    )
   }
 
   const commerce = recentCommerce(lead)
@@ -140,15 +143,20 @@ export function computeResponseProbability(run: ResponseContext, lead: Lead): Re
     layers.push("presença em rede social")
   }
 
-  if (!hasRecentActivity(lead) && commerce.length === 0) {
+  if (!hasRecentActivity(lead) && commerce.length === 0 && !dumpShipmentsAreRecent(lead)) {
     score = Math.min(score, 42)
     layers.push("sem sinal público em 24 meses")
   }
 
   const publishedBuy = hasPublishedBuyFacts(lead) || restock
   if (!publishedBuy) {
-    score = Math.min(score, 54)
-    layers.push("sem fato publicado de compra — dump/Atlas não sobem para high")
+    const cap = dumpApisConfirmed(lead) && lead.filing ? 61 : 54
+    score = Math.min(score, cap)
+    layers.push(
+      cap === 61
+        ? "sem última compra/estoque/vendas na página — embarque de aduana sobe o sinal, mas não vira high nem pedido Kanechom/LQ"
+        : "sem fato publicado de compra — dump/Atlas não sobem para high"
+    )
   }
 
   score = Math.max(0, Math.min(100, score))

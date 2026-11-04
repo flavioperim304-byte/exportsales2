@@ -16,6 +16,8 @@ import {
 import { hasCommercialBuyFacts } from "../lib/commerce"
 import { hasPublishedBuyFacts } from "../lib/fit-probability"
 import { qualificationRows } from "../lib/qualify"
+import { shouldClassifyLead } from "../lib/dump-signal"
+import { openaiInstructions } from "../lib/prompts"
 import { applyFilingToLead, parseTradeDump } from "../lib/trade-records"
 import type { Extraction, Lead } from "../lib/types"
 
@@ -156,6 +158,28 @@ test("even after the APIs confirm the company, the dump still does not confirm a
   const [row] = qualificationRows([lead], { ...KANECHOM_BRIEF, markets: "Panama" })
   assert.equal(row.bestFit, "neither")
   assert.match(row.qualificationNeeded, /confirmaram|indicação|falsos/i)
+})
+
+test("dump names wait for Exa and Firecrawl before OpenAI and Parallel", () => {
+  assert.equal(
+    shouldClassifyLead({
+      seed: "dump",
+      apiConfirm: { exa: "confirmed", firecrawl: "pending", note: "" },
+    } as Lead),
+    false
+  )
+  assert.equal(
+    shouldClassifyLead({
+      seed: "dump",
+      apiConfirm: { exa: "confirmed", firecrawl: "confirmed", note: "" },
+    } as Lead),
+    true
+  )
+  assert.equal(shouldClassifyLead({ seed: "exa" } as Lead), true)
+  assert.match(
+    openaiInstructions({ ...KANECHOM_BRIEF, searchKind: "dump" }),
+    /HS shipments on the card are a strong importer signal/
+  )
 })
 
 test("Dump + API is a first-class search kind and keeps the four pipeline stages", () => {

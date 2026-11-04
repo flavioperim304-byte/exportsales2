@@ -27,6 +27,10 @@ function buyingAsk(): string {
   return "On each company, look for last purchase or shipment, stock or restock, how current brands are performing, published sales or volume, and a competitor move. Quote the source. Leave a field empty when it is not published. A company that only has a brochure is not a high fit. A job ad for sales or purchasing is a supporting signal, not purchase intent. Do not set best_fit from ICP, a brochure, social posts, or hiring alone. If last purchase, stock, and sales are unpublished, best_fit is neither."
 }
 
+function dumpAsk(): string {
+  return "Dump + API: only companies Exa and Firecrawl confirmed reach this scoring step. HS shipments on the card are a strong importer signal — the account moves cargo — not a Kanechom or LQ purchase. Do not copy dump volume into last_purchase. Do not set best_fit from the dump alone. Score channel fit; Parallel still refines."
+}
+
 function extra(brief: Brief): string {
   const note = brief.instructions?.trim()
   return note ? `Additional instructions: ${note}` : ""
@@ -297,6 +301,7 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
       "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
       cardAsk("a supplier"),
       buyingAsk(),
+      brief.searchKind === "dump" ? dumpAsk() : "",
       "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
       marketAsk(),
       anchorsFor(brief),
@@ -319,6 +324,7 @@ export function openaiInstructions(brief: Brief, also?: Brief): string {
     "For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither.",
     cardAsk("a supplier"),
     buyingAsk(),
+    brief.searchKind === "dump" ? dumpAsk() : "",
     "qualification_needed is what a salesperson still has to confirm. High icp means product and channel fit. It is not the purchase probability.",
     marketAsk(),
     anchorsFor(brief),
@@ -366,6 +372,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
       "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
       cardAsk("a supplier", true),
       buyingAsk(),
+      brief.searchKind === "dump" ? dumpAsk() : "",
       "Say who to approach first, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and the supplier fit to high, medium, or low. Set best_fit to the supplier to pursue or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
       marketAsk(),
       anchorsFor(brief),
@@ -398,6 +405,7 @@ export function parallelInstructions(brief: Brief, also?: Brief): string {
     "Separate product fit from willingness and authority to buy. Name a competitor brand only when a source names it. Do not treat an employee count as distribution capacity. If you cite a number, include the year and the source. If a company is owned by or exclusive to a brand group, say so and do not treat it as an independent distributor.",
     cardAsk("a supplier", true),
     buyingAsk(),
+    brief.searchKind === "dump" ? dumpAsk() : "",
     "Say who to approach first for each supplier, the public outreach route when one is published, and a specific opening offer. For every candidate set icp and each supplier fit to high, medium, or low. Set best_fit to the supplier to pursue, both, or neither. qualification_needed is what a salesperson still has to confirm. Rank only within this list. icp is not the purchase probability.",
     marketAsk(),
     anchorsFor(brief),

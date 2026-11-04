@@ -124,6 +124,36 @@ test("listing old leads fills a missing response instead of leaving it at zero",
   assert.match(rows[0].responseNote || "", /sem fato publicado de compra/i)
 })
 
+test("confirmed dump shipments are a strong signal and still not a Kanechom purchase", () => {
+  const item = lead({
+    seed: "dump",
+    apiConfirm: {
+      exa: "confirmed",
+      firecrawl: "confirmed",
+      note: "Exa e Firecrawl confirmaram.",
+    },
+    filing: {
+      ...filing("usable"),
+      hsShipments: 12,
+      lastTradeDate: "2026-06-30",
+      latestMonths: ["202606"],
+    },
+    openai: {
+      icp: "high",
+      supplierFits: [{ supplier: "Kanechom", level: "high" }],
+      bestFit: "Kanechom",
+      qualificationNeeded: "Confirm a first order.",
+      rationale: "Looks like a distributor.",
+    },
+  })
+  const result = computeResponseProbability(runOf(item, { trade: trade() }), item)
+  assert.ok(result.score >= 38, `expected a strong medium, got ${result.score}`)
+  assert.notEqual(result.level, "high")
+  assert.ok(result.score <= 61)
+  assert.match(result.note, /embarques de aduana confirmados/i)
+  assert.match(result.note, /não é compra Kanechom/i)
+})
+
 test("a dump filing never makes response probability high", () => {
   const item = lead({
     filing: filing("usable"),

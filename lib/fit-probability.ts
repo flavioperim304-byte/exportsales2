@@ -1,5 +1,6 @@
 import { hasRecentActivity } from "./activity"
 import { hasCommercialBuyFacts, hasCommerceSignals, recentCommerce } from "./commerce"
+import { dumpApisConfirmed, dumpShipmentPoints } from "./dump-signal"
 import type { Brief, BuyingFact, BuyingKind, Competitor, FitProbability, Lead } from "./types"
 import { clip } from "./text"
 
@@ -211,8 +212,11 @@ export function computeFitProbability(
   index += productBoost(brief, lead)
   index += competitorBoost(lead, competitors)
   index += commerceBoost(lead)
+  const dumpBoost = dumpShipmentPoints(lead)
+  if (dumpBoost) index += dumpBoost
   const commerceBuy = hasCommercialBuyFacts(lead)
-  if (found.length === 0 && !hasCommerceSignals(lead)) index = Math.min(index, 38)
+  const dumpCargo = dumpApisConfirmed(lead) && Boolean(lead.filing)
+  if (found.length === 0 && !hasCommerceSignals(lead) && !dumpCargo) index = Math.min(index, 38)
   if (found.length < 2 && !hasRecentActivity(lead) && recentCommerce(lead).length < 2) {
     index = Math.min(index, 44)
   }
