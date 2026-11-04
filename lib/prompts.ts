@@ -264,7 +264,6 @@ export function exaSystemPrompt(): string {
     `Return at most ${LEADS_PER_COUNTRY} real companies of the single buyer type named in the query.`,
     "Every company must be in the one country named in the query. Omit a company from any other country.",
     "Return buyers for the supplier named in the query. Do not return that supplier, and do not return a different supplier.",
-    "A wholesaler search must not be filled with distributors. A trading-company search must not be filled with distributors. If that type is scarce, return fewer companies.",
     "Each company needs its official website.",
     "Do not score the companies, do not write a market report, and do not invent email addresses or phone numbers.",
     "Skip the supplier’s own website. Prefer a company site over a social profile.",

@@ -29,7 +29,8 @@ test("each country gets its own prompt and ten leads", () => {
   assert.equal(LEADS_PER_COUNTRY, 10)
   assert.match(exaSystemPrompt(), /search mode/)
   assert.match(exaSystemPrompt(), /any other country/)
-  assert.match(exaSystemPrompt(), /must not be filled with distributors/)
+  assert.doesNotMatch(exaSystemPrompt(), /must not be filled with distributors/)
+  assert.doesNotMatch(exaSystemPrompt(), /If that type is scarce/)
   assert.deepEqual(targetCountries(brief), ["Germany", "France"])
 
   const germany = exaQuery(brief, "Germany")
