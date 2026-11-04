@@ -2,6 +2,9 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { KANECHOM_BRIEF } from "../lib/example"
 import {
+  DESK_LEADS_TABLE,
+  DESK_RUNS_TABLE,
+  IGNORED_SUPABASE_TABLES,
   listLeadRecordsFromRuns,
   postgresConfigured,
   postgresWantsSsl,
@@ -82,6 +85,19 @@ test("toLeadRecord copies published contacts and never treats a dump seed as a p
         missing: ["last_purchase"],
         facts: [],
       },
+      openai: {
+        icp: "medium",
+        supplierFits: [{ supplier: "Kanechom", level: "medium" }],
+        bestFit: "Kanechom",
+        qualificationNeeded: "Confirm a first order.",
+        rationale: "Looks like a distributor.",
+      },
+      rag: {
+        checked: true,
+        match: false,
+        neighbor: "Another Distributor Ltd",
+        note: "Neighbor is a different company.",
+      },
     },
   ]
   const row = toLeadRecord(run, run.leads[0])
@@ -90,9 +106,25 @@ test("toLeadRecord copies published contacts and never treats a dump seed as a p
   assert.equal(row.seed, "dump")
   assert.equal(row.email, "compras@casaandes.example")
   assert.equal(row.fit, "medium")
+  assert.equal(row.fitIndex, 40)
+  assert.equal(row.icp, "medium")
   assert.equal(row.band, "possible")
   assert.equal(row.supplier, run.brief.supplierName)
   assert.equal(row.lastPurchase, undefined)
+  assert.equal(row.ragMatch, false)
+  assert.equal(row.ragNeighbor, "Another Distributor Ltd")
+})
+
+test("desk tables are new and old CRM names stay ignored", () => {
+  assert.equal(DESK_RUNS_TABLE, "desk_runs")
+  assert.equal(DESK_LEADS_TABLE, "desk_leads")
+  assert.ok(IGNORED_SUPABASE_TABLES.includes("Leads"))
+  assert.ok(IGNORED_SUPABASE_TABLES.includes("leads_master"))
+  assert.ok(IGNORED_SUPABASE_TABLES.includes("tradeindata_novas_leads_import"))
+  assert.equal(
+    (IGNORED_SUPABASE_TABLES as readonly string[]).includes(DESK_LEADS_TABLE),
+    false
+  )
 })
 
 test("listLeadRecordsFromRuns skips the coffee sample", () => {

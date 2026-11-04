@@ -235,18 +235,23 @@ export function SourcesForm() {
           </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Opcional — a inteligência já roda sem isso. No Supabase o botão é{" "}
-          <span className="font-medium text-foreground">Connect</span> no topo do projeto (não em
-          Settings). Escolha <span className="font-medium text-foreground">Session pooler</span>,
-          porta 5432. Troque <code>[YOUR-PASSWORD]</code>. Não cole a URL https://….supabase.co nem
-          a anon key.
+          Opcional — a inteligência já roda sem isso. Grava só em{" "}
+          <span className="font-medium text-foreground">desk_runs</span> e{" "}
+          <span className="font-medium text-foreground">desk_leads</span>. Tabelas antigas deste
+          projeto (<span className="font-medium text-foreground">Leads</span>, leads_master,
+          leads_enriquecidas, tradeindata_*, trade_test_*) não são lidas nem copiadas. No
+          Supabase o botão é <span className="font-medium text-foreground">Connect</span> no topo
+          do projeto (não em Settings). Escolha{" "}
+          <span className="font-medium text-foreground">Session pooler</span>, porta 5432. Troque{" "}
+          <code>[YOUR-PASSWORD]</code>. Não cole a URL https://….supabase.co nem a anon key.
         </p>
         {db?.postgres && !db.error ? (
           <p className="text-sm">
             Conectado em {db.host || "Supabase"}
             {db.port ? `:${db.port}` : ""} · {db.leadCount} lead{db.leadCount === 1 ? "" : "s"} em{" "}
             {db.runCount} busca{db.runCount === 1 ? "" : "s"}
-            {db.envLocked ? " · variável do Render" : " · gravado neste disco"}.
+            {db.envLocked ? " · variável do Render" : " · gravado neste disco"}
+            {db.tables?.length ? ` · ${db.tables.join(", ")}` : ""}.
           </p>
         ) : db?.error ? (
           <p className="text-sm text-destructive">{db.error}</p>
@@ -289,7 +294,10 @@ export function SourcesForm() {
                       return
                     }
                     setDatabaseUrl("")
-                    setDbNote(data.note || "Supabase conectado. As próximas buscas gravam em desk_leads.")
+                    setDbNote(
+                      data.note ||
+                        "Supabase conectado. As próximas buscas gravam em desk_runs e desk_leads. Tabelas antigas não entram."
+                    )
                   } catch {
                     setDbNote("O desk não conseguiu testar o banco.")
                   } finally {

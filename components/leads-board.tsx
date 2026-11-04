@@ -89,7 +89,7 @@ export function LeadsBoard({
       {visible.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border px-4 py-8 text-sm text-muted-foreground">
           {records.length === 0
-            ? "Nenhuma lead gravada ainda. Rode Nova busca. Em Fontes, cole a URI Session pooler do Supabase (porta 5432) e clique Conectar."
+            ? "Nenhuma lead em desk_leads ainda. Rode Nova busca. Tabelas antigas (Leads, leads_master, tradeindata_*) não aparecem aqui."
             : "Nenhuma lead neste filtro."}
         </p>
       ) : (

@@ -651,6 +651,8 @@ export type LeadRecord = {
   band?: Band
   score?: number
   fit?: FitProbability["level"]
+  fitIndex?: number
+  icp?: "high" | "medium" | "low"
   email?: string
   phone?: string
   website?: string
@@ -662,6 +664,8 @@ export type LeadRecord = {
   hiring?: boolean
   mixChange?: boolean
   socialGrowth?: boolean
+  ragMatch?: boolean
+  ragNeighbor?: string
   createdAt: string
   updatedAt: string
 }
@@ -677,6 +681,7 @@ export type DbStatus = {
   user?: string
   envLocked?: boolean
   note?: string
+  tables?: string[]
 }
 
 export type RunSummary = {

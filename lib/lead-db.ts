@@ -4,6 +4,37 @@ import { envDatabaseUrl, getDatabaseUrl } from "./keys"
 import { SAMPLE_RUN_ID } from "./ids"
 import type { DbStatus, Lead, LeadRecord, LeadSeed, Run } from "./types"
 
+/** Live Export Desk tables. Older CRM tables in the same project are never read. */
+export const DESK_RUNS_TABLE = "desk_runs"
+export const DESK_LEADS_TABLE = "desk_leads"
+
+export const IGNORED_SUPABASE_TABLES = [
+  "Leads",
+  "leads_master",
+  "leads_enriquecidas",
+  "leads_comesa_gem",
+  "leads-lote13",
+  "tradeindata_novas_leads_import",
+  "tradeindata_stage_20260810",
+  "trade_test_runs",
+  "trade_test_shipments",
+  "trade_test_companies",
+  "clientes",
+  "demandas_clientes",
+  "distribuidores_cadastrados",
+  "evidencias_empresas",
+  "fornecedores_feira",
+  "fornecedores_nacionais",
+  "fornecedores_nacionais_icp",
+  "importadores_premium",
+  "matches_feira",
+  "matches_inteligentes",
+  "mensagens_abordagem",
+  "oportunidades_comerciais",
+  "relacoes_embarque",
+  "swift_search_jobs",
+] as const
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS desk_runs (
   id TEXT PRIMARY KEY,
@@ -27,6 +58,8 @@ CREATE TABLE IF NOT EXISTS desk_leads (
   band TEXT,
   score INTEGER,
   fit TEXT,
+  fit_index INTEGER,
+  icp TEXT,
   email TEXT,
   phone TEXT,
   website TEXT,
@@ -38,6 +71,8 @@ CREATE TABLE IF NOT EXISTS desk_leads (
   hiring BOOLEAN,
   mix_change BOOLEAN,
   social_growth BOOLEAN,
+  rag_match BOOLEAN,
+  rag_neighbor TEXT,
   payload JSONB NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (run_id, id)
@@ -45,6 +80,8 @@ CREATE TABLE IF NOT EXISTS desk_leads (
 CREATE INDEX IF NOT EXISTS desk_leads_domain_idx ON desk_leads (lower(domain));
 CREATE INDEX IF NOT EXISTS desk_leads_country_idx ON desk_leads (country);
 CREATE INDEX IF NOT EXISTS desk_leads_name_idx ON desk_leads (lower(name));
+CREATE INDEX IF NOT EXISTS desk_leads_response_idx ON desk_leads (response_level, response_score DESC);
+CREATE INDEX IF NOT EXISTS desk_leads_signals_idx ON desk_leads (signals_at);
 ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS response_level TEXT;
 ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS response_score INTEGER;
 ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS response_note TEXT;
@@ -52,6 +89,23 @@ ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS signals_at TIMESTAMPTZ;
 ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS hiring BOOLEAN;
 ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS mix_change BOOLEAN;
 ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS social_growth BOOLEAN;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS fit_index INTEGER;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS icp TEXT;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS rag_match BOOLEAN;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS rag_neighbor TEXT;
+ALTER TABLE desk_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE desk_leads ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON TABLE desk_runs FROM anon;
+    REVOKE ALL ON TABLE desk_leads FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON TABLE desk_runs FROM authenticated;
+    REVOKE ALL ON TABLE desk_leads FROM authenticated;
+  END IF;
+END $$;
 `
 
 let pool: Pool | undefined
@@ -126,6 +180,8 @@ export function toLeadRecord(run: Run, lead: Lead): LeadRecord {
     band: lead.score?.band,
     score: lead.score?.total,
     fit: lead.fit?.level,
+    fitIndex: lead.fit?.index,
+    icp: lead.context?.icp || lead.openai?.icp,
     email: lead.extraction?.email || undefined,
     phone: lead.extraction?.phone || lead.extraction?.whatsapp || undefined,
     website: lead.extraction?.website || lead.url || undefined,
@@ -137,6 +193,8 @@ export function toLeadRecord(run: Run, lead: Lead): LeadRecord {
     hiring: lead.response?.hiring,
     mixChange: lead.response?.mixChange,
     socialGrowth: lead.response?.socialGrowth,
+    ragMatch: lead.rag?.checked ? lead.rag.match : undefined,
+    ragNeighbor: lead.rag?.neighbor || undefined,
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
   }
@@ -175,7 +233,7 @@ function liveRuns(runs: Run[]): Run[] {
 
 export async function migrateJsonIfEmpty(runs: Run[]): Promise<number> {
   await ensureLeadSchema()
-  const counted = await getPool().query<{ n: number }>("SELECT count(*)::int AS n FROM desk_runs")
+  const counted = await getPool().query<{ n: number }>(`SELECT count(*)::int AS n FROM ${DESK_RUNS_TABLE}`)
   if ((counted.rows[0]?.n ?? 0) > 0) return 0
   const incoming = liveRuns(runs)
   for (const run of incoming) {
@@ -222,7 +280,7 @@ async function withTx<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
 export async function pgListRuns(): Promise<Run[]> {
   await ensureLeadSchema()
   const { rows } = await getPool().query<{ payload: Run }>(
-    "SELECT payload FROM desk_runs WHERE id <> $1 ORDER BY created_at DESC",
+    `SELECT payload FROM ${DESK_RUNS_TABLE} WHERE id <> $1 ORDER BY created_at DESC`,
     [SAMPLE_RUN_ID]
   )
   return rows.map((row) => row.payload)
@@ -231,7 +289,7 @@ export async function pgListRuns(): Promise<Run[]> {
 export async function pgGetRun(id: string): Promise<Run | null> {
   await ensureLeadSchema()
   const { rows } = await getPool().query<{ payload: Run }>(
-    "SELECT payload FROM desk_runs WHERE id = $1",
+    `SELECT payload FROM ${DESK_RUNS_TABLE} WHERE id = $1`,
     [id]
   )
   return rows[0]?.payload ?? null
@@ -242,7 +300,7 @@ export async function pgSaveRun(run: Run): Promise<void> {
   await ensureLeadSchema()
   await withTx(async (client) => {
     await client.query(
-      `INSERT INTO desk_runs (id, created_at, updated_at, mode, status, supplier, markets, payload)
+      `INSERT INTO ${DESK_RUNS_TABLE} (id, created_at, updated_at, mode, status, supplier, markets, payload)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
        ON CONFLICT (id) DO UPDATE SET
          updated_at = EXCLUDED.updated_at,
@@ -265,9 +323,9 @@ export async function pgSaveRun(run: Run): Promise<void> {
     const leads = run.leads ?? []
     const ids = leads.map((lead) => lead.id)
     if (ids.length === 0) {
-      await client.query("DELETE FROM desk_leads WHERE run_id = $1", [run.id])
+      await client.query(`DELETE FROM ${DESK_LEADS_TABLE} WHERE run_id = $1`, [run.id])
     } else {
-      await client.query("DELETE FROM desk_leads WHERE run_id = $1 AND NOT (id = ANY($2::text[]))", [
+      await client.query(`DELETE FROM ${DESK_LEADS_TABLE} WHERE run_id = $1 AND NOT (id = ANY($2::text[]))`, [
         run.id,
         ids,
       ])
@@ -275,13 +333,13 @@ export async function pgSaveRun(run: Run): Promise<void> {
     for (const lead of leads) {
       const row = toLeadRecord(run, lead)
       await client.query(
-        `INSERT INTO desk_leads (
-           id, run_id, name, domain, url, country, market, seed, band, score, fit,
+        `INSERT INTO ${DESK_LEADS_TABLE} (
+           id, run_id, name, domain, url, country, market, seed, band, score, fit, fit_index, icp,
            email, phone, website, last_purchase, response_level, response_score, response_note,
-           signals_at, hiring, mix_change, social_growth, payload, updated_at
+           signals_at, hiring, mix_change, social_growth, rag_match, rag_neighbor, payload, updated_at
          ) VALUES (
-           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
-           $19, $20, $21, $22, $23::jsonb, $24
+           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+           $21, $22, $23, $24, $25, $26, $27::jsonb, $28
          )
          ON CONFLICT (run_id, id) DO UPDATE SET
            name = EXCLUDED.name,
@@ -293,6 +351,8 @@ export async function pgSaveRun(run: Run): Promise<void> {
            band = EXCLUDED.band,
            score = EXCLUDED.score,
            fit = EXCLUDED.fit,
+           fit_index = EXCLUDED.fit_index,
+           icp = EXCLUDED.icp,
            email = EXCLUDED.email,
            phone = EXCLUDED.phone,
            website = EXCLUDED.website,
@@ -304,6 +364,8 @@ export async function pgSaveRun(run: Run): Promise<void> {
            hiring = EXCLUDED.hiring,
            mix_change = EXCLUDED.mix_change,
            social_growth = EXCLUDED.social_growth,
+           rag_match = EXCLUDED.rag_match,
+           rag_neighbor = EXCLUDED.rag_neighbor,
            payload = EXCLUDED.payload,
            updated_at = EXCLUDED.updated_at`,
         [
@@ -318,6 +380,8 @@ export async function pgSaveRun(run: Run): Promise<void> {
           row.band ?? null,
           row.score ?? null,
           row.fit ?? null,
+          row.fitIndex ?? null,
+          row.icp ?? null,
           row.email ?? null,
           row.phone ?? null,
           row.website ?? null,
@@ -329,6 +393,8 @@ export async function pgSaveRun(run: Run): Promise<void> {
           row.hiring ?? null,
           row.mixChange ?? null,
           row.socialGrowth ?? null,
+          row.ragMatch ?? null,
+          row.ragNeighbor ?? null,
           JSON.stringify(lead),
           row.updatedAt,
         ]
@@ -339,7 +405,7 @@ export async function pgSaveRun(run: Run): Promise<void> {
 
 export async function pgDeleteRun(id: string): Promise<void> {
   await ensureLeadSchema()
-  await getPool().query("DELETE FROM desk_runs WHERE id = $1", [id])
+  await getPool().query(`DELETE FROM ${DESK_RUNS_TABLE} WHERE id = $1`, [id])
 }
 
 type LeadSqlRow = {
@@ -354,6 +420,8 @@ type LeadSqlRow = {
   band: LeadRecord["band"] | null
   score: number | null
   fit: LeadRecord["fit"] | null
+  fit_index: number | null
+  icp: LeadRecord["icp"] | null
   email: string | null
   phone: string | null
   website: string | null
@@ -365,6 +433,8 @@ type LeadSqlRow = {
   hiring: boolean | null
   mix_change: boolean | null
   social_growth: boolean | null
+  rag_match: boolean | null
+  rag_neighbor: string | null
   updated_at: Date | string
   supplier: string
   status: LeadRecord["status"]
@@ -379,12 +449,12 @@ export async function pgListLeadRecords(): Promise<LeadRecord[]> {
   await ensureLeadSchema()
   const { rows } = await getPool().query<LeadSqlRow>(
     `SELECT l.id, l.run_id, l.name, l.domain, l.url, l.country, l.market, l.seed,
-            l.band, l.score, l.fit, l.email, l.phone, l.website, l.last_purchase,
+            l.band, l.score, l.fit, l.fit_index, l.icp, l.email, l.phone, l.website, l.last_purchase,
             l.response_level, l.response_score, l.response_note, l.signals_at,
-            l.hiring, l.mix_change, l.social_growth,
+            l.hiring, l.mix_change, l.social_growth, l.rag_match, l.rag_neighbor,
             l.updated_at, r.supplier, r.status, r.created_at
-     FROM desk_leads l
-     JOIN desk_runs r ON r.id = l.run_id
+     FROM ${DESK_LEADS_TABLE} l
+     JOIN ${DESK_RUNS_TABLE} r ON r.id = l.run_id
      ORDER BY l.updated_at DESC, l.name ASC`
   )
   return rows.map((row) => ({
@@ -401,6 +471,8 @@ export async function pgListLeadRecords(): Promise<LeadRecord[]> {
     band: row.band || undefined,
     score: row.score ?? undefined,
     fit: row.fit || undefined,
+    fitIndex: row.fit_index ?? undefined,
+    icp: row.icp || undefined,
     email: row.email || undefined,
     phone: row.phone || undefined,
     website: row.website || undefined,
@@ -412,6 +484,8 @@ export async function pgListLeadRecords(): Promise<LeadRecord[]> {
     hiring: row.hiring ?? undefined,
     mixChange: row.mix_change ?? undefined,
     socialGrowth: row.social_growth ?? undefined,
+    ragMatch: row.rag_match ?? undefined,
+    ragNeighbor: row.rag_neighbor || undefined,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
   }))
@@ -428,22 +502,24 @@ function statusHint(url: string): Pick<DbStatus, "source" | "host" | "port" | "u
 export async function postgresStatus(): Promise<DbStatus> {
   const url = databaseUrl()
   const hint = statusHint(url)
+  const tables = [DESK_RUNS_TABLE, DESK_LEADS_TABLE]
   if (!postgresConfigured()) {
-    return { postgres: false, leadCount: 0, runCount: 0, source: "none", ...hint }
+    return { postgres: false, leadCount: 0, runCount: 0, source: "none", tables, ...hint }
   }
   try {
     await ensureLeadSchema()
-    const runs = await getPool().query<{ n: number }>("SELECT count(*)::int AS n FROM desk_runs")
-    const leads = await getPool().query<{ n: number }>("SELECT count(*)::int AS n FROM desk_leads")
+    const runs = await getPool().query<{ n: number }>(`SELECT count(*)::int AS n FROM ${DESK_RUNS_TABLE}`)
+    const leads = await getPool().query<{ n: number }>(`SELECT count(*)::int AS n FROM ${DESK_LEADS_TABLE}`)
     lastError = undefined
     return {
       postgres: true,
       runCount: runs.rows[0]?.n ?? 0,
       leadCount: leads.rows[0]?.n ?? 0,
+      tables,
       ...hint,
     }
   } catch (error) {
     lastError = explainPostgresError(error instanceof Error ? error.message : "Postgres connection failed.")
-    return { postgres: true, leadCount: 0, runCount: 0, error: lastError, ...hint }
+    return { postgres: true, leadCount: 0, runCount: 0, error: lastError, tables, ...hint }
   }
 }

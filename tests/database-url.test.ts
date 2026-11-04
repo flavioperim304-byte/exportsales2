@@ -63,3 +63,14 @@ test("pooler IPv6 and tenant errors point back to Session pooler", () => {
   assert.match(explainPostgresError("connect ENETUNREACH"), /Session pooler/)
   assert.match(explainPostgresError("Tenant or user not found"), /postgres\.REFERENCIA/)
 })
+
+test("an allow-list rejection names Network Restrictions and the Render IP", () => {
+  const explained = explainPostgresError(
+    "(EADDRNOTALLOWED) address not in tenant allow_list: {74, 220, 48, 166}"
+  )
+  assert.match(explained, /74\.220\.48\.166/)
+  assert.match(explained, /Network Restrictions/)
+  assert.match(explained, /0\.0\.0\.0\/0/)
+  assert.match(explained, /desk_leads/)
+  assert.match(explained, /não são usadas/)
+})

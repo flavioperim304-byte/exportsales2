@@ -111,5 +111,10 @@ export function explainPostgresError(message: string): string {
   if (/ECONNREFUSED/i.test(text)) {
     return `${text} Porta ou host errados. Session pooler é 5432, não 6543.`
   }
+  if (/EADDRNOTALLOWED|not in tenant allow_list/i.test(text)) {
+    const octets = text.match(/allow_list:\s*\{(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\}/i)
+    const ip = octets ? `${octets[1]}.${octets[2]}.${octets[3]}.${octets[4]}` : ""
+    return `${text} O Supabase recusou o IP de saída do Render${ip ? ` (${ip})` : ""}. Abra Database Settings → Network Restrictions (https://supabase.com/dashboard/project/xtmixcnaojzcrwcbxcnw/database/settings) e permita 0.0.0.0/0 e ::/0. O Render starter não tem IP fixo, então um único endereço não segura. As tabelas desk_runs e desk_leads já existem neste projeto. Leads, leads_master e tradeindata_* não são usadas.`
+  }
   return text
 }
