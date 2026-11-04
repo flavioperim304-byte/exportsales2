@@ -34,7 +34,7 @@ export function LeadsBoard({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           {records.length} empresa{records.length === 1 ? "" : "s"} ·{" "}
-          {postgres ? "Postgres" : "arquivo local (data/runs.json)"}
+          {postgres ? "Postgres · desk_leads" : "arquivo local (data/runs.json)"}
         </p>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <input
