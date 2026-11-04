@@ -7,10 +7,16 @@ import type { WatchLead } from "@/lib/monitors"
 type Payload = {
   webhookUrl: string
   period: string
+  days: number
   event: string
   signals: string[]
   queryExample: string
   topPerCountry: number
+  triggerMode: "interval" | "manual"
+  companiesPerMonitor: number
+  numResults: number
+  numResultsMax: number
+  usdPerRun: number
   watch: WatchLead[]
   monitors: { id: string; name: string; country: string; rank: number; query: string }[]
   exa: boolean
@@ -44,7 +50,9 @@ export function MonitorPanel() {
     <section className="rounded-xl border border-border bg-card p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Monitor Exa · semanal</p>
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+            Monitor Exa · a cada {data?.days ?? 15} dias
+          </p>
           <h2 className="mt-1 font-serif text-2xl">Top 3 por país</h2>
         </div>
         <Button
@@ -83,10 +91,10 @@ export function MonitorPanel() {
       </div>
       <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
         As leads antigas não entram nas tabelas CRM. O desk pega os 3 melhores ranks de cada país
-        (probabilidade de resposta, depois fit) e cria um monitor Exa por empresa. Cada monitor
-        roda a cada 7 dias e manda só o que é novo para o webhook no Render. Sinais definidos na
-        query: news, product launches, promotion, exhibitions, events, mentions. Não é compra
-        Kanechom/LQ.
+        (probabilidade de resposta, depois fit) e cria um monitor Exa por empresa. Cada monitor é
+        uma query só — a API não tem cota de empresas, mas misturar nomes divide os 10 resultados.
+        Frequência: 15 dias. Sinais na query: news, product launches, promotion, exhibitions,
+        events, mentions. Não é compra Kanechom/LQ.
       </p>
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <div>
@@ -96,7 +104,26 @@ export function MonitorPanel() {
         <div>
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">Trigger</dt>
           <dd className="mt-0.5">
-            interval · {data?.period || "7d"} · evento {data?.event || "monitor.run.completed"}
+            {data?.triggerMode === "manual"
+              ? "manual · Render Cron GET /api/monitors/run a cada 15 dias"
+              : `interval · ${data?.period || "15d"}`}{" "}
+            · evento {data?.event || "monitor.run.completed"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Custo publicado</dt>
+          <dd className="mt-0.5">
+            US$ {data?.usdPerRun ?? 0.002} por run (US$ 2 / 1k). Até {data?.numResults ?? 10}{" "}
+            resultados inclusos. Desta lista:{" "}
+            {(((data?.watch.length ?? 0) * (data?.usdPerRun ?? 0.002)) || 0).toFixed(3)} USD a cada
+            15 dias na tarifa base.
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Empresas / monitor</dt>
+          <dd className="mt-0.5">
+            {data?.companiesPerMonitor ?? 1} empresa por monitor. Máx. {data?.numResultsMax ?? 100}{" "}
+            resultados na API; usamos {data?.numResults ?? 10}.
           </dd>
         </div>
         <div className="sm:col-span-2">

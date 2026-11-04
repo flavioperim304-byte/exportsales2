@@ -5,8 +5,19 @@ import { clip } from "./text"
 import type { ActivityKind, ActivitySignal, Lead, Run } from "./types"
 
 export const TOP_PER_COUNTRY = 3
-export const MONITOR_PERIOD = "7d"
+export const MONITOR_PERIOD = "15d"
+export const MONITOR_DAYS = 15
 export const MONITOR_EVENT = "monitor.run.completed" as const
+export const MONITOR_NUM_RESULTS = 10
+export const MONITOR_NUM_RESULTS_MAX = 100
+/** Published Exa rate: $2 / 1k monitor requests, first 10 results included. */
+export const MONITOR_USD_PER_RUN = 0.002
+
+export type MonitorTriggerMode = "interval" | "manual"
+
+export function monitorTriggerMode(): MonitorTriggerMode {
+  return process.env.MONITOR_TRIGGER === "manual" ? "manual" : "interval"
+}
 
 /** Signal types written into the Exa monitor query. Not a purchase. */
 export const MONITOR_SIGNALS = [
@@ -158,14 +169,20 @@ export function monitorQuery(name: string, country: string): string {
 }
 
 export function monitorCreateBody(watch: WatchLead, webhookUrl: string) {
-  return {
+  const body: {
+    name: string
+    search: { query: string; numResults: number; contents: { highlights: boolean } }
+    trigger?: { type: "interval"; period: string }
+    metadata: { runId: string; leadId: string; country: string; domain: string }
+    webhook: { url: string; events: [typeof MONITOR_EVENT] }
+    outputSchema: typeof MONITOR_OUTPUT_SCHEMA
+  } = {
     name: `Export Desk · ${watch.country} #${watch.rank} · ${watch.name}`.slice(0, 120),
     search: {
       query: monitorQuery(watch.name, watch.country),
-      numResults: 10,
+      numResults: MONITOR_NUM_RESULTS,
       contents: { highlights: true },
     },
-    trigger: { type: "interval" as const, period: MONITOR_PERIOD },
     metadata: {
       runId: watch.runId,
       leadId: watch.leadId,
@@ -178,6 +195,10 @@ export function monitorCreateBody(watch: WatchLead, webhookUrl: string) {
     },
     outputSchema: MONITOR_OUTPUT_SCHEMA,
   }
+  if (monitorTriggerMode() === "interval") {
+    body.trigger = { type: "interval", period: MONITOR_PERIOD }
+  }
+  return body
 }
 
 export function verifyExaSignature(payload: string, signatureHeader: string, secret: string): boolean {

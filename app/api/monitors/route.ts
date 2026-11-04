@@ -1,10 +1,16 @@
 import { connection } from "next/server"
 import { getKeys } from "@/lib/keys"
 import {
+  MONITOR_DAYS,
   MONITOR_EVENT,
+  MONITOR_NUM_RESULTS,
+  MONITOR_NUM_RESULTS_MAX,
   MONITOR_PERIOD,
   MONITOR_SIGNALS,
+  MONITOR_USD_PER_RUN,
+  TOP_PER_COUNTRY,
   monitorQuery,
+  monitorTriggerMode,
   monitorsCreateAllowed,
   topLeadsByCountry,
   webhookPublicUrl,
@@ -19,13 +25,20 @@ export async function GET() {
   const runs = await listRuns()
   const watch = topLeadsByCountry(runs)
   const example = watch[0]
+  const mode = monitorTriggerMode()
   return Response.json({
     webhookUrl: webhookPublicUrl(),
     period: MONITOR_PERIOD,
+    days: MONITOR_DAYS,
     event: MONITOR_EVENT,
     signals: MONITOR_SIGNALS,
     queryExample: example ? monitorQuery(example.name, example.country) : monitorQuery("Premium Cosmetics", "Panama"),
-    topPerCountry: 3,
+    topPerCountry: TOP_PER_COUNTRY,
+    triggerMode: mode,
+    companiesPerMonitor: 1,
+    numResults: MONITOR_NUM_RESULTS,
+    numResultsMax: MONITOR_NUM_RESULTS_MAX,
+    usdPerRun: MONITOR_USD_PER_RUN,
     watch,
     monitors: publicMonitors(),
     exa: Boolean(getKeys().exa),

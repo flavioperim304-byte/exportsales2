@@ -35,7 +35,7 @@ async function LeadsLoader() {
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Empresas das buscas Kanechom e LQ. No Supabase isso grava em desk_runs e desk_leads;
           tabelas antigas (Leads, leads_master, tradeindata_*) não aparecem aqui. Os 3 melhores
-          ranks de cada país entram num monitor Exa semanal (lançamentos, promoção, feiras,
+          ranks de cada país entram num monitor Exa a cada 15 dias (lançamentos, promoção, feiras,
           eventos, menções, notícias) via webhook no Render. O restante usa Atualizar sinais. Uma
           linha dump não confirma compra.
         </p>

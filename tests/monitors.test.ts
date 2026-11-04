@@ -95,7 +95,7 @@ test("the monitor query names the company and the six signal types", () => {
   for (const token of ["news", "product launch", "promotion", "exhibition", "event", "mention"]) {
     assert.match(query, new RegExp(token.replace(" ", "\\s")))
   }
-  assert.equal(MONITOR_PERIOD, "7d")
+  assert.equal(MONITOR_PERIOD, "15d")
   assert.deepEqual([...MONITOR_SIGNALS], [
     "news",
     "product launches",
@@ -118,9 +118,34 @@ test("the monitor query names the company and the six signal types", () => {
     },
     "https://exportsales.onrender.com/api/exa/webhook"
   )
-  assert.equal(body.trigger.period, "7d")
+  assert.equal(body.trigger?.period, "15d")
   assert.deepEqual(body.webhook.events, ["monitor.run.completed"])
   assert.equal(body.metadata.leadId, "c2")
+})
+
+test("manual mode omits the interval so a Render Cron can POST trigger", () => {
+  const previous = process.env.MONITOR_TRIGGER
+  process.env.MONITOR_TRIGGER = "manual"
+  try {
+    const body = monitorCreateBody(
+      {
+        runId: "r1",
+        leadId: "c2",
+        name: "Premium Cosmetics",
+        domain: "premium.example",
+        url: "https://premium.example",
+        country: "Panama",
+        rank: 1,
+        responseScore: 70,
+        fitIndex: 40,
+      },
+      "https://exportsales.onrender.com/api/exa/webhook"
+    )
+    assert.equal(body.trigger, undefined)
+  } finally {
+    if (previous === undefined) delete process.env.MONITOR_TRIGGER
+    else process.env.MONITOR_TRIGGER = previous
+  }
 })
 
 test("webhook HMAC follows Exa's t.payload scheme", () => {
