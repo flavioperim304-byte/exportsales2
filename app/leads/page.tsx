@@ -1,27 +1,12 @@
-import { Suspense } from "react"
 import Link from "next/link"
-import { connection } from "next/server"
 import { LeadsBoard } from "@/components/leads-board"
 import { MonitorPanel } from "@/components/monitor-panel"
 import { postgresStatus } from "@/lib/lead-db"
 import { listLeadRecords } from "@/lib/store"
 
-export default function LeadsPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="mx-auto w-full max-w-7xl px-4 py-10">
-          <p className="text-sm text-muted-foreground">Abrindo as leads…</p>
-        </main>
-      }
-    >
-      <LeadsLoader />
-    </Suspense>
-  )
-}
+export const dynamic = "force-dynamic"
 
-async function LeadsLoader() {
-  await connection()
+export default async function LeadsPage() {
   const [records, db] = await Promise.all([listLeadRecords(), postgresStatus()])
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 sm:py-8">
