@@ -10,6 +10,7 @@ import {
   DESK_RUNS_TABLE,
   IGNORED_SUPABASE_TABLES,
   listLeadRecordsFromRuns,
+  normalizeRun,
   postgresConfigured,
   postgresWantsSsl,
   toLeadRecord,
@@ -163,4 +164,33 @@ test("listLeadRecordsFromRuns skips the coffee sample", () => {
   assert.equal(rows.length, 1)
   assert.equal(rows[0].name, "Beta Hair")
   assert.equal(rows[0].runId, "run-pg-2")
+})
+
+test("normalizeRun fills missing arrays and does not invent scores", () => {
+  const run = normalizeRun({
+    ...createRun(KANECHOM_BRIEF),
+    id: "run-thin",
+    mode: "live",
+    leads: [
+      {
+        id: "thin",
+        name: "Thin Co",
+        domain: "thin.example",
+        url: "https://thin.example",
+        country: "Chile",
+        exa: { title: "Thin Co", url: "https://thin.example", domain: "thin.example", text: "", highlights: undefined as never, summary: "" },
+        score: { total: 40, band: "possible", headline: "possible", nextAction: "", disqualified: false, dimensions: undefined as never },
+        fit: { level: "medium", index: 40, note: "saved", facts: undefined as never, missing: undefined as never },
+        activity: { fetchedAt: "2026-11-05T00:00:00.000Z", signals: undefined as never },
+      },
+    ],
+    competitors: undefined as never,
+  })
+  const lead = run.leads[0]
+  assert.deepEqual(lead.exa.highlights, [])
+  assert.deepEqual(lead.score?.dimensions, [])
+  assert.deepEqual(lead.fit?.facts, [])
+  assert.deepEqual(lead.activity?.signals, [])
+  assert.deepEqual(run.competitors, [])
+  assert.equal(lead.score?.total, 40)
 })

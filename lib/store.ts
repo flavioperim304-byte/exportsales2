@@ -11,6 +11,7 @@ import {
   pgSaveRun,
   readyPostgres,
   listLeadRecordsFromRuns,
+  normalizeRun,
 } from "./lead-db"
 import { sampleRun } from "./sample"
 import type { LeadMemoryEvent, LeadRecord, Run } from "./types"
@@ -108,14 +109,18 @@ export async function listRuns(): Promise<Run[]> {
     (run) => run.id !== SAMPLE_RUN_ID
   )
   stored.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  return [sampleRun(), ...stored]
+  return [sampleRun(), ...stored.map(normalizeRun)]
 }
 
 export async function getRun(id: string): Promise<Run | null> {
   if (id === SAMPLE_RUN_ID) return sampleRun()
   if (await postgresReady()) return pgGetRun(id)
-  if (durable()) return blobGet(id)
-  return loadDatabase().runs.find((run) => run.id === id) ?? null
+  if (durable()) {
+    const blob = await blobGet(id)
+    return blob ? normalizeRun(blob) : null
+  }
+  const found = loadDatabase().runs.find((run) => run.id === id) ?? null
+  return found ? normalizeRun(found) : null
 }
 
 export async function listLeadRecords(): Promise<LeadRecord[]> {

@@ -369,13 +369,35 @@ async function withTx<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
   }
 }
 
+/** Fill missing arrays so the Painel never calls .filter on undefined. Empty, not invented. */
+export function normalizeRun(run: Run): Run {
+  return {
+    ...run,
+    logs: run.logs ?? [],
+    competitors: run.competitors ?? [],
+    leads: (run.leads ?? []).map(normalizeLead),
+  }
+}
+
+function normalizeLead(lead: Lead): Lead {
+  const next: Lead = { ...lead }
+  if (next.exa) next.exa = { ...next.exa, highlights: next.exa.highlights ?? [] }
+  if (next.score) next.score = { ...next.score, dimensions: next.score.dimensions ?? [] }
+  if (next.alsoScore) next.alsoScore = { ...next.alsoScore, dimensions: next.alsoScore.dimensions ?? [] }
+  if (next.openai) next.openai = { ...next.openai, supplierFits: next.openai.supplierFits ?? [] }
+  if (next.fit) next.fit = { ...next.fit, facts: next.fit.facts ?? [], missing: next.fit.missing ?? [] }
+  if (next.activity) next.activity = { ...next.activity, signals: next.activity.signals ?? [] }
+  if (next.commerce) next.commerce = { ...next.commerce, signals: next.commerce.signals ?? [] }
+  return next
+}
+
 export async function pgListRuns(): Promise<Run[]> {
   await ensureLeadSchema()
   const { rows } = await getPool().query<{ payload: Run }>(
     `SELECT payload FROM ${DESK_RUNS_TABLE} WHERE id <> $1 ORDER BY created_at DESC`,
     [SAMPLE_RUN_ID]
   )
-  return rows.map((row) => row.payload)
+  return rows.map((row) => normalizeRun(row.payload))
 }
 
 export async function pgGetRun(id: string): Promise<Run | null> {
@@ -384,7 +406,7 @@ export async function pgGetRun(id: string): Promise<Run | null> {
     `SELECT payload FROM ${DESK_RUNS_TABLE} WHERE id = $1`,
     [id]
   )
-  return rows[0]?.payload ?? null
+  return rows[0] ? normalizeRun(rows[0].payload) : null
 }
 
 function asLeadPayload(value: unknown): Lead | undefined {
@@ -444,6 +466,7 @@ async function upsertCompany(
 
 export async function pgSaveRun(run: Run): Promise<void> {
   if (run.id === SAMPLE_RUN_ID || run.mode === "sample") return
+  run = normalizeRun(run)
   await ensureLeadSchema()
   await withTx(async (client) => {
     const previousRun = await client.query<{ status: string; version: number }>(
