@@ -177,7 +177,7 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
         )
       )
     }
-    if (lead.openai && lead.openai.supplierFits.length > 0) {
+    if (lead.openai && (lead.openai.supplierFits?.length ?? 0) > 0) {
       return guardFit(lead, fromJudgment(lead, lead.openai, "openai", lead.openai.rationale, brief))
     }
     const fits = [
@@ -216,7 +216,7 @@ export function qualificationRows(leads: Lead[], brief: Brief, also?: Brief): Qu
       company: lead.name,
       country: lead.market || lead.extraction?.country || lead.country || "",
       level,
-      rationale: rationale || lead.exa.summary || "No fit statement yet.",
+      rationale: rationale || lead.exa?.summary || "No fit statement yet.",
       fits: fits.map(({ supplier, level: fitLevel }) => ({ supplier, level: fitLevel })),
       bestFit,
       qualificationNeeded: needed(open[0] ? (open[0].supplier === brief.supplierName ? lead.score : lead.alsoScore) : lead.score),

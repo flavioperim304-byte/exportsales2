@@ -11,7 +11,7 @@ export function viewRun(run: Run): Run {
 }
 
 export function summarize(run: Run): RunSummary {
-  const ranked = [...run.leads].sort(
+  const ranked = [...(run.leads ?? [])].sort(
     (a, b) => (b.score?.total ?? 0) - (a.score?.total ?? 0)
   )
   const top = ranked.find((lead) => lead.score && !lead.score.disqualified) ?? ranked[0]
@@ -24,7 +24,7 @@ export function summarize(run: Run): RunSummary {
     markets: run.brief.markets,
     products: run.brief.products,
     createdAt: run.createdAt,
-    leadCount: run.leads.length,
+    leadCount: run.leads?.length ?? 0,
     topLead: top?.score
       ? { name: top.name, band: top.score.band, total: top.score.total }
       : undefined,
@@ -38,7 +38,7 @@ export function boardRun(run: Run): Run {
     ...presented,
     logs: [],
     searchTasks: undefined,
-    leads: presented.leads.map(boardLead),
+    leads: (presented.leads ?? []).map(boardLead),
   }
 }
 

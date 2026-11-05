@@ -200,8 +200,10 @@ function buyerRows(runs: Run[]): Buyer[] {
   const rank: Record<string, number> = { high: 0, medium: 1, low: 2 }
   const rows: Buyer[] = []
   for (const run of runs) {
-    const leads = new Map(run.leads.map((lead) => [lead.name, lead]))
-    for (const row of qualificationRows(run.leads, run.brief, run.also)) {
+    if (!run.brief) continue
+    const runLeads = run.leads ?? []
+    const leads = new Map(runLeads.map((lead) => [lead.name, lead]))
+    for (const row of qualificationRows(runLeads, run.brief, run.also)) {
       const lead = leads.get(row.company)
       rows.push({
         runId: run.id,

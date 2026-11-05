@@ -51,9 +51,9 @@ function corpus(lead: Lead): string {
     extraction?.excerpt,
     (extraction?.buyerSignals ?? []).join(" "),
     (extraction?.buys ?? []).join(" "),
-    lead.exa.summary,
-    lead.exa.text,
-    lead.exa.highlights.join(" "),
+    lead.exa?.summary,
+    lead.exa?.text,
+    (lead.exa?.highlights ?? []).join(" "),
     (lead.context?.knownSuppliers ?? []).join(" "),
     (lead.activity?.signals ?? []).map((signal) => `${signal.title} ${signal.quote}`).join(" "),
   ]
@@ -159,7 +159,7 @@ export function buyingFacts(lead: Lead): BuyingFact[] {
 }
 
 function roleBoost(lead: Lead): number {
-  const role = `${lead.extraction?.role ?? ""} ${lead.exa.summary}`.toLowerCase()
+  const role = `${lead.extraction?.role ?? ""} ${lead.exa?.summary ?? ""}`.toLowerCase()
   if (/\b(importer|importador|distributor|distribuidor|wholesaler|atacadista)\b/i.test(role)) return 10
   if (/\b(trader|trading|trading company)\b/i.test(role)) return 6
   return 0
