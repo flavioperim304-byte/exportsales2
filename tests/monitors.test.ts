@@ -81,7 +81,10 @@ test("monitors only take best fits in relevant countries and skip sample runs", 
   const southAfrica = [scored({ id: "za1", name: "Joburg Hair", country: "South Africa" }, "best_fit", 86)]
   const uk = [scored({ id: "uk1", name: "London Hair", country: "United Kingdom" }, "best_fit", 84)]
   const bolivia = [scored({ id: "b1", name: "La Paz Hair", country: "Bolivia" }, "best_fit", 85)]
-  const costa = [scored({ id: "cr1", name: "Tico Hair", country: "Costa Rica" }, "strong", 75)]
+  const costa = [scored({ id: "cr1", name: "Tico Hair", country: "Costa Rica" }, "best_fit", 75)]
+  const portugal = [scored({ id: "pt1", name: "Lisboa Hair", country: "Portugal" }, "best_fit", 80)]
+  const pakistan = [scored({ id: "pk1", name: "Karachi Hair", country: "Pakistan" }, "best_fit", 82)]
+  const spain = [scored({ id: "es1", name: "Madrid Hair", country: "Spain" }, "strong", 77)]
   const sample = liveRun("sample-ish", chile)
   sample.mode = "sample"
   const runs = [
@@ -93,6 +96,9 @@ test("monitors only take best fits in relevant countries and skip sample runs", 
     liveRun("uk", uk),
     liveRun("bolivia", bolivia),
     liveRun("costa", costa),
+    liveRun("portugal", portugal),
+    liveRun("pakistan", pakistan),
+    liveRun("spain", spain),
   ]
   const watched = watchLeadsForMonitors(runs)
   assert.deepEqual(
@@ -109,14 +115,20 @@ test("monitors only take best fits in relevant countries and skip sample runs", 
   assert.equal(monitorMarketAllowed("UK"), false)
   assert.equal(monitorMarketAllowed("India"), false)
   assert.equal(monitorMarketAllowed("Bolivia"), false)
+  assert.equal(monitorMarketAllowed("Costa Rica"), false)
+  assert.equal(monitorMarketAllowed("Portugal"), false)
+  assert.equal(monitorMarketAllowed("Pakistan"), false)
   const skipped = skippedMonitorCountries(runs)
   assert.deepEqual(
     skipped.map((row) => `${row.country}:${row.reason}`),
     [
       "Bolivia:market",
-      "Costa Rica:band",
+      "Costa Rica:market",
       "Kenya:market",
+      "Pakistan:market",
+      "Portugal:market",
       "South Africa:market",
+      "Spain:band",
       "Uganda:market",
       "United Kingdom:market",
     ]
