@@ -94,8 +94,9 @@ export function MonitorPanel() {
       <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
         Vários monitors: um por empresa, todos automáticos a cada 15 dias. Só entra Best fit em
         mercado relevante (México, Centroamérica, Caribe, Chile, Colômbia, Peru, Equador, Argentina,
-        África do Sul, Magrebe, Golfo, Portugal, Espanha). Fora: restante da África, Ásia, Bolívia,
-        Paraguai, Uruguai, Venezuela. Strong e Possible não rastreiam. Não é compra Kanechom/LQ.
+        Magrebe, Golfo, Portugal, Espanha). Fora: África do Sul, Uganda, Reino Unido, restante da
+        África, Ásia, Bolívia, Paraguai, Uruguai, Venezuela. Strong e Possible não rastreiam. Não é
+        compra Kanechom/LQ.
       </p>
       <div className="mt-4">
         <WebhookLine compact />

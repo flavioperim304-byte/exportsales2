@@ -16,7 +16,8 @@ export const MONITOR_USD_PER_RUN = 0.002
 
 /**
  * Kanechom / LQ commercial geography. One monitor per best_fit company here.
- * Skip Atlas-dump leftovers: rest of Africa, Asia, and small South America.
+ * Not priority — do not watch: South Africa, Uganda, United Kingdom, plus
+ * Atlas-dump leftovers in the rest of Africa, Asia, and small South America.
  */
 export const MONITOR_MARKETS = new Set([
   "mexico",
@@ -48,7 +49,6 @@ export const MONITOR_MARKETS = new Set([
   "jordan",
   "lebanon",
   "oman",
-  "south africa",
   "portugal",
   "spain",
 ])

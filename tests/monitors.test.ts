@@ -78,6 +78,8 @@ test("monitors only take best fits in relevant countries and skip sample runs", 
   ]
   const kenya = [scored({ id: "k1", name: "Nairobi Hair", country: "Kenya" }, "best_fit", 90)]
   const uganda = [scored({ id: "u1", name: "Kampala Hair", country: "Uganda" }, "best_fit", 88)]
+  const southAfrica = [scored({ id: "za1", name: "Joburg Hair", country: "South Africa" }, "best_fit", 86)]
+  const uk = [scored({ id: "uk1", name: "London Hair", country: "United Kingdom" }, "best_fit", 84)]
   const bolivia = [scored({ id: "b1", name: "La Paz Hair", country: "Bolivia" }, "best_fit", 85)]
   const costa = [scored({ id: "cr1", name: "Tico Hair", country: "Costa Rica" }, "strong", 75)]
   const sample = liveRun("sample-ish", chile)
@@ -87,6 +89,8 @@ test("monitors only take best fits in relevant countries and skip sample runs", 
     liveRun("chile", chile),
     liveRun("kenya", kenya),
     liveRun("uganda", uganda),
+    liveRun("south-africa", southAfrica),
+    liveRun("uk", uk),
     liveRun("bolivia", bolivia),
     liveRun("costa", costa),
   ]
@@ -99,12 +103,23 @@ test("monitors only take best fits in relevant countries and skip sample runs", 
   assert.equal(watched.some((row) => row.name === "Gama Hair"), false)
   assert.equal(monitorMarketAllowed("Republica Domincana"), true)
   assert.equal(monitorMarketAllowed("Uganda"), false)
+  assert.equal(monitorMarketAllowed("South Africa"), false)
+  assert.equal(monitorMarketAllowed("África do Sul"), false)
+  assert.equal(monitorMarketAllowed("United Kingdom"), false)
+  assert.equal(monitorMarketAllowed("UK"), false)
   assert.equal(monitorMarketAllowed("India"), false)
   assert.equal(monitorMarketAllowed("Bolivia"), false)
   const skipped = skippedMonitorCountries(runs)
   assert.deepEqual(
     skipped.map((row) => `${row.country}:${row.reason}`),
-    ["Bolivia:market", "Costa Rica:band", "Kenya:market", "Uganda:market"]
+    [
+      "Bolivia:market",
+      "Costa Rica:band",
+      "Kenya:market",
+      "South Africa:market",
+      "Uganda:market",
+      "United Kingdom:market",
+    ]
   )
 })
 
