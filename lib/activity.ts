@@ -131,7 +131,7 @@ export function signalsFromSearch(results: unknown[], lead: Lead): ActivitySigna
 
 export function recentSignals(activity: ActivitySnapshot | undefined): ActivitySignal[] {
   if (!activity) return []
-  return activity.signals.filter((signal) => isRecent(signal.publishedAt, activity.fetchedAt))
+  return (activity.signals ?? []).filter((signal) => isRecent(signal.publishedAt, activity.fetchedAt))
 }
 
 export function hasRecentActivity(lead: Lead): boolean {

@@ -63,7 +63,7 @@ function comexPoints(run: ResponseContext, lead: Lead): number {
 function competitorPoints(run: ResponseContext, lead: Lead): number {
   const market = (lead.market || lead.country || "").toLowerCase()
   if (!market) return 0
-  const hits = run.competitors.filter((item) => item.country.toLowerCase().includes(market) || market.includes(item.country.toLowerCase()))
+  const hits = (run.competitors ?? []).filter((item) => item.country.toLowerCase().includes(market) || market.includes(item.country.toLowerCase()))
   if (hits.length >= 3) return 8
   if (hits.length > 0) return 5
   return 0

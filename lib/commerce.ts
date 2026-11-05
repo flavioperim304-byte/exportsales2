@@ -131,7 +131,7 @@ export function signalsFromSearch(results: unknown[], lead: Lead): CommerceSigna
 export function recentCommerce(lead: Lead): CommerceSignal[] {
   const snapshot = lead.commerce
   if (!snapshot) return []
-  return snapshot.signals.filter((signal) => isRecent(signal.publishedAt, snapshot.fetchedAt))
+  return (snapshot.signals ?? []).filter((signal) => isRecent(signal.publishedAt, snapshot.fetchedAt))
 }
 
 export function hasCommerceSignals(lead: Lead): boolean {

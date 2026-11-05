@@ -181,7 +181,7 @@ function productBoost(brief: Brief, lead: Lead): number {
 function competitorBoost(lead: Lead, competitors: Competitor[]): number {
   const market = (lead.market || lead.country || "").toLowerCase()
   if (!market) return competitors.length ? 4 : 0
-  const local = competitors.filter((item) => item.country.toLowerCase().includes(market) || market.includes(item.country.toLowerCase()))
+  const local = (competitors ?? []).filter((item) => item.country.toLowerCase().includes(market) || market.includes(item.country.toLowerCase()))
   return local.length ? 8 : 0
 }
 
@@ -250,8 +250,8 @@ export function computeFitProbability(
 
 export function fitProbabilityLine(fit: FitProbability | undefined): string {
   if (!fit) return "Fit probability has not been calculated."
-  const have = fit.facts.filter((fact) => fact.found).map((fact) => buyingKindLabel(fact.kind))
-  const miss = fit.missing.map(buyingKindLabel)
+  const have = (fit.facts ?? []).filter((fact) => fact.found).map((fact) => buyingKindLabel(fact.kind))
+  const miss = (fit.missing ?? []).map(buyingKindLabel)
   return [
     `Fit probability ${fit.level}, evidence index ${fit.index}/100.`,
     have.length ? `Published: ${have.join(", ")}.` : "No commercial buying facts were published.",

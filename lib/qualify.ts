@@ -38,7 +38,7 @@ export function icpLevel(score: LeadScore | undefined): IcpLevel {
 function needed(score: LeadScore | undefined): string {
   if (!score) return "Collect page evidence before outreach."
   if (score.disqualified) return score.disqualifyReason || "Disqualified on the current evidence."
-  const thin = score.dimensions.filter((item) => item.max > 0 && item.points / item.max <= 0.45)
+  const thin = (score.dimensions ?? []).filter((item) => item.max > 0 && item.points / item.max <= 0.45)
   if (thin.length === 0) {
     return "Confirm room for another brand, competing-brand restrictions, and an initial order."
   }

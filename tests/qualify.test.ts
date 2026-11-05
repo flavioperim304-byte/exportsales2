@@ -189,3 +189,13 @@ test("Parallel is asked to separate fit from the ability to buy", () => {
   assert.equal(icpLevel(score(50, "possible")), "medium")
   assert.equal(icpLevel(score(10, "weak", true)), "low")
 })
+
+test("qualificationRows does not throw when saved score, fit, and signals omit arrays", () => {
+  const thin = lead("ThinCo", { total: 48, band: "possible", headline: "possible", nextAction: "", disqualified: false, dimensions: undefined as never })
+  thin.fit = { level: "medium", index: 48, note: "saved", missing: undefined as never, facts: undefined as never }
+  thin.activity = { fetchedAt: "2026-11-05T00:00:00.000Z", signals: undefined as never }
+  thin.commerce = { fetchedAt: "2026-11-05T00:00:00.000Z", signals: undefined as never }
+  const rows = qualificationRows([thin], KANECHOM_BRIEF)
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].company, "ThinCo")
+})
