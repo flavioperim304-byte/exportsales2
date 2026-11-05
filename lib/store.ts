@@ -5,6 +5,7 @@ import { SAMPLE_RUN_ID } from "./ids"
 import {
   pgDeleteRun,
   pgGetRun,
+  pgListLeadEvents,
   pgListLeadRecords,
   pgListRuns,
   pgSaveRun,
@@ -12,7 +13,7 @@ import {
   listLeadRecordsFromRuns,
 } from "./lead-db"
 import { sampleRun } from "./sample"
-import type { LeadRecord, Run } from "./types"
+import type { LeadMemoryEvent, LeadRecord, Run } from "./types"
 
 function durable(): boolean {
   return process.env.NETLIFY === "true" && process.env.NEXT_PHASE !== "phase-production-build"
@@ -121,6 +122,11 @@ export async function listLeadRecords(): Promise<LeadRecord[]> {
   if (await postgresReady()) return pgListLeadRecords()
   const runs = await listRuns()
   return listLeadRecordsFromRuns(runs)
+}
+
+export async function listLeadEvents(companyId: string): Promise<LeadMemoryEvent[]> {
+  if (!(await postgresReady())) return []
+  return pgListLeadEvents(companyId)
 }
 
 function writeJson(run: Run) {

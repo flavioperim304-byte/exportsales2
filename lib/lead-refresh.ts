@@ -2,6 +2,7 @@ import { emptyActivity, searchActivity } from "./activity"
 import { emptyCommerce, searchCommerce } from "./commerce"
 import { scrapeProfile } from "./firecrawl"
 import { stampIntelligence } from "./intelligence"
+import { markLeadScan, mergeActivitySignals, mergeCommerceSignals } from "./memory"
 import { getKeys } from "./keys"
 import { watchedLeadIds } from "./monitor-store"
 import { getRun, listRuns, updateRun } from "./store"
@@ -62,10 +63,10 @@ export async function refreshSavedLeads(limit = MAX_REFRESH_PER_PASS): Promise<R
       await updateRun(run.id, (current) => {
         const next = current.leads.find((row) => row.id === item.leadId)
         if (!next) return
-        next.activity = activity
-        next.commerce = commerce
+        next.activity = mergeActivitySignals(next.activity, activity)
+        next.commerce = mergeCommerceSignals(next.commerce, commerce)
         if (extraction) next.extraction = extraction
-        next.signalsAt = new Date().toISOString()
+        markLeadScan(next, "refresh")
         stampIntelligence(current, next)
       })
       result.refreshed += 1
@@ -77,7 +78,7 @@ export async function refreshSavedLeads(limit = MAX_REFRESH_PER_PASS): Promise<R
         if (!next) return
         if (!next.activity) next.activity = emptyActivity(message)
         if (!next.commerce) next.commerce = emptyCommerce(message)
-        next.signalsAt = new Date().toISOString()
+        markLeadScan(next, "refresh")
         stampIntelligence(current, next)
       })
     }

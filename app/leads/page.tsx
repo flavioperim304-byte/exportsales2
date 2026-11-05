@@ -33,8 +33,9 @@ async function LeadsLoader() {
         </p>
         <h1 className="mt-2 font-serif text-3xl sm:text-4xl">Leads</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Empresas das buscas Kanechom e LQ. No Supabase isso grava em desk_runs e desk_leads;
-          tabelas antigas (Leads, leads_master, tradeindata_*) não aparecem aqui. Cada Best fit
+          Empresas das buscas Kanechom e LQ. O perfil atual fica em desk_leads; o histórico vai
+          para desk_lead_events e snapshots em desk_*_versions. Tabelas antigas (Leads,
+          leads_master, tradeindata_*) não aparecem aqui. Cada Best fit
           de um país relevante ganha um monitor Exa automático a cada 15 dias (lançamentos,
           promoção, feiras, eventos, menções, notícias) via webhook no Render. O restante usa
           Atualizar sinais. Uma linha dump não confirma compra.

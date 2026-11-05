@@ -507,6 +507,11 @@ export type Lead = {
   response?: ResponseProbability
   /** Last Exa/Firecrawl signal refresh. Weekly monitors skip leads fresher than six days. */
   signalsAt?: string
+  /** Last enrichment scan (monitor 15d, Atualizar sinais, or a live run tick). */
+  lastScanAt?: string
+  lastScanSource?: "run" | "monitor" | "refresh"
+  /** Incremented in Postgres when the audit snapshot of this lead changes. */
+  version?: number
   /** Chroma RAG check against previously ingested dashboard CSVs. */
   rag?: RagMatch
   /** Commercial due diligence reports, newest last. One brand per report. */
@@ -681,8 +686,25 @@ export type LeadRecord = {
   socialGrowth?: boolean
   ragMatch?: boolean
   ragNeighbor?: string
+  companyId?: string
+  version?: number
+  lastScanAt?: string
+  lastScanSource?: "run" | "monitor" | "refresh"
   createdAt: string
   updatedAt: string
+}
+
+export type LeadMemoryEvent = {
+  id: string
+  companyId: string
+  runId?: string
+  leadId?: string
+  at: string
+  source: "run" | "monitor" | "refresh"
+  kind: string
+  summary: string
+  before?: Record<string, unknown>
+  after?: Record<string, unknown>
 }
 
 export type DbStatus = {

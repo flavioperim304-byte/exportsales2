@@ -2,6 +2,7 @@ import crypto from "node:crypto"
 import { classifyActivity, mentionsCompany } from "./activity"
 import { canonicalCountry, foldCountry, resolveCountry } from "./comexstat-map"
 import { stampIntelligence } from "./intelligence"
+import { markLeadScan } from "./memory"
 import { clip } from "./text"
 import type { ActivityKind, ActivitySignal, Lead, Run } from "./types"
 
@@ -393,6 +394,7 @@ export function applyMonitorToRun(run: Run, leadId: string, output: unknown, fet
   if (!lead) return 0
   const incoming = signalsFromMonitorOutput(lead, output)
   mergeMonitorSignals(lead, incoming, fetchedAt)
+  markLeadScan(lead, "monitor", fetchedAt)
   stampIntelligence(run, lead)
   return incoming.length
 }

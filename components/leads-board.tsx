@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import type { LeadRecord } from "@/lib/types"
+import type { LeadMemoryEvent, LeadRecord } from "@/lib/types"
 
 export function LeadsBoard({
   records,
@@ -19,6 +19,9 @@ export function LeadsBoard({
   const [query, setQuery] = useState("")
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState("")
+  const [openId, setOpenId] = useState("")
+  const [history, setHistory] = useState<Record<string, LeadMemoryEvent[]>>({})
+  const [historyError, setHistoryError] = useState("")
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return records
@@ -121,7 +124,12 @@ export function LeadsBoard({
                   row.hiring ? "vaga de compras" : "",
                   row.mixChange ? "mudança de mix" : "",
                   row.socialGrowth ? "crescimento em rede" : "",
-                  row.signalsAt ? `sinais ${row.signalsAt.slice(0, 10)}` : "",
+                  row.lastScanAt
+                    ? `varredura ${row.lastScanAt.slice(0, 10)}${row.lastScanSource ? ` · ${row.lastScanSource}` : ""}`
+                    : row.signalsAt
+                      ? `sinais ${row.signalsAt.slice(0, 10)}`
+                      : "",
+                  row.version ? `v${row.version}` : "",
                 ]
                   .filter(Boolean)
                   .join(" · ") || "Sinais semanais ainda não rodaram nesta ficha."}
@@ -139,7 +147,61 @@ export function LeadsBoard({
                     <span className="text-muted-foreground">{row.domain}</span>
                   </>
                 ) : null}
+                {row.companyId ? (
+                  <>
+                    {" · "}
+                    <button
+                      type="button"
+                      className="underline-offset-2 hover:underline"
+                      onClick={async () => {
+                        const companyId = row.companyId
+                        if (!companyId) return
+                        const key = `${row.runId}:${row.id}`
+                        if (openId === key) {
+                          setOpenId("")
+                          return
+                        }
+                        setOpenId(key)
+                        setHistoryError("")
+                        if (history[companyId]) return
+                        try {
+                          const response = await fetch(
+                            `/api/leads/history?companyId=${encodeURIComponent(companyId)}`
+                          )
+                          const data = (await response.json()) as { events?: LeadMemoryEvent[]; error?: string }
+                          if (!response.ok) {
+                            setHistoryError(data.error || "Histórico indisponível.")
+                            return
+                          }
+                          setHistory((current) => ({ ...current, [companyId]: data.events ?? [] }))
+                        } catch {
+                          setHistoryError("Histórico indisponível.")
+                        }
+                      }}
+                    >
+                      {openId === `${row.runId}:${row.id}` ? "Fechar histórico" : "Histórico"}
+                    </button>
+                  </>
+                ) : null}
               </p>
+              {openId === `${row.runId}:${row.id}` ? (
+                <ol className="mt-3 flex flex-col gap-2 border-t border-border pt-3 text-sm">
+                  {historyError ? <li className="text-destructive">{historyError}</li> : null}
+                  {(history[row.companyId || ""] ?? []).length === 0 && !historyError ? (
+                    <li className="text-muted-foreground">
+                      Sem eventos ainda, ou o Postgres não está ligado. O perfil atual continua em desk_leads.
+                    </li>
+                  ) : null}
+                  {(history[row.companyId || ""] ?? []).map((event) => (
+                    <li key={event.id}>
+                      <p className="text-muted-foreground">
+                        {event.at.slice(0, 16).replace("T", " ")} · {event.source} · {event.kind}
+                      </p>
+                      <p>{event.summary}</p>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
             </li>
           ))}
         </ul>

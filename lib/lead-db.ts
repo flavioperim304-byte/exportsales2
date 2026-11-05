@@ -3,11 +3,30 @@ import { databaseHintFromUrl, explainPostgresError } from "./database-url"
 import { stampIntelligence } from "./intelligence"
 import { envDatabaseUrl, getDatabaseUrl } from "./keys"
 import { SAMPLE_RUN_ID } from "./ids"
-import type { DbStatus, Lead, LeadRecord, LeadSeed, Run } from "./types"
+import {
+  DESK_COMPANIES_TABLE,
+  DESK_LEAD_EVENTS_TABLE,
+  DESK_LEAD_VERSIONS_TABLE,
+  DESK_RUN_VERSIONS_TABLE,
+  auditChanged,
+  companyIdFor,
+  leadAudit,
+  leadBestFit,
+  memoryEvents,
+  snapshotReason,
+  type ScanSource,
+} from "./memory"
+import type { DbStatus, Lead, LeadMemoryEvent, LeadRecord, LeadSeed, Run } from "./types"
 
 /** Live Export Desk tables. Older CRM tables in the same project are never read. */
 export const DESK_RUNS_TABLE = "desk_runs"
 export const DESK_LEADS_TABLE = "desk_leads"
+export {
+  DESK_COMPANIES_TABLE,
+  DESK_LEAD_EVENTS_TABLE,
+  DESK_LEAD_VERSIONS_TABLE,
+  DESK_RUN_VERSIONS_TABLE,
+} from "./memory"
 
 export const IGNORED_SUPABASE_TABLES = [
   "Leads",
@@ -94,17 +113,84 @@ ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS fit_index INTEGER;
 ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS icp TEXT;
 ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS rag_match BOOLEAN;
 ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS rag_neighbor TEXT;
+ALTER TABLE desk_runs ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS company_id TEXT;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS last_scan_at TIMESTAMPTZ;
+ALTER TABLE desk_leads ADD COLUMN IF NOT EXISTS last_scan_source TEXT;
+CREATE TABLE IF NOT EXISTS desk_companies (
+  id TEXT PRIMARY KEY,
+  domain TEXT NOT NULL DEFAULT '',
+  country TEXT NOT NULL DEFAULT '',
+  name TEXT NOT NULL,
+  url TEXT NOT NULL DEFAULT '',
+  last_scan_at TIMESTAMPTZ,
+  last_scan_source TEXT,
+  last_icp TEXT,
+  last_best_fit TEXT,
+  last_fit TEXT,
+  last_response_level TEXT,
+  last_response_score INTEGER,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS desk_run_versions (
+  run_id TEXT NOT NULL REFERENCES desk_runs(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL,
+  at TIMESTAMPTZ NOT NULL,
+  status TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  PRIMARY KEY (run_id, version)
+);
+CREATE TABLE IF NOT EXISTS desk_lead_versions (
+  run_id TEXT NOT NULL,
+  lead_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  company_id TEXT,
+  at TIMESTAMPTZ NOT NULL,
+  reason TEXT NOT NULL,
+  payload JSONB NOT NULL,
+  PRIMARY KEY (run_id, lead_id, version)
+);
+CREATE TABLE IF NOT EXISTS desk_lead_events (
+  id TEXT PRIMARY KEY,
+  company_id TEXT NOT NULL,
+  run_id TEXT,
+  lead_id TEXT,
+  at TIMESTAMPTZ NOT NULL,
+  source TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  before_state JSONB,
+  after_state JSONB
+);
+CREATE INDEX IF NOT EXISTS desk_companies_domain_idx ON desk_companies (lower(domain));
+CREATE INDEX IF NOT EXISTS desk_lead_events_company_idx ON desk_lead_events (company_id, at DESC);
+CREATE INDEX IF NOT EXISTS desk_lead_versions_company_idx ON desk_lead_versions (company_id, at DESC);
+CREATE INDEX IF NOT EXISTS desk_leads_company_idx ON desk_leads (company_id);
 ALTER TABLE desk_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE desk_leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE desk_companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE desk_run_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE desk_lead_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE desk_lead_events ENABLE ROW LEVEL SECURITY;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
     REVOKE ALL ON TABLE desk_runs FROM anon;
     REVOKE ALL ON TABLE desk_leads FROM anon;
+    REVOKE ALL ON TABLE desk_companies FROM anon;
+    REVOKE ALL ON TABLE desk_run_versions FROM anon;
+    REVOKE ALL ON TABLE desk_lead_versions FROM anon;
+    REVOKE ALL ON TABLE desk_lead_events FROM anon;
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
     REVOKE ALL ON TABLE desk_runs FROM authenticated;
     REVOKE ALL ON TABLE desk_leads FROM authenticated;
+    REVOKE ALL ON TABLE desk_companies FROM authenticated;
+    REVOKE ALL ON TABLE desk_run_versions FROM authenticated;
+    REVOKE ALL ON TABLE desk_lead_versions FROM authenticated;
+    REVOKE ALL ON TABLE desk_lead_events FROM authenticated;
   END IF;
 END $$;
 `
@@ -196,6 +282,10 @@ export function toLeadRecord(run: Run, lead: Lead): LeadRecord {
     socialGrowth: lead.response?.socialGrowth,
     ragMatch: lead.rag?.checked ? lead.rag.match : undefined,
     ragNeighbor: lead.rag?.neighbor || undefined,
+    companyId: companyIdFor(lead),
+    version: lead.version,
+    lastScanAt: lead.lastScanAt || lead.signalsAt || lead.response?.computedAt,
+    lastScanSource: lead.lastScanSource,
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
   }
@@ -297,20 +387,89 @@ export async function pgGetRun(id: string): Promise<Run | null> {
   return rows[0]?.payload ?? null
 }
 
+function asLeadPayload(value: unknown): Lead | undefined {
+  if (!value || typeof value !== "object") return undefined
+  const row = value as Lead
+  return row.id && row.name ? row : undefined
+}
+
+function scanSourceOf(lead: Lead): ScanSource {
+  return lead.lastScanSource === "monitor" || lead.lastScanSource === "refresh" ? lead.lastScanSource : "run"
+}
+
+async function upsertCompany(
+  client: PoolClient,
+  lead: Lead,
+  scanAt: string | undefined,
+  source: ScanSource | null
+): Promise<string> {
+  const id = companyIdFor(lead)
+  const audit = leadAudit(lead)
+  await client.query(
+    `INSERT INTO ${DESK_COMPANIES_TABLE} (
+       id, domain, country, name, url, last_scan_at, last_scan_source,
+       last_icp, last_best_fit, last_fit, last_response_level, last_response_score, updated_at
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     ON CONFLICT (id) DO UPDATE SET
+       domain = EXCLUDED.domain,
+       country = EXCLUDED.country,
+       name = EXCLUDED.name,
+       url = EXCLUDED.url,
+       last_scan_at = COALESCE(EXCLUDED.last_scan_at, ${DESK_COMPANIES_TABLE}.last_scan_at),
+       last_scan_source = COALESCE(EXCLUDED.last_scan_source, ${DESK_COMPANIES_TABLE}.last_scan_source),
+       last_icp = EXCLUDED.last_icp,
+       last_best_fit = EXCLUDED.last_best_fit,
+       last_fit = EXCLUDED.last_fit,
+       last_response_level = EXCLUDED.last_response_level,
+       last_response_score = EXCLUDED.last_response_score,
+       updated_at = EXCLUDED.updated_at`,
+    [
+      id,
+      lead.domain || "",
+      lead.country || lead.market || "",
+      lead.name,
+      lead.url || "",
+      scanAt ?? null,
+      source,
+      audit.icp || null,
+      leadBestFit(lead) || null,
+      audit.fit || null,
+      audit.responseLevel || null,
+      audit.responseScore === "" ? null : audit.responseScore,
+      new Date().toISOString(),
+    ]
+  )
+  return id
+}
+
 export async function pgSaveRun(run: Run): Promise<void> {
   if (run.id === SAMPLE_RUN_ID || run.mode === "sample") return
   await ensureLeadSchema()
   await withTx(async (client) => {
+    const previousRun = await client.query<{ status: string; version: number }>(
+      `SELECT status, version FROM ${DESK_RUNS_TABLE} WHERE id = $1`,
+      [run.id]
+    )
+    const previousLeads = await client.query<{ id: string; version: number; payload: unknown }>(
+      `SELECT id, version, payload FROM ${DESK_LEADS_TABLE} WHERE run_id = $1`,
+      [run.id]
+    )
+    const previousById = new Map(previousLeads.rows.map((row) => [row.id, row]))
+    const priorStatus = previousRun.rows[0]?.status
+    const runVersion = (previousRun.rows[0]?.version ?? 0) + (priorStatus !== run.status ? 1 : 0)
+    const nextRunVersion = Math.max(1, priorStatus === undefined ? 1 : runVersion)
+
     await client.query(
-      `INSERT INTO ${DESK_RUNS_TABLE} (id, created_at, updated_at, mode, status, supplier, markets, payload)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+      `INSERT INTO ${DESK_RUNS_TABLE} (id, created_at, updated_at, mode, status, supplier, markets, payload, version)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
        ON CONFLICT (id) DO UPDATE SET
          updated_at = EXCLUDED.updated_at,
          mode = EXCLUDED.mode,
          status = EXCLUDED.status,
          supplier = EXCLUDED.supplier,
          markets = EXCLUDED.markets,
-         payload = EXCLUDED.payload`,
+         payload = EXCLUDED.payload,
+         version = EXCLUDED.version`,
       [
         run.id,
         run.createdAt,
@@ -320,8 +479,20 @@ export async function pgSaveRun(run: Run): Promise<void> {
         run.brief.supplierName,
         run.brief.markets,
         JSON.stringify(run),
+        nextRunVersion,
       ]
     )
+    if (priorStatus !== run.status) {
+      const reason =
+        priorStatus === undefined ? "created" : `status ${priorStatus} → ${run.status}`
+      await client.query(
+        `INSERT INTO ${DESK_RUN_VERSIONS_TABLE} (run_id, version, at, status, reason, payload)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+         ON CONFLICT (run_id, version) DO NOTHING`,
+        [run.id, nextRunVersion, run.updatedAt, run.status, reason, JSON.stringify(run)]
+      )
+    }
+
     const leads = run.leads ?? []
     const ids = leads.map((lead) => lead.id)
     if (ids.length === 0) {
@@ -333,15 +504,76 @@ export async function pgSaveRun(run: Run): Promise<void> {
       ])
     }
     for (const lead of leads) {
+      const source = scanSourceOf(lead)
+      const scanAt = lead.lastScanAt || lead.signalsAt || (!previousById.get(lead.id) ? run.updatedAt : undefined)
+      const companyScan = lead.lastScanSource || (!previousById.get(lead.id) ? "run" : null)
+      const companyId = await upsertCompany(client, lead, scanAt, companyScan)
+      const previous = previousById.get(lead.id)
+      const previousLead = asLeadPayload(previous?.payload)
+      const before = previousLead ? leadAudit(previousLead) : undefined
+      const after = leadAudit(lead)
+      const versioned = auditChanged(before, after)
+      const nextVersion = versioned ? (previous?.version ?? 0) + 1 : (previous?.version ?? 1)
+      if (versioned) {
+        lead.version = nextVersion
+        const reason = snapshotReason(before, after, source)
+        await client.query(
+          `INSERT INTO ${DESK_LEAD_VERSIONS_TABLE} (run_id, lead_id, version, company_id, at, reason, payload)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+           ON CONFLICT (run_id, lead_id, version) DO NOTHING`,
+          [run.id, lead.id, nextVersion, companyId, run.updatedAt, reason, JSON.stringify(lead)]
+        )
+        for (const event of memoryEvents(before, after, source)) {
+          await client.query(
+            `INSERT INTO ${DESK_LEAD_EVENTS_TABLE} (
+               id, company_id, run_id, lead_id, at, source, kind, summary, before_state, after_state
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb)`,
+            [
+              crypto.randomUUID(),
+              companyId,
+              run.id,
+              lead.id,
+              run.updatedAt,
+              event.source,
+              event.kind,
+              event.summary,
+              event.before ? JSON.stringify(event.before) : null,
+              event.after ? JSON.stringify(event.after) : null,
+            ]
+          )
+        }
+      } else if (source === "monitor" || source === "refresh") {
+        for (const event of memoryEvents(before, after, source)) {
+          if (event.kind !== "scan") continue
+          await client.query(
+            `INSERT INTO ${DESK_LEAD_EVENTS_TABLE} (
+               id, company_id, run_id, lead_id, at, source, kind, summary, before_state, after_state
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb)`,
+            [
+              crypto.randomUUID(),
+              companyId,
+              run.id,
+              lead.id,
+              scanAt || run.updatedAt,
+              event.source,
+              event.kind,
+              event.summary,
+              event.before ? JSON.stringify(event.before) : null,
+              event.after ? JSON.stringify(event.after) : null,
+            ]
+          )
+        }
+      }
       const row = toLeadRecord(run, lead)
       await client.query(
         `INSERT INTO ${DESK_LEADS_TABLE} (
            id, run_id, name, domain, url, country, market, seed, band, score, fit, fit_index, icp,
            email, phone, website, last_purchase, response_level, response_score, response_note,
-           signals_at, hiring, mix_change, social_growth, rag_match, rag_neighbor, payload, updated_at
+           signals_at, hiring, mix_change, social_growth, rag_match, rag_neighbor, payload, updated_at,
+           company_id, version, last_scan_at, last_scan_source
          ) VALUES (
            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-           $21, $22, $23, $24, $25, $26, $27::jsonb, $28
+           $21, $22, $23, $24, $25, $26, $27::jsonb, $28, $29, $30, $31, $32
          )
          ON CONFLICT (run_id, id) DO UPDATE SET
            name = EXCLUDED.name,
@@ -369,7 +601,11 @@ export async function pgSaveRun(run: Run): Promise<void> {
            rag_match = EXCLUDED.rag_match,
            rag_neighbor = EXCLUDED.rag_neighbor,
            payload = EXCLUDED.payload,
-           updated_at = EXCLUDED.updated_at`,
+           updated_at = EXCLUDED.updated_at,
+           company_id = EXCLUDED.company_id,
+           version = EXCLUDED.version,
+           last_scan_at = COALESCE(EXCLUDED.last_scan_at, ${DESK_LEADS_TABLE}.last_scan_at),
+           last_scan_source = COALESCE(EXCLUDED.last_scan_source, ${DESK_LEADS_TABLE}.last_scan_source)`,
         [
           row.id,
           row.runId,
@@ -399,6 +635,10 @@ export async function pgSaveRun(run: Run): Promise<void> {
           row.ragNeighbor ?? null,
           JSON.stringify(lead),
           row.updatedAt,
+          companyId,
+          nextVersion,
+          lead.lastScanAt ?? scanAt ?? null,
+          lead.lastScanSource ?? null,
         ]
       )
     }
@@ -437,6 +677,10 @@ type LeadSqlRow = {
   social_growth: boolean | null
   rag_match: boolean | null
   rag_neighbor: string | null
+  company_id: string | null
+  version: number | null
+  last_scan_at: Date | string | null
+  last_scan_source: LeadRecord["lastScanSource"] | null
   updated_at: Date | string
   supplier: string
   status: LeadRecord["status"]
@@ -454,6 +698,7 @@ export async function pgListLeadRecords(): Promise<LeadRecord[]> {
             l.band, l.score, l.fit, l.fit_index, l.icp, l.email, l.phone, l.website, l.last_purchase,
             l.response_level, l.response_score, l.response_note, l.signals_at,
             l.hiring, l.mix_change, l.social_growth, l.rag_match, l.rag_neighbor,
+            l.company_id, l.version, l.last_scan_at, l.last_scan_source,
             l.updated_at, r.supplier, r.status, r.created_at
      FROM ${DESK_LEADS_TABLE} l
      JOIN ${DESK_RUNS_TABLE} r ON r.id = l.run_id
@@ -488,8 +733,48 @@ export async function pgListLeadRecords(): Promise<LeadRecord[]> {
     socialGrowth: row.social_growth ?? undefined,
     ragMatch: row.rag_match ?? undefined,
     ragNeighbor: row.rag_neighbor || undefined,
+    companyId: row.company_id || undefined,
+    version: row.version ?? undefined,
+    lastScanAt: row.last_scan_at ? iso(row.last_scan_at) : undefined,
+    lastScanSource: row.last_scan_source || undefined,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
+  }))
+}
+
+export async function pgListLeadEvents(companyId: string, limit = 40): Promise<LeadMemoryEvent[]> {
+  if (!companyId.trim()) return []
+  await ensureLeadSchema()
+  const { rows } = await getPool().query<{
+    id: string
+    company_id: string
+    run_id: string | null
+    lead_id: string | null
+    at: Date | string
+    source: LeadMemoryEvent["source"]
+    kind: string
+    summary: string
+    before_state: Record<string, unknown> | null
+    after_state: Record<string, unknown> | null
+  }>(
+    `SELECT id, company_id, run_id, lead_id, at, source, kind, summary, before_state, after_state
+     FROM ${DESK_LEAD_EVENTS_TABLE}
+     WHERE company_id = $1
+     ORDER BY at DESC
+     LIMIT $2`,
+    [companyId, Math.min(80, Math.max(1, limit))]
+  )
+  return rows.map((row) => ({
+    id: row.id,
+    companyId: row.company_id,
+    runId: row.run_id || undefined,
+    leadId: row.lead_id || undefined,
+    at: iso(row.at),
+    source: row.source,
+    kind: row.kind,
+    summary: row.summary,
+    before: row.before_state || undefined,
+    after: row.after_state || undefined,
   }))
 }
 
@@ -504,7 +789,14 @@ function statusHint(url: string): Pick<DbStatus, "source" | "host" | "port" | "u
 export async function postgresStatus(): Promise<DbStatus> {
   const url = databaseUrl()
   const hint = statusHint(url)
-  const tables = [DESK_RUNS_TABLE, DESK_LEADS_TABLE]
+  const tables = [
+    DESK_RUNS_TABLE,
+    DESK_LEADS_TABLE,
+    DESK_COMPANIES_TABLE,
+    DESK_RUN_VERSIONS_TABLE,
+    DESK_LEAD_VERSIONS_TABLE,
+    DESK_LEAD_EVENTS_TABLE,
+  ]
   if (!postgresConfigured()) {
     return { postgres: false, leadCount: 0, runCount: 0, source: "none", tables, ...hint }
   }

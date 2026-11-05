@@ -269,7 +269,7 @@ function openaiEvidenceSection(brief: Brief, also?: Brief): string {
     .join("\n")
 }
 
-function openaiScopeSection(brief: Brief, also?: Brief, kind: "buyers" | "prompt" | "competitors" | "dump"): string {
+function openaiScopeSection(brief: Brief, also: Brief | undefined, kind: "buyers" | "prompt" | "competitors" | "dump"): string {
   const countries = targetCountries(brief)
   const markets = countries.length ? countries.join(", ") : brief.markets || "unpublished"
   const suppliers = also ? `${brief.supplierName} and ${also.supplierName}` : brief.supplierName

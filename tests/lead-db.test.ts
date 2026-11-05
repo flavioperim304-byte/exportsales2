@@ -2,7 +2,11 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { KANECHOM_BRIEF } from "../lib/example"
 import {
+  DESK_COMPANIES_TABLE,
+  DESK_LEAD_EVENTS_TABLE,
+  DESK_LEAD_VERSIONS_TABLE,
   DESK_LEADS_TABLE,
+  DESK_RUN_VERSIONS_TABLE,
   DESK_RUNS_TABLE,
   IGNORED_SUPABASE_TABLES,
   listLeadRecordsFromRuns,
@@ -113,11 +117,16 @@ test("toLeadRecord copies published contacts and never treats a dump seed as a p
   assert.equal(row.lastPurchase, undefined)
   assert.equal(row.ragMatch, false)
   assert.equal(row.ragNeighbor, "Another Distributor Ltd")
+  assert.equal(row.companyId, "d:casaandes.example|chile")
 })
 
 test("desk tables are new and old CRM names stay ignored", () => {
   assert.equal(DESK_RUNS_TABLE, "desk_runs")
   assert.equal(DESK_LEADS_TABLE, "desk_leads")
+  assert.equal(DESK_COMPANIES_TABLE, "desk_companies")
+  assert.equal(DESK_RUN_VERSIONS_TABLE, "desk_run_versions")
+  assert.equal(DESK_LEAD_VERSIONS_TABLE, "desk_lead_versions")
+  assert.equal(DESK_LEAD_EVENTS_TABLE, "desk_lead_events")
   assert.ok(IGNORED_SUPABASE_TABLES.includes("Leads"))
   assert.ok(IGNORED_SUPABASE_TABLES.includes("leads_master"))
   assert.ok(IGNORED_SUPABASE_TABLES.includes("tradeindata_novas_leads_import"))
