@@ -1,6 +1,5 @@
 import Link from "next/link"
 import { LeadsBoard } from "@/components/leads-board"
-import { MonitorPanel } from "@/components/monitor-panel"
 import { postgresStatus } from "@/lib/lead-db"
 import { listLeadRecords } from "@/lib/store"
 
