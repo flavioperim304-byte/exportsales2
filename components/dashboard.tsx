@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { CompetitorMap } from "@/components/competitor-map"
-import { WebhookLine } from "@/components/webhook-line"
 import { TradeLines } from "@/components/trade-volume"
 import { isHttpUrl, mailtoHref, telHref } from "@/lib/format"
 import { qualificationRows } from "@/lib/qualify"
@@ -98,18 +97,7 @@ export function Dashboard({
           </Link>
         </div>
       </div>
-
-      <p className="text-sm text-muted-foreground">
-        {sourcesReady} de 4 APIs conectadas. Postgres e as chaves ficam em{" "}
-        <Link href="/sources" className="underline-offset-2 hover:underline">
-          Fontes
-        </Link>
-        .
-      </p>
-      {refreshError ? <p className="text-sm text-destructive">{refreshError}</p> : null}
-      <WebhookLine />
-
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
+         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onClick={() => setFocusId("all")}
